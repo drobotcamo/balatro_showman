@@ -1,0 +1,737 @@
+{
+  "gameplay_screenshots\\11-19-2025-BU-01_000000.png": [
+    {
+      "bbox": {
+        "x": 469,
+        "y": 150,
+        "width": 38,
+        "height": 52
+      },
+      "category": "tag_images",
+      "name": "Negative Tag",
+      "confidence": 0.6088065505027771
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000004.png": [
+    {
+      "bbox": {
+        "x": 160,
+        "y": 25,
+        "width": 306,
+        "height": 304
+      },
+      "category": "planet_images",
+      "name": "Earth",
+      "confidence": 0.6559750437736511
+    },
+    {
+      "bbox": {
+        "x": 119,
+        "y": 23,
+        "width": 388,
+        "height": 311
+      },
+      "category": "planet_images",
+      "name": "Earth",
+      "confidence": 0.6553311347961426
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000005.png": [
+    {
+      "bbox": {
+        "x": 102,
+        "y": 0,
+        "width": 405,
+        "height": 334
+      },
+      "category": "planet_images",
+      "name": "Eris",
+      "confidence": 0.6270544528961182
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000007.png": [
+    {
+      "bbox": {
+        "x": 119,
+        "y": 23,
+        "width": 388,
+        "height": 311
+      },
+      "category": "planet_images",
+      "name": "Earth",
+      "confidence": 0.653261661529541
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000014.png": [
+    {
+      "bbox": {
+        "x": 160,
+        "y": 25,
+        "width": 306,
+        "height": 304
+      },
+      "category": "planet_images",
+      "name": "Earth",
+      "confidence": 0.6346039772033691
+    },
+    {
+      "bbox": {
+        "x": 119,
+        "y": 23,
+        "width": 386,
+        "height": 311
+      },
+      "category": "planet_images",
+      "name": "Earth",
+      "confidence": 0.6447100639343262
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000015.png": [
+    {
+      "bbox": {
+        "x": 119,
+        "y": 23,
+        "width": 384,
+        "height": 309
+      },
+      "category": "planet_images",
+      "name": "Earth",
+      "confidence": 0.6485210657119751
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000017.png": [
+    {
+      "bbox": {
+        "x": 285,
+        "y": 143,
+        "width": 56,
+        "height": 74
+      },
+      "category": "joker_images",
+      "name": "Astronomer",
+      "confidence": 0.6360062956809998
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000018.png": [
+    {
+      "bbox": {
+        "x": 526,
+        "y": 262,
+        "width": 54,
+        "height": 72
+      },
+      "category": "booster_images",
+      "name": "Celestial Normal 1",
+      "confidence": 0.6454209685325623
+    },
+    {
+      "bbox": {
+        "x": 23,
+        "y": 236,
+        "width": 43,
+        "height": 50
+      },
+      "category": "joker_images",
+      "name": "Reserved Parking",
+      "confidence": 0.6007875204086304
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000019.png": [
+    {
+      "bbox": {
+        "x": 526,
+        "y": 262,
+        "width": 54,
+        "height": 72
+      },
+      "category": "booster_images",
+      "name": "Celestial Normal 1",
+      "confidence": 0.6429346203804016
+    },
+    {
+      "bbox": {
+        "x": 23,
+        "y": 236,
+        "width": 43,
+        "height": 50
+      },
+      "category": "joker_images",
+      "name": "Reserved Parking",
+      "confidence": 0.6007875204086304
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000020.png": [
+    {
+      "bbox": {
+        "x": 526,
+        "y": 262,
+        "width": 54,
+        "height": 72
+      },
+      "category": "booster_images",
+      "name": "Celestial Normal 1",
+      "confidence": 0.6436523199081421
+    },
+    {
+      "bbox": {
+        "x": 23,
+        "y": 236,
+        "width": 43,
+        "height": 50
+      },
+      "category": "joker_images",
+      "name": "Reserved Parking",
+      "confidence": 0.6008005738258362
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000021.png": [
+    {
+      "bbox": {
+        "x": 526,
+        "y": 262,
+        "width": 62,
+        "height": 72
+      },
+      "category": "joker_images",
+      "name": "Seeing Double",
+      "confidence": 0.6588311195373535
+    },
+    {
+      "bbox": {
+        "x": 23,
+        "y": 236,
+        "width": 43,
+        "height": 50
+      },
+      "category": "joker_images",
+      "name": "Reserved Parking",
+      "confidence": 0.6008005738258362
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000022.png": [
+    {
+      "bbox": {
+        "x": 526,
+        "y": 262,
+        "width": 62,
+        "height": 72
+      },
+      "category": "joker_images",
+      "name": "Seeing Double",
+      "confidence": 0.6587202548980713
+    },
+    {
+      "bbox": {
+        "x": 23,
+        "y": 236,
+        "width": 43,
+        "height": 50
+      },
+      "category": "joker_images",
+      "name": "Reserved Parking",
+      "confidence": 0.6008005738258362
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000023.png": [
+    {
+      "bbox": {
+        "x": 526,
+        "y": 262,
+        "width": 62,
+        "height": 72
+      },
+      "category": "joker_images",
+      "name": "Seeing Double",
+      "confidence": 0.6587202548980713
+    },
+    {
+      "bbox": {
+        "x": 23,
+        "y": 236,
+        "width": 43,
+        "height": 50
+      },
+      "category": "joker_images",
+      "name": "Reserved Parking",
+      "confidence": 0.6008005738258362
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000024.png": [
+    {
+      "bbox": {
+        "x": 526,
+        "y": 262,
+        "width": 62,
+        "height": 73
+      },
+      "category": "joker_images",
+      "name": "Seeing Double",
+      "confidence": 0.6835712194442749
+    },
+    {
+      "bbox": {
+        "x": 23,
+        "y": 236,
+        "width": 43,
+        "height": 50
+      },
+      "category": "joker_images",
+      "name": "Reserved Parking",
+      "confidence": 0.6189568042755127
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000025.png": [
+    {
+      "bbox": {
+        "x": 521,
+        "y": 268,
+        "width": 54,
+        "height": 72
+      },
+      "category": "booster_images",
+      "name": "Celestial Normal 1",
+      "confidence": 0.6570142507553101
+    },
+    {
+      "bbox": {
+        "x": 525,
+        "y": 262,
+        "width": 54,
+        "height": 73
+      },
+      "category": "booster_images",
+      "name": "Celestial Normal 1",
+      "confidence": 0.6671700477600098
+    },
+    {
+      "bbox": {
+        "x": 23,
+        "y": 236,
+        "width": 43,
+        "height": 50
+      },
+      "category": "joker_images",
+      "name": "Reserved Parking",
+      "confidence": 0.6189568042755127
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000026.png": [
+    {
+      "bbox": {
+        "x": 116,
+        "y": 309,
+        "width": 41,
+        "height": 35
+      },
+      "category": "blind_images",
+      "name": "Big Blind",
+      "confidence": 0.6277483701705933
+    },
+    {
+      "bbox": {
+        "x": 519,
+        "y": 267,
+        "width": 56,
+        "height": 73
+      },
+      "category": "joker_images",
+      "name": "Seeing Double",
+      "confidence": 0.684920072555542
+    },
+    {
+      "bbox": {
+        "x": 525,
+        "y": 263,
+        "width": 54,
+        "height": 72
+      },
+      "category": "joker_images",
+      "name": "Seeing Double",
+      "confidence": 0.6320680379867554
+    },
+    {
+      "bbox": {
+        "x": 23,
+        "y": 236,
+        "width": 43,
+        "height": 50
+      },
+      "category": "joker_images",
+      "name": "Reserved Parking",
+      "confidence": 0.6954584121704102
+    },
+    {
+      "bbox": {
+        "x": 115,
+        "y": 234,
+        "width": 42,
+        "height": 34
+      },
+      "category": "blind_images",
+      "name": "Big Blind",
+      "confidence": 0.6327204704284668
+    },
+    {
+      "bbox": {
+        "x": 71,
+        "y": 234,
+        "width": 42,
+        "height": 34
+      },
+      "category": "blind_images",
+      "name": "Small Blind",
+      "confidence": 0.6383882761001587
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000027.png": [
+    {
+      "bbox": {
+        "x": 116,
+        "y": 309,
+        "width": 41,
+        "height": 35
+      },
+      "category": "blind_images",
+      "name": "Big Blind",
+      "confidence": 0.6277483701705933
+    },
+    {
+      "bbox": {
+        "x": 521,
+        "y": 268,
+        "width": 54,
+        "height": 72
+      },
+      "category": "joker_images",
+      "name": "Seeing Double",
+      "confidence": 0.671642541885376
+    },
+    {
+      "bbox": {
+        "x": 525,
+        "y": 263,
+        "width": 54,
+        "height": 72
+      },
+      "category": "joker_images",
+      "name": "Seeing Double",
+      "confidence": 0.6348510980606079
+    },
+    {
+      "bbox": {
+        "x": 23,
+        "y": 236,
+        "width": 43,
+        "height": 50
+      },
+      "category": "joker_images",
+      "name": "Reserved Parking",
+      "confidence": 0.6954584121704102
+    },
+    {
+      "bbox": {
+        "x": 115,
+        "y": 234,
+        "width": 42,
+        "height": 34
+      },
+      "category": "blind_images",
+      "name": "Big Blind",
+      "confidence": 0.6310504078865051
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000028.png": [
+    {
+      "bbox": {
+        "x": 116,
+        "y": 309,
+        "width": 41,
+        "height": 35
+      },
+      "category": "blind_images",
+      "name": "Big Blind",
+      "confidence": 0.6277483701705933
+    },
+    {
+      "bbox": {
+        "x": 521,
+        "y": 268,
+        "width": 54,
+        "height": 72
+      },
+      "category": "planet_images",
+      "name": "Ceres",
+      "confidence": 0.6763967275619507
+    },
+    {
+      "bbox": {
+        "x": 525,
+        "y": 263,
+        "width": 54,
+        "height": 72
+      },
+      "category": "planet_images",
+      "name": "Ceres",
+      "confidence": 0.6726911067962646
+    },
+    {
+      "bbox": {
+        "x": 23,
+        "y": 236,
+        "width": 43,
+        "height": 50
+      },
+      "category": "joker_images",
+      "name": "Reserved Parking",
+      "confidence": 0.6954584121704102
+    },
+    {
+      "bbox": {
+        "x": 115,
+        "y": 234,
+        "width": 42,
+        "height": 34
+      },
+      "category": "blind_images",
+      "name": "Big Blind",
+      "confidence": 0.6310504078865051
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000029.png": [
+    {
+      "bbox": {
+        "x": 116,
+        "y": 309,
+        "width": 41,
+        "height": 35
+      },
+      "category": "blind_images",
+      "name": "Big Blind",
+      "confidence": 0.6277483701705933
+    },
+    {
+      "bbox": {
+        "x": 521,
+        "y": 268,
+        "width": 54,
+        "height": 72
+      },
+      "category": "joker_images",
+      "name": "Seeing Double",
+      "confidence": 0.6612722873687744
+    },
+    {
+      "bbox": {
+        "x": 525,
+        "y": 263,
+        "width": 54,
+        "height": 72
+      },
+      "category": "joker_images",
+      "name": "Seeing Double",
+      "confidence": 0.6457476019859314
+    },
+    {
+      "bbox": {
+        "x": 23,
+        "y": 236,
+        "width": 43,
+        "height": 50
+      },
+      "category": "joker_images",
+      "name": "Reserved Parking",
+      "confidence": 0.6929426789283752
+    },
+    {
+      "bbox": {
+        "x": 115,
+        "y": 234,
+        "width": 42,
+        "height": 34
+      },
+      "category": "blind_images",
+      "name": "Big Blind",
+      "confidence": 0.6245986223220825
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000030.png": [
+    {
+      "bbox": {
+        "x": 116,
+        "y": 309,
+        "width": 41,
+        "height": 35
+      },
+      "category": "blind_images",
+      "name": "Big Blind",
+      "confidence": 0.6277483701705933
+    },
+    {
+      "bbox": {
+        "x": 521,
+        "y": 267,
+        "width": 54,
+        "height": 73
+      },
+      "category": "joker_images",
+      "name": "Seeing Double",
+      "confidence": 0.6393848657608032
+    },
+    {
+      "bbox": {
+        "x": 525,
+        "y": 263,
+        "width": 54,
+        "height": 72
+      },
+      "category": "joker_images",
+      "name": "Seeing Double",
+      "confidence": 0.6460939645767212
+    },
+    {
+      "bbox": {
+        "x": 23,
+        "y": 236,
+        "width": 43,
+        "height": 50
+      },
+      "category": "joker_images",
+      "name": "Reserved Parking",
+      "confidence": 0.6929426789283752
+    },
+    {
+      "bbox": {
+        "x": 115,
+        "y": 234,
+        "width": 42,
+        "height": 34
+      },
+      "category": "blind_images",
+      "name": "Big Blind",
+      "confidence": 0.6242374777793884
+    },
+    {
+      "bbox": {
+        "x": 377,
+        "y": 152,
+        "width": 56,
+        "height": 74
+      },
+      "category": "joker_images",
+      "name": "Riff-Raff",
+      "confidence": 0.6124981045722961
+    },
+    {
+      "bbox": {
+        "x": 251,
+        "y": 151,
+        "width": 55,
+        "height": 74
+      },
+      "category": "joker_images",
+      "name": "Juggler",
+      "confidence": 0.6713733673095703
+    }
+  ],
+  "gameplay_screenshots\\11-19-2025-BU-01_000031.png": [
+    {
+      "bbox": {
+        "x": 116,
+        "y": 309,
+        "width": 41,
+        "height": 35
+      },
+      "category": "blind_images",
+      "name": "Big Blind",
+      "confidence": 0.6277483701705933
+    },
+    {
+      "bbox": {
+        "x": 521,
+        "y": 267,
+        "width": 54,
+        "height": 73
+      },
+      "category": "joker_images",
+      "name": "Seeing Double",
+      "confidence": 0.63975989818573
+    },
+    {
+      "bbox": {
+        "x": 525,
+        "y": 263,
+        "width": 54,
+        "height": 72
+      },
+      "category": "joker_images",
+      "name": "Seeing Double",
+      "confidence": 0.6460283994674683
+    },
+    {
+      "bbox": {
+        "x": 23,
+        "y": 236,
+        "width": 43,
+        "height": 50
+      },
+      "category": "joker_images",
+      "name": "Reserved Parking",
+      "confidence": 0.6929426789283752
+    },
+    {
+      "bbox": {
+        "x": 115,
+        "y": 234,
+        "width": 42,
+        "height": 34
+      },
+      "category": "blind_images",
+      "name": "Big Blind",
+      "confidence": 0.6254956126213074
+    },
+    {
+      "bbox": {
+        "x": 197,
+        "y": 169,
+        "width": 51,
+        "height": 68
+      },
+      "category": "joker_images",
+      "name": "Wee Joker",
+      "confidence": 0.6194174289703369
+    },
+    {
+      "bbox": {
+        "x": 188,
+        "y": 152,
+        "width": 55,
+        "height": 73
+      },
+      "category": "joker_images",
+      "name": "Burnt Joker",
+      "confidence": 0.627102255821228
+    },
+    {
+      "bbox": {
+        "x": 251,
+        "y": 151,
+        "width": 55,
+        "height": 74
+      },
+      "category": "joker_images",
+      "name": "Stone Joker",
+      "confidence": 0.6338293552398682
+    },
+    {
+      "bbox": {
+        "x": 314,
+        "y": 150,
+        "width": 56,
+        "height": 87
+      },
+      "category": "joker_images",
+      "name": "Riff-Raff",
+      "confidence": 0.6434006094932556
+    }
+  ]
+}

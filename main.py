@@ -1,15 +1,20 @@
-import json
+from transformers import AutoImageProcessor, AutoModel
+from PIL import Image
+import torch
 
-names_to_img_urls = {}
+processor = AutoImageProcessor.from_pretrained("facebook/dinov2-small")
+model = AutoModel.from_pretrained("facebook/dinov2-small")
 
-with open("./jokers.txt", "r") as f:
-    line = f.readline()
-    while line:
-        segments = line.split('/')
-        print(segments[7])
-        name = segments[7]
-        names_to_img_urls[name[0:-4].replace('_', ' ')] = line[1:-3]
-        line = f.readline()
 
-with open("./joker_images.json", "w") as f:
-    json.dump(names_to_img_urls, f, indent=4)
+# Load an image (replace 'path_to_image.jpg' with your image path)
+image = Image.open("path_to_image.jpg")
+
+# Preprocess the image
+inputs = processor(images=image, return_tensors="pt")
+
+# Perform inference
+with torch.no_grad():
+    outputs = model(**inputs)
+
+# Example: Print the outputs (you may need to interpret them based on the model)
+print(outputs)
