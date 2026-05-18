@@ -1,3 +1,4 @@
-game_asset_images/*
-game_asset_urls/*
-gameplay_sources/*
+/game_asset_images/*
+/game_asset_urls/*
+/gameplay_sources/*
+/dataset/*
