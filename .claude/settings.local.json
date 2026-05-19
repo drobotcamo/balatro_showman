@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-CimInstance Win32_DiskDrive | Select-Object Model, @{N='Size_GB';E={[math]::Round\\($_.Size/1GB,0\\)}}, InterfaceType, FirmwareRevision)",
+      "PowerShell(Get-CimInstance Win32_PageFileUsage)",
+      "PowerShell(Get-WmiObject Win32_PageFileUsage)",
+      "PowerShell(wmic memorychip get capacity,speed,memorytype,manufacturer,partnumber 2>&1)",
+      "PowerShell(Get-Disk | Select-Object Number, FriendlyName, @{N='Size_GB';E={[math]::Round\\($_.Size/1GB,0\\)}}, BusType, HealthStatus, OperationalStatus)",
+      "PowerShell(Get-Process | Where-Object {$_.Name -notin @\\('svchost','System','Idle','Registry','smss','csrss','wininit','winlogon','lsass','fontdrvhost','dwm','spoolsv','WmiPrvSE','conhost','RuntimeBroker','dllhost','taskhostw','sihost','ctfmon','SearchHost','StartMenuExperienceHost','ShellExperienceHost','TextInputHost','SecurityHealthSysHost','MsMpEng','NisSrv','SgrmBroker','audiodg','WUDFHost','UserOOBEBroker'\\)} | Sort-Object WorkingSet64 -Descending | Select-Object Name, Id, @{N='RAM_MB';E={[math]::Round\\($_.WorkingSet64/1MB,1\\)}}, @{N='CPU_s';E={[math]::Round\\($_.CPU,1\\)}}, Path | Format-Table -AutoSize)",
+      "PowerShell($groups = Get-Process | Group-Object Name | ForEach-Object { [PSCustomObject]@{Name=$_.Name; Count=$_.Count; TotalMB=[math]::Round\\(\\($_.Group | Measure-Object WorkingSet64 -Sum\\).Sum/1MB,1\\)} } | Sort-Object TotalMB -Descending | Select-Object -First 20; $groups | Format-Table -AutoSize; $total = \\(Get-Process | Measure-Object WorkingSet64 -Sum\\).Sum / 1MB; Write-Output \"Total visible process RAM: $\\([math]::Round\\($total,0\\)\\) MB\")",
+      "PowerShell(Get-NetAdapter | Where-Object { $_.InterfaceDescription -match \"Wi-Fi|Wireless|802.11|WLAN\" } | Select-Object Name, InterfaceDescription, Status, LinkSpeed, DriverVersion, DriverDate, DriverFileName, MacAddress | Format-List)",
+      "PowerShell(Get-WmiObject Win32_NetworkAdapter | Where-Object { $_.AdapterType -match \"Ethernet 802.11\" -or $_.Description -match \"Wi-Fi|Wireless|802.11|WLAN\" } | Select-Object Name, Description, DeviceID, Manufacturer, ServiceName | Format-List)"
+    ]
+  }
+}
