@@ -1,4 +1,5 @@
 /game_asset_images/*
 /game_asset_urls/*
-/gameplay_sources/*
+/gameplay_sources/gameplay_footage
 /dataset/*
+/test_output/*

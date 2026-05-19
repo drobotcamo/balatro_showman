@@ -92,6 +92,8 @@ Once skip tags work, this same pattern (detector + test harness) becomes the reu
 ```text
 ./gameplay_sources
   /gameplay_footage        # mp4 files (YouTube footage, Gold Stake runs)
+  downloader.py            # yt-dlp wrapper: downloads YouTube footage at 1080p
+  video_parser.py          # interval-based frame extractor (util)
 ./game_asset_images        # PNGs of each game asset, organized by type
   /blind_images
   /booster_images
