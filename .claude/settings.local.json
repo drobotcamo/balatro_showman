@@ -60,10 +60,18 @@
       "WebFetch(domain:github.com)",
       "Bash(gh repo *)",
       "Bash(gh api *)",
-      "Bash(xargs -I {} curl -s {})"
+      "Bash(xargs -I {} curl -s {})",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(curl -s https://raw.githubusercontent.com/marco-costa-ml/balatro-policy-transformer/main/tensorize.py)",
+      "Bash(python -c \"import json,sys; r=json.load\\(sys.stdin\\); print\\('test metrics:', r.get\\('test_metrics', {}\\).get\\('top1'\\)\\); print\\('n_params:', r.get\\('n_params'\\)\\); print\\('n_actions:', r.get\\('n_actions'\\)\\); print\\('best_ckpt:', r.get\\('best_checkpoint'\\)\\); print\\('device:', r.get\\('device'\\)\\)\")",
+      "Bash(python -c \"import json,sys; r=json.load\\(sys.stdin\\); [print\\(k, len\\(v.get\\('video_ids',[]\\)\\), 'videos'\\) for k,v in r.get\\('splits',{}\\).items\\(\\)]\")",
+      "Read(//c/Users/camgr/Downloads/**)",
+      "Bash(mkdir -p \"c:/Users/camgr/Documents/code_projects/balatro_showman/vendor/balatro-cv-pipeline/external/runs/detect/train/weights\" && cp \"c:/Users/camgr/Downloads/model.pt\" \"c:/Users/camgr/Documents/code_projects/balatro_showman/vendor/balatro-cv-pipeline/external/runs/detect/train/weights/best.pt\" && echo \"copied\")"
     ],
     "additionalDirectories": [
-      "C:\\Users\\camgr\\.claude\\projects\\c--Users-camgr-Documents-code_projects-balatro_showman"
+      "C:\\Users\\camgr\\.claude\\projects\\c--Users-camgr-Documents-code_projects-balatro_showman",
+      "c:\\Users\\camgr\\Downloads"
     ]
   }
 }
