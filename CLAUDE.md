@@ -32,6 +32,28 @@ A tool that advises on shop decisions in Balatro at **Gold Stake** (hardest diff
   - `AssetName.json` — sidecar with `video_path`, `frame_idx`, `frame_w`, `frame_h`, `asset_type`, `asset_name`, `bbox_xyxy`
 - The sidecar JSON is what enables YOLO dataset building. **Crops without sidecars cannot be used for training.**
 
+**Keyboard shortcuts:**
+
+| Key | Action |
+| --- | ------ |
+| Draw + Enter | Confirm asset name and save crop |
+| R / S | Next frame |
+| W | Previous frame |
+| Tab / Shift+Tab | Cycle asset type forward/back |
+| 1–9 | Jump to asset type by number |
+| G | Focus name field |
+| Z / Ctrl+Z | Undo last save (or cancel pending confirm) |
+| X | Clear current selection |
+| E | Save (same as Enter) |
+| 0 / Home | Reset zoom to full frame |
+| Q | Quit |
+
+**Autocomplete** sources names from both `game_asset_images/` (wiki sprites) and existing sidecar JSONs in `recorded_gameplay_asset_images/`. Fuzzy match fires only above a 0.4 similarity threshold — below that the raw spoken/typed string is kept so the mismatch is visible.
+
+**Label index:** On startup, the tool builds a `(video_name, frame_idx) → count` index from all existing sidecars in the background. While labeling, the nav bar shows `[N labeled]` next to any frame that already has labels, so you know whether to skip it or add more.
+
+**`assets browse` undo:** Ctrl+Z restores the last deleted crop and its sidecar JSON from in-memory bytes. Closing the window discards the undo history.
+
 ### Decision Detection (deferred)
 Compare consecutive frames for inventory delta (item appears/disappears from shop). Comes after element detection is proven.
 
