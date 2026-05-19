@@ -15,12 +15,12 @@ A tool that advises on shop decisions in Balatro at **Gold Stake** (hardest diff
 - Training footage: YouTube, top/skilled players only. This keeps shop decisions high quality and makes in-round mistakes a non-issue.
 - Both wins and losses are valuable — wins validate full decision chains, losses are informative failures.
 
-### CV Strategy: YOLOv8 Object Detection
+### CV Strategy: YOLO11 Object Detection
 
 - **Template matching was abandoned.** Produced zero hits on small assets (stickers). Shop slot positions are not fixed enough for a two-pass (slot detect → classify) approach.
-- **Current approach:** Fine-tune YOLOv8n (`yolov8n.pt`) on footage-labeled bounding boxes. One unified model detects all asset types in a single pass per frame.
+- **Current approach:** Fine-tune YOLO11s (`yolo11s.pt`) on footage-labeled bounding boxes. One unified model detects all asset types in a single pass per frame.
 - **Class naming convention:** `type:name` (e.g. `joker:Strength`, `tarot:Death`, `sticker:Eternal`). Type-prefixed to prevent cross-type name collisions and make detections self-describing.
-- Training: freeze first 10 backbone layers (`freeze=10`), fine-tune from pretrained weights. Upgrade to `yolov8s.pt` if accuracy is insufficient after more data.
+- Training: freeze first 10 backbone layers (`freeze=10`), fine-tune from pretrained weights. Upgrade to `yolo11m.pt` if accuracy is insufficient after more data.
 
 ### Labeling Suite
 
@@ -76,7 +76,7 @@ python main.py download <url>                                   # download YouTu
 python main.py extract BU1 [--frame N]                         # labeling GUI
 python main.py dataset build [--output-dir dataset]            # build YOLO dataset from sidecars
 python main.py dataset synthetic [--output-dir dataset_synthetic]  # build synthetic dataset from wiki sprites
-python main.py train [--name balatro] [--epochs 100]           # train YOLOv8
+python main.py train [--name balatro] [--epochs 100]           # train YOLO11s
 python main.py models                                           # list trained models + mAP50
 python main.py models use balatro_synthetic                     # set active model
 python main.py detect BU1                                       # run detection (uses active model)
@@ -90,7 +90,7 @@ Tab completion: `echo 'eval "$(register-python-argcomplete main.py)"' >> ~/.bash
 ## Tech Stack
 
 - Python, OpenCV (cv2), Pillow
-- YOLOv8 (Ultralytics) + PyTorch — primary CV engine
+- YOLO11 (Ultralytics) + PyTorch — primary CV engine
 - `argcomplete` — CLI tab completion
 - `openai-whisper` + `sounddevice` — voice input in labeling tool
 - `pyyaml` — dataset YAML writing
@@ -103,14 +103,15 @@ Tab completion: `echo 'eval "$(register-python-argcomplete main.py)"' >> ~/.bash
 
 ## Model Selection
 
-YOLOv8 comes in a size ladder. Bigger = more parameters = more capacity = needs more data and more time to train:
+YOLO11 comes in a size ladder. Bigger = more parameters = more capacity = needs more data and more time to train:
 
 | Model | Params | When to use |
 |---|---|---|
-| `yolov8n.pt` | 3M | Default. Sparse data (<500 labeled frames), fast iteration, real-time inference |
-| `yolov8s.pt` | 11M | Step up when nano consistently confuses visually similar assets with good label coverage |
-| `yolov8m.pt` | 26M | Hundreds of labeled frames, accuracy is the priority over speed |
-| `yolov8l/x.pt` | 44M+ | Large dataset, maximum accuracy, offline use only |
+| `yolo11n.pt` | 2.6M | Fastest iteration, very sparse data |
+| `yolo11s.pt` | 9.4M | Default. Sparse data (<500 labeled frames), good balance of speed and accuracy |
+| `yolo11m.pt` | 20M | Step up when small confuses visually similar assets with good label coverage |
+| `yolo11l.pt` | 25M | Hundreds of labeled frames, accuracy is the priority over speed |
+| `yolo11x.pt` | 56M | Large dataset, maximum accuracy, offline use only |
 
 **Signal to upgrade:** if the trained model confuses visually similar assets (e.g. one joker for another) even after adding more labels, that's a capacity problem — increase model size. If it's missing detections entirely, that's a data problem — label more.
 

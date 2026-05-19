@@ -1,7 +1,7 @@
 """
 Trained model registry.
 
-Scans runs/detect/ for trained YOLOv8 runs and manages an active-model pointer
+Scans runs/detect/ for trained YOLO11 runs and manages an active-model pointer
 stored in .model at the project root.
 
 Usage:

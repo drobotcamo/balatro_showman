@@ -6,7 +6,7 @@ Balatro Showman — unified CLI entry point.
     python main.py download <url> [url ...]         download YouTube footage
     python main.py extract  <video|BU#> [options]   label assets in footage (GUI)
     python main.py dataset  build [options]         build YOLO dataset from labeled sidecars
-    python main.py train    [options]               train YOLOv8 on the built dataset
+    python main.py train    [options]               train YOLO11 on the built dataset
     python main.py models                           list trained models + mAP scores
     python main.py models   use <name>              set the active model for detect
     python main.py detect   <video|BU#> [options]   run YOLO asset detection
@@ -72,7 +72,7 @@ def main():
     _synth_args(p_synth)
 
     # ── train ─────────────────────────────────────────────────────────────────
-    p_train = sub.add_parser("train", help="Train YOLOv8 on the built dataset")
+    p_train = sub.add_parser("train", help="Train YOLO11 on the built dataset")
     from tools.train import _add_args as _train_args
     _train_args(p_train)
 

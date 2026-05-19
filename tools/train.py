@@ -1,8 +1,8 @@
 """
-Train a YOLOv8 detection model on the built dataset.
+Train a YOLO11 detection model on the built dataset.
 
 Usage:
-    python main.py train [--data dataset/dataset.yaml] [--base-model yolov8n.pt]
+    python main.py train [--data dataset/dataset.yaml] [--base-model yolo11s.pt]
                         [--epochs 100] [--imgsz 640] [--batch 16] [--name balatro]
 """
 
@@ -39,8 +39,8 @@ def run(args):
 def _add_args(parser):
     parser.add_argument("--data", default="dataset/dataset.yaml",
                         help="Path to dataset.yaml (default: dataset/dataset.yaml)")
-    parser.add_argument("--base-model", default="yolov8n.pt",
-                        help="Base YOLOv8 model to fine-tune (default: yolov8n.pt)")
+    parser.add_argument("--base-model", default="yolo11s.pt",
+                        help="Base YOLO11 model to fine-tune (default: yolo11s.pt)")
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--batch", type=int, default=16)
@@ -51,7 +51,7 @@ def _add_args(parser):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train YOLOv8 on the built dataset")
+    parser = argparse.ArgumentParser(description="Train YOLO11 on the built dataset")
     _add_args(parser)
     run(parser.parse_args())
 

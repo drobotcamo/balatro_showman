@@ -19,7 +19,7 @@ Tool that will make informed decisions in Balatro at the highest difficulty (Gol
 
 ## Precision: Important
 
-Accuracy of the tool requires near-100% recognition of gameplay elements. For this reason, detection uses a single unified YOLOv8 model that detects all asset types in one pass, with type-prefixed class names (`joker:Strength`, `tarot:Death`, etc.) to make detections self-describing.
+Accuracy of the tool requires near-100% recognition of gameplay elements. For this reason, detection uses a single unified YOLO11 model that detects all asset types in one pass, with type-prefixed class names (`joker:Strength`, `tarot:Death`, etc.) to make detections self-describing.
 
 Gameplay element categories (sorted by importance):
 
@@ -50,11 +50,11 @@ State transitions that need to be detected:
 
 **Phase 0 — Template Matching (abandoned):** Attempted first due to simplicity. Produced zero hits on small assets (stickers). Shop slot positions are not predictable enough for a fixed-slot approach. Superseded.
 
-**Phase 1 — YOLOv8 Object Detection (current):** Fine-tune YOLOv8n on footage-labeled bounding boxes. Handles variable asset positions, small assets, and occlusion without per-asset template management.
+**Phase 1 — YOLO11 Object Detection (current):** Fine-tune YOLO11s on footage-labeled bounding boxes. Handles variable asset positions, small assets, and occlusion without per-asset template management.
 
 - Class naming: `type:name` (e.g. `joker:Strength`, `sticker:Eternal`). Type-prefixed to prevent cross-type name collisions and make detections self-describing.
 - One unified model detects all asset types in a single pass per frame.
-- Base model: `yolov8n.pt` (nano). Upgrade to `yolov8s.pt` if accuracy is insufficient.
+- Base model: `yolo11s.pt`. Upgrade to `yolo11m.pt` if accuracy is insufficient.
 - Training: fine-tune from pretrained weights with `freeze=10` (backbone layers frozen).
 
 Decision detection (identifying *when* a decision was made by comparing consecutive frames for state delta) comes **after** element detection is proven.
@@ -69,7 +69,7 @@ python main.py extract <video>        # label assets in footage (GUI)
 python main.py dataset build          # reads all sidecars, extracts full frames from videos,
                                       # writes YOLO-format images/ + labels/ + dataset.yaml
 
-python main.py train                  # fine-tunes YOLOv8n on the built dataset
+python main.py train                  # fine-tunes YOLO11s on the built dataset
                                       # output: runs/detect/balatro/weights/best.pt
 
 python main.py detect <video>         # runs best.pt on sampled frames, saves annotated output
@@ -137,7 +137,7 @@ test_harness.py                  # detection test harness (detect subcommand)
 # Tech Stack
 
 - **Python** — primary language
-- **YOLOv8 (Ultralytics)** — object detection, fine-tuned from pretrained weights
+- **YOLO11s (Ultralytics)** — object detection, fine-tuned from pretrained weights
 - **PyTorch** — model training backbone
 - **OpenCV (cv2)** — frame extraction, image preprocessing, bounding box rendering
 - **Pillow** — image handling
