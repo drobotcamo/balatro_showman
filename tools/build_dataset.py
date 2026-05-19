@@ -25,6 +25,7 @@ import yaml
 from utils import progress
 
 RECORDED = Path("recorded_gameplay_asset_images")
+FOOTAGE_DIR = Path("gameplay_sources/gameplay_footage")
 
 
 def _load_sidecars():
@@ -40,6 +41,14 @@ def _load_sidecars():
 
 def _class_label(sidecar):
     return f"{sidecar['asset_type']}:{sidecar['asset_name']}"
+
+
+def _resolve_video_path(value: str) -> str:
+    """Accept either a bare filename ('foo.mp4') or a legacy absolute path."""
+    p = Path(value)
+    if p.is_absolute():
+        return str(p)
+    return str(FOOTAGE_DIR / p.name)
 
 
 def _frame_key(sidecar):
@@ -138,11 +147,12 @@ def run(args):
     caps: dict[str, cv2.VideoCapture] = {}
 
     def get_cap(video_path):
-        if video_path not in caps:
-            caps[video_path] = cv2.VideoCapture(video_path)
-            if not caps[video_path].isOpened():
-                print(f"  ERROR: cannot open video {video_path}")
-        return caps[video_path]
+        resolved = _resolve_video_path(video_path)
+        if resolved not in caps:
+            caps[resolved] = cv2.VideoCapture(resolved)
+            if not caps[resolved].isOpened():
+                print(f"  ERROR: cannot open video {resolved}")
+        return caps[resolved]
 
     n_written = 0
     n_skipped = 0

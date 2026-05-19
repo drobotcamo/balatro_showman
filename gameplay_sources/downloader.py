@@ -17,6 +17,7 @@ Skips if the file already exists (use --overwrite to force).
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -77,7 +78,13 @@ def _probe_video(path: Path, ffprobe: str) -> dict | None:
     return None
 
 
-def build_ydl_opts(ffmpeg_dir: str, node_path: str | None, overwrite: bool) -> dict:
+def _next_number(prefix: str) -> int:
+    pattern = re.compile(rf"{re.escape(prefix)}(\d+)\.mp4", re.IGNORECASE)
+    nums = [int(m.group(1)) for f in OUTPUT_DIR.glob(f"{prefix}*.mp4") if (m := pattern.fullmatch(f.name))]
+    return max(nums, default=0) + 1
+
+
+def build_ydl_opts(ffmpeg_dir: str, node_path: str | None, overwrite: bool, out_stem: str) -> dict:
     opts = {
         # Priority: 1080p mp4+audio → best ≤1080p mp4+audio → best ≤1080p (pre-merged)
         "format": (
@@ -85,7 +92,7 @@ def build_ydl_opts(ffmpeg_dir: str, node_path: str | None, overwrite: bool) -> d
             "/bestvideo[height<=1080][ext=mp4]+bestaudio"
             "/best[height<=1080]"
         ),
-        "outtmpl": str(OUTPUT_DIR / "%(title)s.%(ext)s"),
+        "outtmpl": str(OUTPUT_DIR / f"{out_stem}.%(ext)s"),
         "merge_output_format": "mp4",
         "ffmpeg_location": ffmpeg_dir,
         "noplaylist": True,
@@ -109,7 +116,7 @@ def _progress_hook(d: dict):
         print(f"\r  Done: {Path(d['filename']).name}")
 
 
-def download(urls: list, ffmpeg_path: str, node_path: str | None, overwrite: bool = False):
+def download(urls: list, ffmpeg_path: str, node_path: str | None, overwrite: bool = False, prefix: str = "BU"):
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     ffmpeg_dir = str(Path(ffmpeg_path).parent)
@@ -117,10 +124,20 @@ def download(urls: list, ffmpeg_path: str, node_path: str | None, overwrite: boo
     if not Path(ffprobe).exists():
         ffprobe = shutil.which("ffprobe") or ffprobe
 
-    opts = build_ydl_opts(ffmpeg_dir, node_path, overwrite)
+    next_n = _next_number(prefix)
 
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        for url in urls:
+    for url in urls:
+        out_stem = f"{prefix}{next_n}"
+        out_path = OUTPUT_DIR / f"{out_stem}.mp4"
+
+        if out_path.exists() and not overwrite:
+            print(f"\nSkipping {out_stem}: already exists")
+            _report_resolution(out_path, ffprobe)
+            next_n += 1
+            continue
+
+        opts = build_ydl_opts(ffmpeg_dir, node_path, overwrite, out_stem)
+        with yt_dlp.YoutubeDL(opts) as ydl:
             print(f"\nFetching info: {url}")
             try:
                 info = ydl.extract_info(url, download=False)
@@ -132,13 +149,7 @@ def download(urls: list, ffmpeg_path: str, node_path: str | None, overwrite: boo
             duration = info.get("duration", 0)
             print(f"  Title:    {title}")
             print(f"  Duration: {duration // 60}m {duration % 60}s")
-
-            out_path = Path(ydl.prepare_filename(info)).with_suffix(".mp4")
-            if out_path.exists() and not overwrite:
-                print(f"  Skipping: already exists -> {out_path.name}")
-                _report_resolution(out_path, ffprobe)
-                continue
-
+            print(f"  Saving as: {out_stem}.mp4")
             print("  Downloading...")
             try:
                 ydl.download([url])
@@ -148,6 +159,7 @@ def download(urls: list, ffmpeg_path: str, node_path: str | None, overwrite: boo
 
             if out_path.exists():
                 _report_resolution(out_path, ffprobe)
+                next_n += 1
             else:
                 print(f"  WARNING: expected output not found at {out_path}")
 
@@ -174,6 +186,12 @@ def list_formats(url: str, node_path: str | None):
 
 
 def run(args):
+    # Windows console may use a legacy codepage (e.g. cp1252) that can't encode
+    # non-ASCII video titles. Reconfigure to UTF-8 so yt-dlp output doesn't crash.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
+
     ffmpeg_path = _find_tool("ffmpeg", _FFMPEG_FALLBACKS)
     if not ffmpeg_path:
         print(
@@ -192,12 +210,14 @@ def run(args):
         list_formats(args.urls[0], node_path)
         return
 
-    download(args.urls, ffmpeg_path, node_path, args.overwrite)
+    download(args.urls, ffmpeg_path, node_path, args.overwrite, args.prefix)
 
 
 def _add_args(parser):
     parser.add_argument("urls", nargs="+", help="YouTube URLs to download")
     parser.add_argument("--overwrite", action="store_true", help="Re-download if file already exists")
+    parser.add_argument("--prefix", default="BU", metavar="PREFIX",
+                        help="Filename prefix for numbered output files (default: BU → BU27.mp4, BU28.mp4, ...)")
     parser.add_argument("--list-formats", action="store_true", dest="list_formats",
                         help="Show available formats for the first URL without downloading")
 

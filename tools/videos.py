@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 import sys
 
@@ -5,22 +6,26 @@ FOOTAGE_DIR = Path("gameplay_sources/gameplay_footage")
 
 
 def list_videos():
-    """Return {BU1: Path, BU2: Path, ...} sorted by mtime ascending (oldest = BU1)."""
-    files = sorted(FOOTAGE_DIR.glob("*.mp4"), key=lambda f: f.stat().st_mtime)
-    return {f"BU{i + 1}": f for i, f in enumerate(files)}
+    """Return {stem: Path} for all <prefix><N>.mp4 files, sorted by prefix then number."""
+    numbered = []
+    for f in FOOTAGE_DIR.glob("*.mp4"):
+        m = re.fullmatch(r"([A-Za-z]+)(\d+)\.mp4", f.name)
+        if m:
+            numbered.append((m.group(1).upper(), int(m.group(2)), f))
+    return {f.stem: f for _, _, f in sorted(numbered, key=lambda x: (x[0], x[1]))}
 
 
 def resolve_video(arg):
-    """Resolve BU1/BU2/etc. to a Path, or return Path(arg) unchanged."""
+    """Resolve a numbered alias (BU1, FOO3, etc.) to a Path, or return Path(arg) unchanged."""
+    videos = list_videos()
     upper = str(arg).upper()
-    if upper.startswith("BU") and upper[2:].isdigit():
-        videos = list_videos()
-        if upper not in videos:
-            available = ", ".join(videos) or "none"
-            sys.exit(f"error: '{arg}' not found. Available: {available}")
+    if upper in videos:
         path = videos[upper]
-        print(f"  {upper} → {path.name}")
+        print(f"  {upper} -> {path.name}")
         return path
+    if re.fullmatch(r"[A-Za-z]+\d+", arg):
+        available = ", ".join(videos) or "none"
+        sys.exit(f"error: '{arg}' not found. Available: {available}")
     return Path(arg)
 
 

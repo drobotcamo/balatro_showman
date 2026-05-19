@@ -11,6 +11,7 @@ from utils import progress
 
 from detectors.yolo_detector import YoloDetector
 from tools.assets import ASSET_TYPE_TO_DIR
+from tools.models import resolve_model
 
 COLORS = [
     (100, 100, 255),
@@ -40,8 +41,15 @@ def run(args):
     frames_dir = out_dir / "frames"
     frames_dir.mkdir(parents=True, exist_ok=True)
 
+    model_path = resolve_model(args.model)
+    if model_path is None:
+        print("No model specified and no active model set.")
+        print("Set one:  python main.py models use <name>")
+        print("Or pass:  python main.py detect <video> --model <name-or-path>")
+        sys.exit(1)
+
     try:
-        detector = YoloDetector(model_path=args.model, confidence=args.threshold)
+        detector = YoloDetector(model_path=model_path, confidence=args.confidence)
     except FileNotFoundError as e:
         print(e)
         sys.exit(1)
@@ -59,7 +67,7 @@ def run(args):
     n_sample = len(sample_indices)
 
     print(f"Video:   {video_path.name}  ({total_frames} frames @ {fps:.0f}fps)")
-    print(f"Model:   {args.model}")
+    print(f"Model:   {model_path}")
     print(f"Filter:  {args.asset_type or 'all types'}")
     print(f"Frames:  {n_sample} sampled")
     print(f"Output:  {out_dir}\n")
@@ -126,13 +134,13 @@ def main():
 def _add_args(parser):
     asset_types = list(ASSET_TYPE_TO_DIR.keys())
     parser.add_argument("video", help="Path to gameplay footage mp4 or BU alias")
-    parser.add_argument("--model", default="runs/detect/balatro/weights/best.pt",
-                        help="Path to trained YOLO .pt model")
+    parser.add_argument("--model", default="",
+                        help="Model run name or .pt path (default: active model set via 'models use')")
     parser.add_argument("--asset-type", default=None, choices=asset_types,
                         help="Filter detections to one asset type (default: show all)")
     parser.add_argument("--n-frames", type=int, default=25,
                         help="Number of frames to sample (default: 25)")
-    parser.add_argument("--threshold", type=float, default=0.25,
+    parser.add_argument("--confidence", type=float, default=0.25,
                         help="Detection confidence threshold (default: 0.25)")
     parser.add_argument("--frames", type=int, nargs="+", metavar="N",
                         help="Specific frame indices instead of random sampling")
@@ -140,7 +148,7 @@ def _add_args(parser):
                         help="Save every sampled frame, not just hits")
     parser.add_argument("--debug", action="store_true",
                         help="Print detections per frame to stdout")
-    parser.add_argument("--output-dir", default="test_output")
+    parser.add_argument("--output-dir", default="detect_output")
     parser.add_argument("--seed", type=int, default=42)
 
 

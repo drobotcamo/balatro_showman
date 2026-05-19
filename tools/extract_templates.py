@@ -1,6 +1,7 @@
 import argparse
 import difflib
 import json
+import random
 import threading
 import tkinter as tk
 from tkinter import ttk
@@ -15,39 +16,18 @@ try:
 except ImportError:
     AUDIO_AVAILABLE = False
 
+from tools.assets import ASSET_TYPE_TO_DIR
+from tools.videos import list_videos, resolve_video
+
 OUTPUT_ROOT = Path("recorded_gameplay_asset_images")
 GAME_ASSET_IMAGES = Path("game_asset_images")
 MAX_DISPLAY = (1280, 720)
 SAMPLE_RATE = 16000
 
-ASSET_TYPE_TO_DIR = {
-    "tags":      "tag_images",
-    "jokers":    "joker_images",
-    "boosters":  "booster_images",
-    "blinds":    "blind_images",
-    "vouchers":  "voucher_images",
-    "tarots":    "tarot_images",
-    "planets":   "planet_images",
-    "spectrals": "spectral_images",
-    "modifiers": "modifier_images",
-    "stakes":    "stake_images",
-    "stickers":  "sticker_images",
-    "ui":        None,
-}
 ASSET_TYPES = list(ASSET_TYPE_TO_DIR.keys())
-
-NAV_KEYS = {
-    ",": -1, ".": 1,
-    "j": -500, "l": 500,
-    "u": -1000, "o": 1000,
-    "y": -5000, "p": 5000,
-    "a": -5000, "d": 5000,
-    "A": -500, "D": 500,   # Shift+a / Shift+d
-}
 
 
 def _best_match(raw, names):
-    """Return the closest name from names to raw, or raw itself if names is empty."""
     if not names:
         return raw
     scored = [(difflib.SequenceMatcher(None, raw.lower(), n.lower()).ratio(), n) for n in names]
@@ -64,58 +44,93 @@ def _names_for_type(asset_type):
     return sorted(p.stem.replace("_", " ") for p in asset_dir.glob("*.png"))
 
 
-class TemplateExtractor:
-    def __init__(self, video_path, start_frame=0, whisper_model_name="base"):
-        self.cap = cv2.VideoCapture(str(video_path))
-        self.video_path = Path(video_path).resolve()
-        self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        self.fps = self.cap.get(cv2.CAP_PROP_FPS)
-        self.frame_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        self.frame_h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        self.frame = None
-        self.frame_idx = start_frame
+def _build_pool(video_paths, pool_size):
+    """Return a shuffled list of (Path, frame_idx) sampled proportionally across all videos."""
+    entries = []
+    for vp in video_paths:
+        cap = cv2.VideoCapture(str(vp))
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        cap.release()
+        if total > 0:
+            entries.append((Path(vp), total))
 
-        # View region in native pixel coords [x1, y1, x2, y2]
+    if not entries:
+        return []
+
+    total_all = sum(t for _, t in entries)
+    pool = []
+    for vp, total in entries:
+        count = max(1, round(pool_size * total / total_all))
+        idxs = random.sample(range(total), min(count, total))
+        pool.extend((vp, idx) for idx in idxs)
+
+    random.shuffle(pool)
+    return pool[:pool_size]
+
+
+class TemplateExtractor:
+    def __init__(self, video_paths, pool_size=300, video_aliases=None, whisper_model_name="base"):
+        self.pool = _build_pool(video_paths, pool_size)
+        if not self.pool:
+            print("No valid video frames found.")
+            return
+
+        self.video_aliases = video_aliases or {}  # str(resolved_path) -> "BU1" etc.
+        self.pool_idx = 0
+        self._caps = {}  # str(video_path) -> cv2.VideoCapture
+
+        # Current frame state (populated by _load_pool_frame)
+        self.video_path = None
+        self.frame = None
+        self.frame_idx = 0
+        self.frame_w = 1920
+        self.frame_h = 1080
+        self.fps = 30.0
+        self.total_frames = 0
+
         self.view = [0.0, 0.0, float(self.frame_w), float(self.frame_h)]
         self.canvas_w = MAX_DISPLAY[0]
         self.canvas_h = MAX_DISPLAY[1]
 
-        # Selection (native coords)
         self.sel_start_canvas = None
         self.sel_native = None
         self.rect_id = None
         self.pan_start = None
         self.saved_files = []
+        self.session_count = 0
+        self._confirm_pending = False
 
-        # Audio
         self.whisper_model = None
         self.recording = False
         self.audio_chunks = []
         self.audio_thread = None
 
         self._build_ui()
-        self._load_frame(start_frame)
+        self._load_pool_frame(0)
         threading.Thread(target=self._load_whisper, args=(whisper_model_name,), daemon=True).start()
         self.root.mainloop()
+
+        for cap in self._caps.values():
+            cap.release()
 
     # ── Whisper ───────────────────────────────────────────────────────────────
 
     def _load_whisper(self, model_name):
         try:
             import whisper
-            self.root.after(0, lambda: self.status_var.set("Loading Whisper…"))
+            self.root.after(0, lambda: self.status_var.set("Loading Whisper..."))
             self.whisper_model = whisper.load_model(model_name)
-            self.root.after(0, lambda: self.status_var.set("Ready — draw a box to begin"))
-        except Exception as e:
-            self.root.after(0, lambda: self.status_var.set(f"Whisper unavailable ({e}) — type names manually"))
+            self.root.after(0, lambda: self.status_var.set("Ready -- draw a box to begin"))
+        except Exception:
+            self.root.after(0, lambda: self.status_var.set("Whisper unavailable -- type names manually"))
 
     def _start_listening(self):
         if not AUDIO_AVAILABLE or self.whisper_model is None:
-            self.status_var.set("Box drawn — type name and press Enter")
+            self.status_var.set("Box drawn -- type name and press Enter / E")
             return
         self.audio_chunks = []
         self.recording = True
-        self.status_var.set("🎤  Listening…   speak the asset name, then press Enter")
+        self.status_var.set("Listening...  speak the asset name, then press Enter")
         self.audio_thread = threading.Thread(target=self._record_audio, daemon=True)
         self.audio_thread.start()
 
@@ -131,7 +146,7 @@ class TemplateExtractor:
             self.audio_thread.join(timeout=2.0)
         if not self.audio_chunks or self.whisper_model is None:
             return ""
-        self.status_var.set("Transcribing…")
+        self.status_var.set("Transcribing...")
         self.root.update()
         audio = np.concatenate(self.audio_chunks).flatten()
         result = self.whisper_model.transcribe(audio, fp16=False, language="en")
@@ -141,28 +156,42 @@ class TemplateExtractor:
 
     def _build_ui(self):
         self.root = tk.Tk()
-        self.root.title("Template Extractor")
+        self.root.title("Balatro Labeler")
 
-        for key, delta in NAV_KEYS.items():
-            self.root.bind(f"<KeyPress-{key}>", lambda e, d=delta: self._nav_key(d))
+        # Navigation keys (guarded -- inactive when focus is in a text field)
+        self.root.bind("<KeyPress-r>", lambda e: self._key_guard(self._next_frame))
+        self.root.bind("<KeyPress-s>", lambda e: self._key_guard(self._next_frame))
+        self.root.bind("<KeyPress-w>", lambda e: self._key_guard(self._prev_frame))
+        self.root.bind("<KeyPress-z>", lambda e: self._key_guard(self._undo))
+        self.root.bind("<KeyPress-x>", lambda e: self._key_guard(self._clear_selection))
+        self.root.bind("<KeyPress-g>", lambda e: self._key_guard(self._focus_name))
+        self.root.bind("<KeyPress-q>", lambda e: self._key_guard(self.root.destroy))
+        self.root.bind("<KeyPress-e>", lambda e: self._key_guard(self._save_crop))
         self.root.bind("<Return>", self._save_crop)
         self.root.bind("<Control-z>", lambda e: self._undo())
-        self.root.bind("<KeyPress-e>", lambda e: self._nav_key_action(self._save_crop))
-        self.root.bind("<Tab>", lambda e: (self._cycle_asset_type(1), "break")[-1])
-        self.root.bind("<Shift-Tab>", lambda e: (self._cycle_asset_type(-1), "break")[-1])
+        self.root.bind("<Tab>", self._on_tab)
+        self.root.bind("<Shift-Tab>", self._on_shift_tab)
 
-        # Top bar
+        # Number keys 1-9 select asset type
+        for i, atype in enumerate(ASSET_TYPES[:9], 1):
+            self.root.bind(f"<KeyPress-{i}>",
+                           lambda e, t=atype: self._key_guard(lambda: self._set_asset_type(t)))
+
+        # ── Top bar ───────────────────────────────────────────────────────────
         top = tk.Frame(self.root)
         top.pack(fill=tk.X, padx=8, pady=4)
 
-        tk.Label(top, text="Asset type:").pack(side=tk.LEFT)
+        tk.Label(top, text="Type [Tab]:").pack(side=tk.LEFT)
         self.asset_type = tk.StringVar(value=ASSET_TYPES[0])
         type_combo = ttk.Combobox(top, textvariable=self.asset_type, values=ASSET_TYPES,
                                   width=12, state="readonly")
         type_combo.pack(side=tk.LEFT, padx=4)
         type_combo.bind("<<ComboboxSelected>>", self._on_asset_type_change)
 
-        tk.Label(top, text="Name:").pack(side=tk.LEFT, padx=(12, 0))
+        hints = "  ".join(f"{i}:{t[:3]}" for i, t in enumerate(ASSET_TYPES[:9], 1))
+        tk.Label(top, text=hints, fg="gray", font=("Courier", 8)).pack(side=tk.LEFT, padx=6)
+
+        tk.Label(top, text="  Name [G]:").pack(side=tk.LEFT, padx=(8, 0))
         self.name_var = tk.StringVar()
         self._all_names = _names_for_type(ASSET_TYPES[0])
         self.name_combo = ttk.Combobox(top, textvariable=self.name_var,
@@ -171,12 +200,12 @@ class TemplateExtractor:
         self.name_combo.bind("<KeyRelease>", self._on_name_key)
         self.name_combo.bind("<Return>", self._save_crop)
 
-        tk.Button(top, text="Save  [Enter]", command=self._save_crop).pack(side=tk.LEFT, padx=8)
+        tk.Button(top, text="Save [E/Enter]", command=self._save_crop).pack(side=tk.LEFT, padx=8)
 
-        self.status_var = tk.StringVar(value="Loading Whisper…")
-        tk.Label(top, textvariable=self.status_var, fg="green", width=52, anchor="w").pack(side=tk.LEFT)
+        self.status_var = tk.StringVar(value="Loading Whisper...")
+        tk.Label(top, textvariable=self.status_var, fg="green", width=50, anchor="w").pack(side=tk.LEFT)
 
-        # Canvas
+        # ── Canvas ────────────────────────────────────────────────────────────
         self.canvas = tk.Canvas(self.root, cursor="crosshair", bg="black")
         self.canvas.pack(fill=tk.BOTH, expand=True)
         self.canvas.bind("<ButtonPress-1>", self._on_press)
@@ -189,47 +218,72 @@ class TemplateExtractor:
         self.canvas.bind("<Button-4>", self._on_scroll)
         self.canvas.bind("<Button-5>", self._on_scroll)
 
-        # Nav bar
+        # ── Nav / info bar ────────────────────────────────────────────────────
         nav = tk.Frame(self.root)
         nav.pack(fill=tk.X, padx=8, pady=4)
 
-        for label, delta, key in [("<< 5k", -5000, "y"), ("< 1k", -1000, "u"),
-                                   ("< 500", -500, "j"), ("< 1", -1, ",")]:
-            tk.Button(nav, text=f"{label}  [{key}]", width=10,
-                      command=lambda d=delta: self._step_frame(d)).pack(side=tk.LEFT, padx=2)
+        tk.Button(nav, text="[W] Back", width=9,
+                  command=self._prev_frame).pack(side=tk.LEFT, padx=2)
 
-        tk.Label(nav, text="  Frame:").pack(side=tk.LEFT)
-        self.frame_var = tk.StringVar()
-        fe = tk.Entry(nav, textvariable=self.frame_var, width=8)
-        fe.pack(side=tk.LEFT, padx=2)
-        fe.bind("<Return>", self._jump_to_frame)
-        tk.Button(nav, text="Go", command=self._jump_to_frame).pack(side=tk.LEFT)
-        self.frame_info = tk.StringVar()
-        tk.Label(nav, textvariable=self.frame_info, width=20, anchor="w").pack(side=tk.LEFT, padx=4)
+        self.pool_label = tk.StringVar(value="0 / 0")
+        tk.Label(nav, textvariable=self.pool_label, width=12, anchor="center",
+                 relief="sunken", padx=4).pack(side=tk.LEFT, padx=4)
 
-        for label, delta, key in [("1 >", 1, "."), ("500 >", 500, "l"),
-                                   ("1k >", 1000, "o"), ("5k >>", 5000, "p")]:
-            tk.Button(nav, text=f"[{key}]  {label}", width=10,
-                      command=lambda d=delta: self._step_frame(d)).pack(side=tk.LEFT, padx=2)
+        tk.Button(nav, text="[R/S] Next", width=9,
+                  command=self._next_frame).pack(side=tk.LEFT, padx=2)
 
-        tk.Label(nav, text="   scroll=zoom   right-drag=pan", fg="gray").pack(side=tk.LEFT, padx=8)
+        tk.Label(nav, text="  ").pack(side=tk.LEFT)
+
+        self.frame_label = tk.StringVar(value="")
+        tk.Label(nav, textvariable=self.frame_label, width=36, anchor="w").pack(side=tk.LEFT)
+
+        self.save_label = tk.StringVar(value="")
+        tk.Label(nav, textvariable=self.save_label, fg="gray", anchor="w").pack(side=tk.LEFT, padx=12)
+
+        self.count_label = tk.StringVar(value="Session: 0 labels")
+        tk.Label(nav, textvariable=self.count_label, fg="blue", anchor="e").pack(side=tk.RIGHT, padx=8)
 
     # ── Frame loading & rendering ─────────────────────────────────────────────
 
-    def _load_frame(self, idx):
-        idx = max(0, min(idx, self.total_frames - 1))
-        self.frame_idx = idx
-        self.cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-        ret, frame = self.cap.read()
-        if not ret:
+    def _load_pool_frame(self, pool_idx):
+        if pool_idx < 0 or pool_idx >= len(self.pool):
             return
+        self.pool_idx = pool_idx
+        video_path, frame_idx = self.pool[pool_idx]
+
+        key = str(video_path)
+        if key not in self._caps:
+            self._caps[key] = cv2.VideoCapture(key)
+        cap = self._caps[key]
+
+        self.video_path = video_path
+        self.frame_idx = frame_idx
+        self.frame_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        self.frame_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+        self.total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+        ret, frame = cap.read()
+        if not ret:
+            if pool_idx + 1 < len(self.pool):
+                self._load_pool_frame(pool_idx + 1)
+            return
+
         self.frame = frame
         self.view = [0.0, 0.0, float(self.frame_w), float(self.frame_h)]
         self._clear_selection()
         self._redraw()
-        ts = idx / self.fps
-        self.frame_var.set(str(idx))
-        self.frame_info.set(f"/ {self.total_frames - 1}   ({ts:.1f}s)")
+        self._update_info()
+
+    def _update_info(self):
+        self.pool_label.set(f"{self.pool_idx + 1} / {len(self.pool)}")
+        alias = self.video_aliases.get(str(self.video_path.resolve()),
+                                       self.video_path.stem[:14])
+        ts = self.frame_idx / self.fps
+        self.frame_label.set(f"{alias}   frame {self.frame_idx:,}   ({ts:.1f}s)")
+        out_dir = OUTPUT_ROOT / self.asset_type.get()
+        self.save_label.set(f"-> {out_dir}")
 
     def _redraw(self):
         if self.frame is None:
@@ -273,6 +327,7 @@ class TemplateExtractor:
         self.sel_native = None
         self.recording = False
         self.audio_chunks = []
+        self._confirm_pending = False
         if self.rect_id:
             self.canvas.delete(self.rect_id)
             self.rect_id = None
@@ -356,7 +411,6 @@ class TemplateExtractor:
             self.status_var.set("Draw a selection first.")
             return
 
-        # Transcribe voice if no name typed yet
         if (self.recording or self.audio_chunks) and not self.name_var.get().strip():
             spoken = self._transcribe()
             if spoken:
@@ -364,12 +418,23 @@ class TemplateExtractor:
 
         raw = self.name_var.get().strip()
         if not raw:
-            self.status_var.set("No name — speak or type one, then press Enter.")
+            self.status_var.set("No name -- speak or type one, then press Enter.")
             return
 
         name = _best_match(raw, self._all_names)
-        if name != raw:
+
+        # First Enter: show matched name as confirmation, wait for second Enter
+        if not self._confirm_pending:
             self.name_var.set(name)
+            if name != raw:
+                self.status_var.set(f"Matched: {name}   -- press Enter again to save")
+            else:
+                self.status_var.set(f"Confirm: {name}   -- press Enter again to save")
+            self._confirm_pending = True
+            return
+
+        # Second Enter: commit
+        self._confirm_pending = False
 
         x0, y0, x1, y1 = self.sel_native
         crop = self.frame[y0:y1, x0:x1]
@@ -387,7 +452,7 @@ class TemplateExtractor:
             n += 1
         cv2.imwrite(str(out_path), crop)
         out_path.with_suffix(".json").write_text(json.dumps({
-            "video_path": str(self.video_path),
+            "video_path": self.video_path.name,
             "frame_idx":  self.frame_idx,
             "frame_w":    self.frame_w,
             "frame_h":    self.frame_h,
@@ -396,53 +461,67 @@ class TemplateExtractor:
             "bbox_xyxy":  [x0, y0, x1, y1],
         }, indent=2))
         self.saved_files.append(out_path)
+        self.session_count += 1
+        self.count_label.set(f"Session: {self.session_count} labels")
 
-        matched_note = f"  (matched from '{raw}')" if name != raw else ""
-        self.status_var.set(f"Saved → {out_path.name}{matched_note}   |   draw next box")
+        matched = f"  (matched '{raw}')" if name != raw else ""
+        self.status_var.set(f"Saved {out_path.name}{matched}   -- draw next box or [R] next frame")
         self.name_var.set("")
         self._clear_selection()
+        self.root.focus_set()
 
     # ── Navigation ────────────────────────────────────────────────────────────
 
-    def _nav_key(self, delta):
-        if isinstance(self.root.focus_get(), (tk.Entry, ttk.Combobox)):
-            return
-        self._step_frame(delta)
-
-    def _nav_key_action(self, fn):
+    def _key_guard(self, fn):
         if isinstance(self.root.focus_get(), (tk.Entry, ttk.Combobox)):
             return
         fn()
+
+    def _on_tab(self, e):
+        if isinstance(self.root.focus_get(), (tk.Entry, ttk.Combobox)):
+            return
+        self._cycle_asset_type(1)
+        return "break"
+
+    def _on_shift_tab(self, e):
+        if isinstance(self.root.focus_get(), (tk.Entry, ttk.Combobox)):
+            return
+        self._cycle_asset_type(-1)
+        return "break"
+
+    def _next_frame(self):
+        self._load_pool_frame(self.pool_idx + 1)
+
+    def _prev_frame(self):
+        self._load_pool_frame(self.pool_idx - 1)
+
+    def _focus_name(self):
+        self.name_combo.focus_set()
 
     def _undo(self):
         if not self.saved_files:
             self.status_var.set("Nothing to undo.")
             return
         path = self.saved_files.pop()
+        self.session_count = max(0, self.session_count - 1)
+        self.count_label.set(f"Session: {self.session_count} labels")
         try:
             path.unlink()
             sidecar = path.with_suffix(".json")
             if sidecar.exists():
                 sidecar.unlink()
-            self.status_var.set(f"Undone — deleted {path.name}")
+            self.status_var.set(f"Undone -- deleted {path.name}")
         except FileNotFoundError:
             self.status_var.set(f"Undo: {path.name} already gone")
 
     def _cycle_asset_type(self, direction):
-        if isinstance(self.root.focus_get(), (tk.Entry, ttk.Combobox)):
-            return
         idx = (ASSET_TYPES.index(self.asset_type.get()) + direction) % len(ASSET_TYPES)
         self.asset_type.set(ASSET_TYPES[idx])
         self._on_asset_type_change()
 
-    def _step_frame(self, delta):
-        self._load_frame(self.frame_idx + delta)
-
-    def _jump_to_frame(self, _=None):
-        try:
-            self._load_frame(int(self.frame_var.get()))
-        except ValueError:
-            pass
+    def _set_asset_type(self, atype):
+        self.asset_type.set(atype)
+        self._on_asset_type_change()
 
     # ── Autocomplete ──────────────────────────────────────────────────────────
 
@@ -450,8 +529,10 @@ class TemplateExtractor:
         self._all_names = _names_for_type(self.asset_type.get())
         self.name_combo["values"] = self._all_names
         self.name_var.set("")
+        self._update_info()
 
     def _on_name_key(self, _=None):
+        self._confirm_pending = False
         typed = self.name_var.get().lower()
         self.name_combo["values"] = (
             [n for n in self._all_names if typed in n.lower()] if typed else self._all_names
@@ -459,19 +540,49 @@ class TemplateExtractor:
 
 
 def run(args):
-    TemplateExtractor(Path(args.video), start_frame=args.frame,
+    videos = list_videos()
+    if not videos:
+        print("No footage found in gameplay_sources/gameplay_footage/")
+        return
+
+    if args.videos:
+        selected = {}
+        for v in args.videos:
+            path = resolve_video(v)
+            alias = next((k for k, p in videos.items() if p.resolve() == path.resolve()), path.stem)
+            selected[str(path.resolve())] = alias
+    else:
+        selected = {str(p.resolve()): alias for alias, p in videos.items()}
+
+    if not selected:
+        print("No matching videos found.")
+        return
+
+    print(f"Sampling from {len(selected)} video(s): {', '.join(selected.values())}")
+    print(f"Pool: {args.pool_size} random frames")
+    print(f"Saving labels to: {OUTPUT_ROOT.resolve()}\n")
+
+    missing = [t for t, d in ASSET_TYPE_TO_DIR.items() if d and not (GAME_ASSET_IMAGES / d).exists()]
+    if missing:
+        print(f"Warning: game_asset_images/ subdirs missing for: {', '.join(missing)}")
+
+    video_paths = [Path(p) for p in selected]
+    TemplateExtractor(video_paths, pool_size=args.pool_size,
+                      video_aliases=selected,
                       whisper_model_name=args.whisper_model)
 
 
 def _add_args(parser):
-    parser.add_argument("video", help="Path to gameplay footage mp4")
-    parser.add_argument("--frame", type=int, default=0, help="Starting frame index (default 0)")
+    parser.add_argument("videos", nargs="*",
+                        help="Videos to sample from (BU aliases or paths). Omit to use all available.")
+    parser.add_argument("--pool-size", type=int, default=300,
+                        help="Number of random frames to pre-sample (default: 300)")
     parser.add_argument("--whisper-model", default="base",
-                        help="Whisper model size: tiny/base/small (default base)")
+                        help="Whisper model size: tiny/base/small (default: base)")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Extract template crops from gameplay footage")
+    parser = argparse.ArgumentParser(description="Label asset crops from gameplay footage")
     _add_args(parser)
     run(parser.parse_args())
 

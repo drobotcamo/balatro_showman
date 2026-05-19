@@ -7,7 +7,9 @@ Balatro Showman — unified CLI entry point.
     python main.py extract  <video|BU#> [options]   label assets in footage (GUI)
     python main.py dataset  build [options]         build YOLO dataset from labeled sidecars
     python main.py train    [options]               train YOLOv8 on the built dataset
-    python main.py detect   <video|BU#> [options]   run YOLO asset detection (--model, --asset-type)
+    python main.py models                           list trained models + mAP scores
+    python main.py models   use <name>              set the active model for detect
+    python main.py detect   <video|BU#> [options]   run YOLO asset detection
     python main.py assets   stats  [type]           print asset coverage
     python main.py assets   browse [type]           open thumbnail grid browser
 
@@ -25,7 +27,7 @@ from tools.videos import list_videos, resolve_video, video_completer, cmd_videos
 
 def _attach_video_completer(parser):
     for action in parser._actions:
-        if action.dest == "video":
+        if action.dest in ("video", "videos"):
             action.completer = video_completer
 
 
@@ -74,9 +76,15 @@ def main():
     from tools.train import _add_args as _train_args
     _train_args(p_train)
 
+    # ── models ────────────────────────────────────────────────────────────────
+    p_models = sub.add_parser("models", help="List trained models and set the active one")
+    models_sub = p_models.add_subparsers(dest="cmd", metavar="action")
+    p_models_use = models_sub.add_parser("use", help="Set the active model for detect")
+    p_models_use.add_argument("name", help="Run name (e.g. balatro_synthetic)")
+
     # ── detect ────────────────────────────────────────────────────────────────
     p_detect = sub.add_parser("detect", help="Run YOLO asset detection on footage")
-    from test_harness import _add_args as _detect_args
+    from tools.detect import _add_args as _detect_args
     _detect_args(p_detect)
     _attach_video_completer(p_detect)
 
@@ -126,8 +134,15 @@ def main():
         from tools.train import run
         run(args)
 
+    elif args.command == "models":
+        from tools.models import cmd_list, cmd_use
+        if getattr(args, "cmd", None) == "use":
+            cmd_use(args.name)
+        else:
+            cmd_list()
+
     elif args.command == "detect":
-        from test_harness import run
+        from tools.detect import run
         run(args)
 
     elif args.command == "assets":

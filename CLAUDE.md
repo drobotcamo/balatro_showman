@@ -55,11 +55,13 @@ Dataset build is idempotent. Re-label → rebuild → retrain as coverage grows.
 - `gameplay_sources/downloader.py` — yt-dlp wrapper
 - `detectors/yolo_detector.py` — YoloDetector: wraps ultralytics YOLO, parses `type:name` classes
 - `detectors/assets.py` — (deprecated) template-matching detector, kept for reference
-- `test_harness.py` — detection test harness (samples frames, saves annotated output)
+- `tools/detect.py` — `detect` command: samples frames, runs YOLO, writes annotated JPEGs + detections.jsonl
 - `tools/extract_templates.py` — labeling GUI (voice + zoom, writes crop + sidecar JSON)
-- `tools/build_dataset.py` — builds YOLO dataset from sidecars
+- `tools/build_dataset.py` — builds YOLO dataset from labeled sidecar JSONs
+- `tools/build_synthetic_dataset.py` — builds synthetic YOLO dataset by compositing wiki sprites onto footage frames
 - `tools/train.py` — wraps ultralytics YOLO train
-- `tools/assets.py` — asset inspector (`stats`, `browse`)
+- `tools/models.py` — trained model registry; active model tracking via `.model` file
+- `tools/assets.py` — asset inspector (`stats`, `browse`); defines `ASSET_TYPE_TO_DIR`
 - `tools/videos.py` — BU alias resolver
 - `main.py` — unified CLI entry point
 - `architecture.md` — full architecture plan (keep in sync with this file)
@@ -72,9 +74,13 @@ Everything runs through `main.py`:
 python main.py videos                                           # list footage BU aliases
 python main.py download <url>                                   # download YouTube footage
 python main.py extract BU1 [--frame N]                         # labeling GUI
-python main.py dataset build [--output-dir dataset]            # build YOLO dataset
+python main.py dataset build [--output-dir dataset]            # build YOLO dataset from sidecars
+python main.py dataset synthetic [--output-dir dataset_synthetic]  # build synthetic dataset from wiki sprites
 python main.py train [--name balatro] [--epochs 100]           # train YOLOv8
-python main.py detect BU1 --model runs/detect/balatro/...      # run detection
+python main.py models                                           # list trained models + mAP50
+python main.py models use balatro_synthetic                     # set active model
+python main.py detect BU1                                       # run detection (uses active model)
+python main.py detect BU1 --model balatro_v2                    # run detection (override model)
 python main.py assets stats [type]                             # coverage report
 python main.py assets browse [type]                            # thumbnail grid
 ```
@@ -94,6 +100,36 @@ Tab completion: `echo 'eval "$(register-python-argcomplete main.py)"' >> ~/.bash
 
 - Don't build until the plan is agreed on. Design/propose first.
 - Keep this file and `architecture.md` in sync as decisions evolve.
+
+## Model Selection
+
+YOLOv8 comes in a size ladder. Bigger = more parameters = more capacity = needs more data and more time to train:
+
+| Model | Params | When to use |
+|---|---|---|
+| `yolov8n.pt` | 3M | Default. Sparse data (<500 labeled frames), fast iteration, real-time inference |
+| `yolov8s.pt` | 11M | Step up when nano consistently confuses visually similar assets with good label coverage |
+| `yolov8m.pt` | 26M | Hundreds of labeled frames, accuracy is the priority over speed |
+| `yolov8l/x.pt` | 44M+ | Large dataset, maximum accuracy, offline use only |
+
+**Signal to upgrade:** if the trained model confuses visually similar assets (e.g. one joker for another) even after adding more labels, that's a capacity problem — increase model size. If it's missing detections entirely, that's a data problem — label more.
+
+**GPU acceleration:** This machine has an AMD RX 6800S — no CUDA. Use DirectML:
+```bash
+pip install torch-directml   # one-time install
+python main.py train --data dataset_synthetic/dataset.yaml --name balatro_v2 --device directml
+```
+`--device` accepts `""` (auto/CPU), `"cpu"`, `"0"` (CUDA GPU 0), or `"directml"` (AMD/Intel on Windows).
+
+**Active model** is tracked in `.model` (gitignored). Manage with:
+```bash
+python main.py models                       # list all trained runs + mAP50
+python main.py models use balatro_synthetic # set active
+python main.py detect BU1                   # uses active model automatically
+python main.py detect BU1 --model balatro_v2  # override by run name
+```
+
+`--model` accepts either a run name (resolved to `runs/detect/<name>/weights/best.pt`) or a full `.pt` path.
 
 ## Code Conventions
 

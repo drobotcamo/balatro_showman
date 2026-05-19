@@ -216,8 +216,8 @@ def run(args):
 def _add_args(parser):
     parser.add_argument("--output-dir", default="dataset_synthetic",
                         help="Output directory (default: dataset_synthetic)")
-    parser.add_argument("--n-backgrounds", type=int, default=500,
-                        help="Background frames to extract from footage (default: 500)")
+    parser.add_argument("--n-backgrounds", type=int, default=200,
+                        help="Background frames to extract from footage (default: 200)")
     parser.add_argument("--sprites-per-frame", type=int, default=4,
                         help="Sprites composited per frame (default: 4)")
     parser.add_argument("--val-frac", type=float, default=0.2,

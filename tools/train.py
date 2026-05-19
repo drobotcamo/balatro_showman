@@ -28,6 +28,7 @@ def run(args):
         name=args.name,
         patience=50,
         freeze=10,
+        device=args.device,
     )
 
     best = Path("runs") / "detect" / args.name / "weights" / "best.pt"
@@ -45,6 +46,8 @@ def _add_args(parser):
     parser.add_argument("--batch", type=int, default=16)
     parser.add_argument("--name", default="balatro",
                         help="Run name; model saved to runs/detect/<name>/weights/best.pt")
+    parser.add_argument("--device", default="",
+                        help="Device: '' (auto), 'cpu', '0' (GPU 0), 'directml' (AMD/Intel on Windows)")
 
 
 def main():
