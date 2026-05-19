@@ -6,7 +6,8 @@ from datetime import datetime
 from pathlib import Path
 
 import cv2
-from tqdm import tqdm
+
+from utils import progress
 
 from detectors.yolo_detector import YoloDetector
 from tools.assets import ASSET_TYPE_TO_DIR
@@ -67,7 +68,7 @@ def run(args):
     detections_path = out_dir / "detections.jsonl"
 
     with open(detections_path, "w") as f:
-        with tqdm(total=n_sample, unit="frame") as bar:
+        with progress(total=n_sample, desc="Detecting", unit="frame") as bar:
             for frame_idx in sample_indices:
                 cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
                 ret, frame = cap.read()

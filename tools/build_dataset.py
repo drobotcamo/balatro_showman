@@ -21,7 +21,8 @@ from pathlib import Path
 
 import cv2
 import yaml
-from tqdm import tqdm
+
+from utils import progress
 
 RECORDED = Path("recorded_gameplay_asset_images")
 
@@ -149,7 +150,7 @@ def run(args):
     all_groups = [(gk, "train") for gk in sorted(train_keys)] + \
                  [(gk, "val")   for gk in sorted(val_keys)]
 
-    with tqdm(total=len(all_groups), unit="frame") as bar:
+    with progress(total=len(all_groups), desc="Extracting frames", unit="frame") as bar:
         for (video_path, frame_idx), split in all_groups:
             video_stem = Path(video_path).stem
             img_name = f"{video_stem}_frame{frame_idx:06d}.jpg"

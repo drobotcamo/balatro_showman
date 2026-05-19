@@ -21,10 +21,10 @@ from pathlib import Path
 import cv2
 import numpy as np
 import yaml
-from tqdm import tqdm
 
 from tools.assets import ASSET_TYPE_TO_DIR
 from tools.videos import list_videos
+from utils import progress
 
 GAME_ASSETS = Path("game_asset_images")
 
@@ -60,19 +60,21 @@ def _extract_backgrounds(n_frames):
         return []
     frames = []
     per_video = max(1, n_frames // len(videos))
-    for path in videos.values():
-        cap = cv2.VideoCapture(str(path))
-        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        if total == 0:
+    with progress(total=n_frames, desc="Extracting backgrounds", unit="frame") as bar:
+        for path in videos.values():
+            cap = cv2.VideoCapture(str(path))
+            total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            if total == 0:
+                cap.release()
+                continue
+            indices = random.sample(range(total), min(per_video, total))
+            for idx in sorted(indices):
+                cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+                ret, frame = cap.read()
+                if ret:
+                    frames.append(frame)
+                    bar.update(1)
             cap.release()
-            continue
-        indices = random.sample(range(total), min(per_video, total))
-        for idx in sorted(indices):
-            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
-            ret, frame = cap.read()
-            if ret:
-                frames.append(frame)
-        cap.release()
     return frames
 
 
@@ -146,7 +148,7 @@ def run(args):
     print(f"Compositing ({args.sprites_per_frame} sprites/frame)...")
     n_written = 0
 
-    with tqdm(total=len(backgrounds), unit="frame") as bar:
+    with progress(total=len(backgrounds), desc="Compositing", unit="frame") as bar:
         for i, bg in enumerate(backgrounds):
             split = "train" if i < n_train else "val"
             fh, fw = bg.shape[:2]

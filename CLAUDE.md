@@ -94,3 +94,18 @@ Tab completion: `echo 'eval "$(register-python-argcomplete main.py)"' >> ~/.bash
 
 - Don't build until the plan is agreed on. Design/propose first.
 - Keep this file and `architecture.md` in sync as decisions evolve.
+
+## Code Conventions
+
+**Progress bars are mandatory for any operation that may take more than a second** — frame extraction, dataset building, training loops, video sampling, etc. Use `from utils import progress` (never import tqdm directly). The `progress()` wrapper keeps defaults consistent and provides a single place to change output behavior globally.
+
+```python
+# iterable form
+for frame in progress(frames, desc="Processing", unit="frame"):
+    ...
+
+# context manager form (when total is known but loop is internal)
+with progress(total=500, desc="Extracting", unit="frame") as bar:
+    ...
+    bar.update(1)
+```
