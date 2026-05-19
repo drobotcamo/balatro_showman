@@ -27,21 +27,32 @@ SAMPLE_RATE = 16000
 ASSET_TYPES = list(ASSET_TYPE_TO_DIR.keys())
 
 
+_FUZZY_THRESHOLD = 0.4
+
+
 def _best_match(raw, names):
     if not names:
         return raw
     scored = [(difflib.SequenceMatcher(None, raw.lower(), n.lower()).ratio(), n) for n in names]
-    return max(scored, key=lambda x: x[0])[1]
+    best_score, best_name = max(scored, key=lambda x: x[0])
+    return best_name if best_score >= _FUZZY_THRESHOLD else raw
 
 
 def _names_for_type(asset_type):
+    names = set()
     dir_name = ASSET_TYPE_TO_DIR.get(asset_type)
-    if not dir_name:
-        return []
-    asset_dir = GAME_ASSET_IMAGES / dir_name
-    if not asset_dir.exists():
-        return []
-    return sorted(p.stem.replace("_", " ") for p in asset_dir.glob("*.png"))
+    if dir_name:
+        asset_dir = GAME_ASSET_IMAGES / dir_name
+        if asset_dir.exists():
+            names.update(p.stem.replace("_", " ") for p in asset_dir.glob("*.png"))
+    recorded_dir = OUTPUT_ROOT / asset_type
+    if recorded_dir.exists():
+        for p in recorded_dir.glob("*.json"):
+            try:
+                names.add(json.loads(p.read_text())["asset_name"])
+            except Exception:
+                pass
+    return sorted(names)
 
 
 def _build_pool(video_paths, pool_size):
@@ -99,6 +110,7 @@ class TemplateExtractor:
         self.saved_files = []
         self.session_count = 0
         self._confirm_pending = False
+        self._label_index = {}  # (video_name, frame_idx) -> label count, built in background
 
         self.whisper_model = None
         self.recording = False
@@ -108,12 +120,21 @@ class TemplateExtractor:
         self._build_ui()
         self._load_pool_frame(0)
         threading.Thread(target=self._load_whisper, args=(whisper_model_name,), daemon=True).start()
+        threading.Thread(target=self._build_label_index, daemon=True).start()
         self.root.mainloop()
 
         for cap in self._caps.values():
             cap.release()
 
     # ── Whisper ───────────────────────────────────────────────────────────────
+
+    def _query_mic(self):
+        if not AUDIO_AVAILABLE:
+            return "mic: unavailable"
+        try:
+            return f"mic: {sd.query_devices(kind='input')['name'][:40]}"
+        except Exception:
+            return "mic: unknown"
 
     def _load_whisper(self, model_name):
         try:
@@ -152,11 +173,27 @@ class TemplateExtractor:
         result = self.whisper_model.transcribe(audio, fp16=False, language="en")
         return result["text"].strip().strip(".,!? ")
 
+    def _build_label_index(self):
+        index = {}
+        for asset_type in ASSET_TYPES:
+            asset_dir = OUTPUT_ROOT / asset_type
+            if not asset_dir.exists():
+                continue
+            for json_file in asset_dir.glob("*.json"):
+                try:
+                    data = json.loads(json_file.read_text())
+                    key = (data["video_path"], data["frame_idx"])
+                    index[key] = index.get(key, 0) + 1
+                except Exception:
+                    pass
+        self._label_index = index
+
     # ── UI ────────────────────────────────────────────────────────────────────
 
     def _build_ui(self):
         self.root = tk.Tk()
         self.root.title("Balatro Labeler")
+        self.root.minsize(900, 500)
 
         # Navigation keys (guarded -- inactive when focus is in a text field)
         self.root.bind("<KeyPress-r>", lambda e: self._key_guard(self._next_frame))
@@ -167,6 +204,8 @@ class TemplateExtractor:
         self.root.bind("<KeyPress-g>", lambda e: self._key_guard(self._focus_name))
         self.root.bind("<KeyPress-q>", lambda e: self._key_guard(self.root.destroy))
         self.root.bind("<KeyPress-e>", lambda e: self._key_guard(self._save_crop))
+        self.root.bind("<KeyPress-0>", lambda e: self._key_guard(self._reset_zoom))
+        self.root.bind("<Home>", lambda e: self._key_guard(self._reset_zoom))
         self.root.bind("<Return>", self._save_crop)
         self.root.bind("<Control-z>", lambda e: self._undo())
         self.root.bind("<Tab>", self._on_tab)
@@ -242,6 +281,10 @@ class TemplateExtractor:
 
         self.count_label = tk.StringVar(value="Session: 0 labels")
         tk.Label(nav, textvariable=self.count_label, fg="blue", anchor="e").pack(side=tk.RIGHT, padx=8)
+        tk.Label(nav, text="[0] zoom↺", fg="gray", font=("Courier", 8)).pack(side=tk.RIGHT, padx=4)
+
+        self.mic_var = tk.StringVar(value=self._query_mic())
+        tk.Label(nav, textvariable=self.mic_var, fg="gray", anchor="e").pack(side=tk.RIGHT, padx=8)
 
     # ── Frame loading & rendering ─────────────────────────────────────────────
 
@@ -281,7 +324,10 @@ class TemplateExtractor:
         alias = self.video_aliases.get(str(self.video_path.resolve()),
                                        self.video_path.stem[:14])
         ts = self.frame_idx / self.fps
-        self.frame_label.set(f"{alias}   frame {self.frame_idx:,}   ({ts:.1f}s)")
+        key = (self.video_path.name, self.frame_idx)
+        existing = self._label_index.get(key, 0)
+        badge = f"  [{existing} labeled]" if existing else ""
+        self.frame_label.set(f"{alias}   frame {self.frame_idx:,}   ({ts:.1f}s){badge}")
         out_dir = OUTPUT_ROOT / self.asset_type.get()
         self.save_label.set(f"-> {out_dir}")
 
@@ -326,6 +372,8 @@ class TemplateExtractor:
         self.sel_start_canvas = None
         self.sel_native = None
         self.recording = False
+        if self.audio_thread and self.audio_thread.is_alive():
+            self.audio_thread.join(timeout=0.15)
         self.audio_chunks = []
         self._confirm_pending = False
         if self.rect_id:
@@ -343,6 +391,9 @@ class TemplateExtractor:
         self.rect_id = self.canvas.create_rectangle(cx0, cy0, cx1, cy1, outline="lime", width=2)
 
     def _on_press(self, e):
+        if self._confirm_pending:
+            self.status_var.set("Press Enter to confirm, or Undo/Z to cancel")
+            return
         self._clear_selection()
         self.sel_start_canvas = (e.x, e.y)
 
@@ -363,6 +414,10 @@ class TemplateExtractor:
         nx0, ny0 = self._c2n(*self.sel_start_canvas)
         nx1, ny1 = self._c2n(e.x, e.y)
         self.sel_native = (min(nx0, nx1), min(ny0, ny1), max(nx0, nx1), max(ny0, ny1))
+        x0, y0, x1, y1 = self.sel_native
+        if x1 - x0 < 4 or y1 - y0 < 4:
+            self._clear_selection()
+            return
         self._start_listening()
 
     # ── Zoom & pan ────────────────────────────────────────────────────────────
@@ -427,10 +482,11 @@ class TemplateExtractor:
         if not self._confirm_pending:
             self.name_var.set(name)
             if name != raw:
-                self.status_var.set(f"Matched: {name}   -- press Enter again to save")
+                self.status_var.set(f"Matched: {name}   -- Enter to save  |  Z to cancel")
             else:
-                self.status_var.set(f"Confirm: {name}   -- press Enter again to save")
+                self.status_var.set(f"Confirm: {name}   -- Enter to save  |  Z to cancel")
             self._confirm_pending = True
+            self.root.focus_set()
             return
 
         # Second Enter: commit
@@ -460,9 +516,12 @@ class TemplateExtractor:
             "asset_name": name,
             "bbox_xyxy":  [x0, y0, x1, y1],
         }, indent=2))
-        self.saved_files.append(out_path)
+        self.saved_files.append((out_path, self.video_path.name, self.frame_idx))
+        key = (self.video_path.name, self.frame_idx)
+        self._label_index[key] = self._label_index.get(key, 0) + 1
         self.session_count += 1
         self.count_label.set(f"Session: {self.session_count} labels")
+        self._update_info()
 
         matched = f"  (matched '{raw}')" if name != raw else ""
         self.status_var.set(f"Saved {out_path.name}{matched}   -- draw next box or [R] next frame")
@@ -495,16 +554,30 @@ class TemplateExtractor:
     def _prev_frame(self):
         self._load_pool_frame(self.pool_idx - 1)
 
+    def _reset_zoom(self):
+        if self.frame is None:
+            return
+        self.view = [0.0, 0.0, float(self.frame_w), float(self.frame_h)]
+        self._redraw()
+
     def _focus_name(self):
         self.name_combo.focus_set()
 
     def _undo(self):
+        if self._confirm_pending:
+            self._clear_selection()
+            self.name_var.set("")
+            self.status_var.set("Cancelled -- draw a new box")
+            return
         if not self.saved_files:
             self.status_var.set("Nothing to undo.")
             return
-        path = self.saved_files.pop()
+        path, video_name, frame_idx = self.saved_files.pop()
         self.session_count = max(0, self.session_count - 1)
         self.count_label.set(f"Session: {self.session_count} labels")
+        key = (video_name, frame_idx)
+        self._label_index[key] = max(0, self._label_index.get(key, 0) - 1)
+        self._update_info()
         try:
             path.unlink()
             sidecar = path.with_suffix(".json")
@@ -526,12 +599,17 @@ class TemplateExtractor:
     # ── Autocomplete ──────────────────────────────────────────────────────────
 
     def _on_asset_type_change(self, _=None):
+        self._confirm_pending = False
         self._all_names = _names_for_type(self.asset_type.get())
-        self.name_combo["values"] = self._all_names
-        self.name_var.set("")
+        typed = self.name_var.get().lower()
+        self.name_combo["values"] = (
+            [n for n in self._all_names if typed in n.lower()] if typed else self._all_names
+        )
         self._update_info()
 
-    def _on_name_key(self, _=None):
+    def _on_name_key(self, e=None):
+        if e and e.keysym in ("Up", "Down", "Left", "Right", "Return", "Escape", "Tab"):
+            return
         self._confirm_pending = False
         typed = self.name_var.get().lower()
         self.name_combo["values"] = (

@@ -21,18 +21,15 @@ RECORDED = Path("recorded_gameplay_asset_images")
 REFERENCE = Path("game_asset_images")
 
 ASSET_TYPE_TO_DIR = {
-    "tags":      "tag_images",
     "jokers":    "joker_images",
-    "boosters":  "booster_images",
-    "blinds":    "blind_images",
-    "vouchers":  "voucher_images",
     "tarots":    "tarot_images",
+    "vouchers":  "voucher_images",
+    "tags":      "tag_images",
     "planets":   "planet_images",
+    "boosters":  "booster_images",
     "spectrals": "spectral_images",
-    "modifiers": "modifier_images",
-    "stakes":    "stake_images",
+    "blinds":    "blind_images",
     "stickers":  "sticker_images",
-    "ui":        None,
 }
 
 THUMB_SIZE = 80
@@ -237,8 +234,14 @@ class AssetBrowser:
 
     def _delete(self, path, btn):
         try:
+            img_bytes = path.read_bytes()
+            sidecar = path.with_suffix(".json")
+            sidecar_bytes = None
+            if sidecar.exists():
+                sidecar_bytes = sidecar.read_bytes()
+                sidecar.unlink()
             path.unlink()
-            self.deleted.append(path)
+            self.deleted.append((path, img_bytes, sidecar, sidecar_bytes))
             btn.configure(bg="red")
             self.root.after(300, btn.destroy)
             self.status_var.set(f"Deleted {path.name}  |  Ctrl+Z to undo")
@@ -249,9 +252,12 @@ class AssetBrowser:
         if not self.deleted:
             self.status_var.set("Nothing to undo.")
             return
-        # Can't restore the image data — just report
-        last = self.deleted.pop()
-        self.status_var.set(f"Can't restore binary file {last.name} — undo not available for browse deletes")
+        path, img_bytes, sidecar, sidecar_bytes = self.deleted.pop()
+        path.write_bytes(img_bytes)
+        if sidecar_bytes is not None:
+            sidecar.write_bytes(sidecar_bytes)
+        self.status_var.set(f"Restored {path.name}")
+        self._load_type(self.type_var.get())
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

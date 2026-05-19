@@ -43,7 +43,8 @@
       "Bash(ls \"C:\\\\Users\\\\camgr\\\\.claude\\\\projects\\\\\")",
       "Read(//c/Users/camgr/.claude/**)",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\camgr\\\\.claude\\\\projects\\\\\" -Force | ForEach-Object { $_.Name })",
-      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\camgr\\\\.claude\\\\projects\\\\\" -Recurse -Force | Where-Object { !$_.PSIsContainer } | ForEach-Object { \"$\\($_.DirectoryName.Replace\\('C:\\\\Users\\\\camgr\\\\.claude\\\\projects\\\\',''\\)\\)  \\\\  $\\($_.Name\\)\" })"
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\camgr\\\\.claude\\\\projects\\\\\" -Recurse -Force | Where-Object { !$_.PSIsContainer } | ForEach-Object { \"$\\($_.DirectoryName.Replace\\('C:\\\\Users\\\\camgr\\\\.claude\\\\projects\\\\',''\\)\\)  \\\\  $\\($_.Name\\)\" })",
+      "Bash(.venv/Scripts/python main.py videos)"
     ],
     "additionalDirectories": [
       "C:\\Users\\camgr\\.claude\\projects\\c--Users-camgr-Documents-code_projects-balatro_showman"
