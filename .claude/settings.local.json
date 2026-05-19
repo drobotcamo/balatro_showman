@@ -17,7 +17,16 @@
       "Bash(choco --version)",
       "Bash(scoop --version)",
       "PowerShell(choco --version 2>$null)",
-      "PowerShell(winget --version 2>$null)"
+      "PowerShell(winget --version 2>$null)",
+      "Bash(python gameplay_sources/downloader.py \"https://www.youtube.com/watch?v=sgOgbZzXYag\")",
+      "Bash(ls \"C:\\\\Users\\\\camgr\\\\AppData\\\\Local\\\\Microsoft\\\\WinGet\\\\Packages\\\\\" 2>&1 | grep -i ffmpeg)",
+      "Read(//c/Users/camgr/AppData/Local/Microsoft/WinGet/**)",
+      "PowerShell(Get-ChildItem \"C:\\\\Program Files\\\\ffmpeg\" -ErrorAction SilentlyContinue | Select-Object Name; Get-ChildItem \"C:\\\\ffmpeg\" -ErrorAction SilentlyContinue | Select-Object Name; \\(Get-Command ffmpeg -ErrorAction SilentlyContinue\\).Source)",
+      "Bash(mkdir -p \"C:/Users/camgr/.claude/projects/c--Users-camgr-Documents-code_projects-balatro_showman/memory\")",
+      "PowerShell(Get-ChildItem \"c:\\\\Users\\\\camgr\\\\Documents\\\\code_projects\\\\balatro_showman\\\\gameplay_sources\\\\\" -Recurse | Select-Object FullName, @{N='MB';E={[math]::Round\\($_.Length/1MB,1\\)}})"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\camgr\\.claude\\projects\\c--Users-camgr-Documents-code_projects-balatro_showman"
     ]
   }
 }

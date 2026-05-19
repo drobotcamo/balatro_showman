@@ -5,8 +5,9 @@ from dataclasses import dataclass
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "game_asset_images" / "tag_images"
 
-# Footage is 640x360; templates are 68px designed for ~1280x720 → expected scale ~0.5
-SCALES = [0.4, 0.5, 0.6]
+# Templates were authored for ~1280x720. Base scale = video_width / 1280;
+# search ±15% around it to absorb minor rendering differences.
+TEMPLATE_BASE_WIDTH = 1280
 DEFAULT_THRESHOLD = 0.8
 IOU_THRESHOLD = 0.3
 
@@ -41,8 +42,12 @@ def _nms(detections):
 
 
 class SkipTagDetector:
-    def __init__(self, threshold=DEFAULT_THRESHOLD):
+    def __init__(self, threshold=DEFAULT_THRESHOLD, video_width=TEMPLATE_BASE_WIDTH, roi=None):
         self.threshold = threshold
+        # roi: (x1_frac, y1_frac, x2_frac, y2_frac) in [0,1], or None for full frame
+        self.roi = roi
+        base = video_width / TEMPLATE_BASE_WIDTH
+        self.scales = [round(base * f, 4) for f in (0.85, 1.0, 1.15)]
         self.prepared = self._load_and_scale_templates()
 
     def _load_and_scale_templates(self):
@@ -56,7 +61,7 @@ class SkipTagDetector:
                 continue
             name = path.stem.replace("_Tag", "").replace("_", " ")
             th, tw = img.shape[:2]
-            for scale in SCALES:
+            for scale in self.scales:
                 new_w = max(1, int(tw * scale))
                 new_h = max(1, int(th * scale))
                 scaled = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
@@ -68,14 +73,49 @@ class SkipTagDetector:
                 prepared.append((name, scale, gray))
         return prepared
 
+    def roi_pixels(self, frame_h, frame_w):
+        if self.roi is None:
+            return 0, 0, frame_w, frame_h
+        x1f, y1f, x2f, y2f = self.roi
+        return (
+            int(frame_w * x1f),
+            int(frame_h * y1f),
+            int(frame_w * x2f),
+            int(frame_h * y2f),
+        )
+
+    def debug_scores(self, frame):
+        """Return best match score per tag name across all scales, sorted descending."""
+        fh, fw = frame.shape[:2]
+        rx1, ry1, rx2, ry2 = self.roi_pixels(fh, fw)
+        crop = frame[ry1:ry2, rx1:rx2]
+        gray_frame = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+        ch, cw = gray_frame.shape
+
+        best = {}
+        for tag_name, scale, gray_tmpl in self.prepared:
+            th, tw = gray_tmpl.shape
+            if tw > cw or th > ch:
+                continue
+            result = cv2.matchTemplate(gray_frame, gray_tmpl, cv2.TM_CCOEFF_NORMED)
+            score = float(result.max())
+            if tag_name not in best or score > best[tag_name][0]:
+                best[tag_name] = (score, scale)
+
+        return sorted(best.items(), key=lambda kv: kv[1][0], reverse=True)
+
     def detect(self, frame):
-        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        fh, fw = gray_frame.shape
+        fh, fw = frame.shape[:2]
+        rx1, ry1, rx2, ry2 = self.roi_pixels(fh, fw)
+        crop = frame[ry1:ry2, rx1:rx2]
+
+        gray_frame = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+        ch, cw = gray_frame.shape
         all_detections = []
 
         for tag_name, scale, gray_tmpl in self.prepared:
             th, tw = gray_tmpl.shape
-            if tw > fw or th > fh:
+            if tw > cw or th > ch:
                 continue
 
             result = cv2.matchTemplate(gray_frame, gray_tmpl, cv2.TM_CCOEFF_NORMED)
@@ -84,7 +124,7 @@ class SkipTagDetector:
             for y, x in zip(ys, xs):
                 all_detections.append(Detection(
                     tag_name=tag_name,
-                    bbox=(int(x), int(y), tw, th),
+                    bbox=(int(x) + rx1, int(y) + ry1, tw, th),
                     confidence=float(result[y, x]),
                     scale=scale,
                 ))
