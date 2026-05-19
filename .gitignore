@@ -1,4 +1,6 @@
 /game_asset_images/*
+/runs/
+/dataset_synthetic/
 /game_asset_urls/*
 /gameplay_sources/gameplay_footage
 /dataset/*

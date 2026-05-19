@@ -1,13 +1,15 @@
 import argparse
 import json
 import random
+import sys
 from datetime import datetime
 from pathlib import Path
 
 import cv2
 from tqdm import tqdm
 
-from detectors.skip_tags import SkipTagDetector
+from detectors.yolo_detector import YoloDetector
+from tools.assets import ASSET_TYPE_TO_DIR
 
 COLORS = [
     (100, 100, 255),
@@ -19,16 +21,13 @@ COLORS = [
 ]
 
 
-def annotate(frame, detections, roi_box=None):
+def annotate(frame, detections):
     out = frame.copy()
-    if roi_box:
-        rx1, ry1, rx2, ry2 = roi_box
-        cv2.rectangle(out, (rx1, ry1), (rx2, ry2), (200, 200, 200), 1)
     for i, det in enumerate(detections):
         color = COLORS[i % len(COLORS)]
         x, y, w, h = det.bbox
         cv2.rectangle(out, (x, y), (x + w, y + h), color, 2)
-        label = f"{det.tag_name} {det.confidence:.2f}"
+        label = f"{det.asset_type}:{det.asset_name} {det.confidence:.2f}"
         cv2.putText(out, label, (x, max(y - 5, 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
     return out
 
@@ -40,10 +39,15 @@ def run(args):
     frames_dir = out_dir / "frames"
     frames_dir.mkdir(parents=True, exist_ok=True)
 
+    try:
+        detector = YoloDetector(model_path=args.model, confidence=args.threshold)
+    except FileNotFoundError as e:
+        print(e)
+        sys.exit(1)
+
     cap = cv2.VideoCapture(str(video_path))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = cap.get(cv2.CAP_PROP_FPS)
-    video_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 
     if args.frames:
         sample_indices = sorted(args.frames)
@@ -53,12 +57,11 @@ def run(args):
         sample_indices = sorted(random.sample(range(total_frames), n_sample))
     n_sample = len(sample_indices)
 
-    detector = SkipTagDetector(threshold=args.threshold, video_width=video_width, roi=args.roi)
-
-    print(f"Video:    {video_path.name}  ({total_frames} frames @ {fps:.0f}fps, {video_width}px wide)")
-    print(f"Sampling: {n_sample} frame(s)  scales={detector.scales}")
-    print(f"ROI:      x={args.roi[0]}-{args.roi[2]}  y={args.roi[1]}-{args.roi[3]}")
-    print(f"Output:   {out_dir}\n")
+    print(f"Video:   {video_path.name}  ({total_frames} frames @ {fps:.0f}fps)")
+    print(f"Model:   {args.model}")
+    print(f"Filter:  {args.asset_type or 'all types'}")
+    print(f"Frames:  {n_sample} sampled")
+    print(f"Output:  {out_dir}\n")
 
     n_with_detections = 0
     detections_path = out_dir / "detections.jsonl"
@@ -72,37 +75,28 @@ def run(args):
                     bar.update(1)
                     continue
 
-                if args.debug:
-                    scores = detector.debug_scores(frame)
-                    print(f"\n--- frame {frame_idx} ---")
-                    for tag_name, (score, scale) in scores[:15]:
-                        marker = " ***" if score >= args.threshold else ""
-                        print(f"  {score:.4f} @ {scale:.3f}x  {tag_name}{marker}")
-
-                    fh2, fw2 = frame.shape[:2]
-                    rx1, ry1, rx2, ry2 = detector.roi_pixels(fh2, fw2)
-                    crop_path = frames_dir / f"frame_{frame_idx:06d}_roi_crop.png"
-                    cv2.imwrite(str(crop_path), frame[ry1:ry2, rx1:rx2])
-
-                detections = detector.detect(frame)
+                detections = detector.detect_filtered(frame, args.asset_type or None)
                 frame_ts = frame_idx / fps
                 img_name = f"frame_{frame_idx:06d}_t{frame_ts:.1f}s.jpg"
 
-                fh, fw = frame.shape[:2]
-                roi_box = detector.roi_pixels(fh, fw)
+                if args.debug:
+                    print(f"\n--- frame {frame_idx} ({frame_ts:.1f}s) ---")
+                    for det in detections:
+                        print(f"  {det.confidence:.4f}  {det.asset_type}:{det.asset_name}  bbox={det.bbox}")
 
                 if detections:
-                    cv2.imwrite(str(frames_dir / img_name), annotate(frame, detections, roi_box), [cv2.IMWRITE_JPEG_QUALITY, 90])
+                    cv2.imwrite(str(frames_dir / img_name), annotate(frame, detections),
+                                [cv2.IMWRITE_JPEG_QUALITY, 90])
                     record = {
                         "frame": frame_idx,
                         "timestamp": round(frame_ts, 2),
                         "image": img_name,
                         "detections": [
                             {
-                                "tag": d.tag_name,
+                                "asset_type": d.asset_type,
+                                "asset_name": d.asset_name,
                                 "bbox": list(d.bbox),
                                 "confidence": round(d.confidence, 4),
-                                "scale": d.scale,
                             }
                             for d in detections
                         ],
@@ -110,7 +104,8 @@ def run(args):
                     f.write(json.dumps(record) + "\n")
                     n_with_detections += 1
                 elif args.save_all:
-                    cv2.imwrite(str(frames_dir / img_name), annotate(frame, [], roi_box), [cv2.IMWRITE_JPEG_QUALITY, 90])
+                    cv2.imwrite(str(frames_dir / img_name), frame,
+                                [cv2.IMWRITE_JPEG_QUALITY, 90])
 
                 bar.set_postfix(hits=n_with_detections)
                 bar.update(1)
@@ -122,23 +117,29 @@ def run(args):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run skip tag detection on sampled video frames")
+    parser = argparse.ArgumentParser(description="Run YOLO asset detection on sampled video frames")
     _add_args(parser)
     run(parser.parse_args())
 
 
 def _add_args(parser):
-    parser.add_argument("video", help="Path to gameplay footage mp4")
-    parser.add_argument("--n-frames", type=int, default=25, help="Number of frames to sample (default 25)")
-    parser.add_argument("--threshold", type=float, default=0.75, help="Detection confidence threshold")
-    parser.add_argument("--roi", type=float, nargs=4, default=[0.25, 0.55, 0.65, 0.90],
-                        metavar=("X1", "Y1", "X2", "Y2"),
-                        help="ROI as frame fractions x1 y1 x2 y2")
+    asset_types = list(ASSET_TYPE_TO_DIR.keys())
+    parser.add_argument("video", help="Path to gameplay footage mp4 or BU alias")
+    parser.add_argument("--model", default="runs/detect/balatro/weights/best.pt",
+                        help="Path to trained YOLO .pt model")
+    parser.add_argument("--asset-type", default=None, choices=asset_types,
+                        help="Filter detections to one asset type (default: show all)")
+    parser.add_argument("--n-frames", type=int, default=25,
+                        help="Number of frames to sample (default: 25)")
+    parser.add_argument("--threshold", type=float, default=0.25,
+                        help="Detection confidence threshold (default: 0.25)")
     parser.add_argument("--frames", type=int, nargs="+", metavar="N",
-                        help="Target specific frame indices instead of random sampling")
-    parser.add_argument("--save-all", action="store_true", help="Save every sampled frame, not just hits")
-    parser.add_argument("--debug", action="store_true", help="Print top template scores per frame")
-    parser.add_argument("--output-dir", default="test_output", help="Root output directory")
+                        help="Specific frame indices instead of random sampling")
+    parser.add_argument("--save-all", action="store_true",
+                        help="Save every sampled frame, not just hits")
+    parser.add_argument("--debug", action="store_true",
+                        help="Print detections per frame to stdout")
+    parser.add_argument("--output-dir", default="test_output")
     parser.add_argument("--seed", type=int, default=42)
 
 

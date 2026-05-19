@@ -15,46 +15,50 @@ A tool that advises on shop decisions in Balatro at **Gold Stake** (hardest diff
 - Training footage: YouTube, top/skilled players only. This keeps shop decisions high quality and makes in-round mistakes a non-issue.
 - Both wins and losses are valuable — wins validate full decision chains, losses are informative failures.
 
-### CV Strategy: Template Matching First
+### CV Strategy: YOLOv8 Object Detection
 
-- Balatro uses fixed pixel-art sprites. Use OpenCV `cv2.matchTemplate` against known assets.
-- **Critical finding:** Wiki/asset sprites do NOT match in-game rendering. Video compression and in-game rendering shift pixels enough that scores max at ~0.65, well below the 0.75 threshold.
-- **Correct approach:** Extract templates directly from real gameplay footage using `tools/extract_templates.py`. Store in `recorded_gameplay_asset_images/<type>/`. Templates from footage match footage.
-- Scale must be derived from video resolution: `base_scale = video_width / 1280`. Search at `[base * 0.85, base, base * 1.15]`.
-- Only escalate to YOLOv8 fine-tuning if template matching demonstrably fails even with footage-extracted templates.
+- **Template matching was abandoned.** Produced zero hits on small assets (stickers). Shop slot positions are not fixed enough for a two-pass (slot detect → classify) approach.
+- **Current approach:** Fine-tune YOLOv8n (`yolov8n.pt`) on footage-labeled bounding boxes. One unified model detects all asset types in a single pass per frame.
+- **Class naming convention:** `type:name` (e.g. `joker:Strength`, `tarot:Death`, `sticker:Eternal`). Type-prefixed to prevent cross-type name collisions and make detections self-describing.
+- Training: freeze first 10 backbone layers (`freeze=10`), fine-tune from pretrained weights. Upgrade to `yolov8s.pt` if accuracy is insufficient after more data.
 
-### Detection Order
-Start with **Skip Tags** for the first PoC. Once this works, the detector + test harness pattern becomes the template for all other element types.
+### Labeling Suite
 
-### Skip Tag ROI
+`python main.py extract BU1` — draw bbox around every visible asset in a frame, name it, press Enter. Repeat for all visible assets, move to next frame.
 
-Tags appear on the blind selection screen. Confirmed working ROI: `x=0.25–0.65, y=0.55–0.90` (fractions of frame). Tune via `--roi` flag and `--save-all` to visually verify.
+- Voice input (Whisper), zoom/pan, asset name autocomplete + fuzzy match, undo, Tab/Shift+Tab to cycle asset types.
+- Each save writes two files to `recorded_gameplay_asset_images/<type>/`:
+  - `AssetName.png` — cropped region (for `assets browse/stats`)
+  - `AssetName.json` — sidecar with `video_path`, `frame_idx`, `frame_w`, `frame_h`, `asset_type`, `asset_name`, `bbox_xyxy`
+- The sidecar JSON is what enables YOLO dataset building. **Crops without sidecars cannot be used for training.**
 
 ### Decision Detection (deferred)
 Compare consecutive frames for inventory delta (item appears/disappears from shop). Comes after element detection is proven.
 
-### Labeling Suite
-
-Built custom — `python main.py extract BU1`. Features: voice input (Whisper), zoom/pan, autocomplete asset names from reference library, fuzzy name matching to enforce naming convention, undo, Tab/Shift+Tab to cycle asset types. Saves to `recorded_gameplay_asset_images/<type>/`.
-
 ## Current Phase
 
-**Phase 0 — Skip Tag Template Matching PoC** (in progress, blocked on template collection)
+**Phase 1 — YOLO Object Detection** (in progress — labeling data, not yet trained)
 
-- `detectors/skip_tags.py` — built and working. Auto-scales to video resolution, ROI cropping, NMS, debug mode.
-- `test_harness.py` — built. `--frames`, `--debug`, `--save-all`, `--n-frames`, `--roi` flags.
-- **Blocker:** Need to collect footage-extracted templates via the labeling tool before detection can be validated.
-- Success = 90%+ accuracy, no false positives.
+The pipeline:
+1. Label footage: `python main.py extract BU1` — label every visible asset per frame
+2. Build dataset: `python main.py dataset build` — extracts full frames + writes YOLO format
+3. Train: `python main.py train --name balatro --epochs 100`
+4. Detect: `python main.py detect BU1 --model runs/detect/balatro/weights/best.pt`
+
+Dataset build is idempotent. Re-label → rebuild → retrain as coverage grows.
 
 ## Repo Contents
 
-- `game_asset_images/` — wiki PNG sprites (use as name reference only, NOT as templates)
-- `recorded_gameplay_asset_images/` — footage-extracted templates (source of truth for detection)
-- `gameplay_sources/gameplay_footage/` — Gold Stake mp4 files (aliased as BU1, BU2, …)
+- `game_asset_images/` — wiki PNG sprites (name reference only, NOT for detection)
+- `recorded_gameplay_asset_images/` — labeled crops + sidecar JSONs (source of truth)
+- `gameplay_sources/gameplay_footage/` — Gold Stake mp4 files (aliased as BU1, BU2, ...)
 - `gameplay_sources/downloader.py` — yt-dlp wrapper
-- `detectors/skip_tags.py` — skip tag detector
-- `test_harness.py` — detection test harness
-- `tools/extract_templates.py` — labeling GUI (voice + zoom)
+- `detectors/yolo_detector.py` — YoloDetector: wraps ultralytics YOLO, parses `type:name` classes
+- `detectors/assets.py` — (deprecated) template-matching detector, kept for reference
+- `test_harness.py` — detection test harness (samples frames, saves annotated output)
+- `tools/extract_templates.py` — labeling GUI (voice + zoom, writes crop + sidecar JSON)
+- `tools/build_dataset.py` — builds YOLO dataset from sidecars
+- `tools/train.py` — wraps ultralytics YOLO train
 - `tools/assets.py` — asset inspector (`stats`, `browse`)
 - `tools/videos.py` — BU alias resolver
 - `main.py` — unified CLI entry point
@@ -65,12 +69,14 @@ Built custom — `python main.py extract BU1`. Features: voice input (Whisper), 
 Everything runs through `main.py`:
 
 ```bash
-python main.py videos                        # list footage BU aliases
-python main.py download <url>                # download YouTube footage
-python main.py detect BU1 [--debug] ...      # run detection
-python main.py extract BU1 [--frame N]       # labeling GUI
-python main.py assets stats [type]           # coverage report
-python main.py assets browse [type]          # thumbnail grid
+python main.py videos                                           # list footage BU aliases
+python main.py download <url>                                   # download YouTube footage
+python main.py extract BU1 [--frame N]                         # labeling GUI
+python main.py dataset build [--output-dir dataset]            # build YOLO dataset
+python main.py train [--name balatro] [--epochs 100]           # train YOLOv8
+python main.py detect BU1 --model runs/detect/balatro/...      # run detection
+python main.py assets stats [type]                             # coverage report
+python main.py assets browse [type]                            # thumbnail grid
 ```
 
 Tab completion: `echo 'eval "$(register-python-argcomplete main.py)"' >> ~/.bashrc`
@@ -78,9 +84,10 @@ Tab completion: `echo 'eval "$(register-python-argcomplete main.py)"' >> ~/.bash
 ## Tech Stack
 
 - Python, OpenCV (cv2), Pillow
+- YOLOv8 (Ultralytics) + PyTorch — primary CV engine
 - `argcomplete` — CLI tab completion
 - `openai-whisper` + `sounddevice` — voice input in labeling tool
-- YOLOv8 (Ultralytics) + PyTorch — for Phase 1+ if template matching insufficient
+- `pyyaml` — dataset YAML writing
 - SQLite or PostgreSQL — run/decision knowledge base (TBD, not started)
 
 ## Working Style Notes

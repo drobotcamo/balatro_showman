@@ -1,5 +1,6 @@
 import argparse
 import difflib
+import json
 import threading
 import tkinter as tk
 from tkinter import ttk
@@ -66,6 +67,7 @@ def _names_for_type(asset_type):
 class TemplateExtractor:
     def __init__(self, video_path, start_frame=0, whisper_model_name="base"):
         self.cap = cv2.VideoCapture(str(video_path))
+        self.video_path = Path(video_path).resolve()
         self.total_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
         self.fps = self.cap.get(cv2.CAP_PROP_FPS)
         self.frame_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -384,6 +386,15 @@ class TemplateExtractor:
             out_path = out_dir / f"{stem}_{n}.png"
             n += 1
         cv2.imwrite(str(out_path), crop)
+        out_path.with_suffix(".json").write_text(json.dumps({
+            "video_path": str(self.video_path),
+            "frame_idx":  self.frame_idx,
+            "frame_w":    self.frame_w,
+            "frame_h":    self.frame_h,
+            "asset_type": self.asset_type.get(),
+            "asset_name": name,
+            "bbox_xyxy":  [x0, y0, x1, y1],
+        }, indent=2))
         self.saved_files.append(out_path)
 
         matched_note = f"  (matched from '{raw}')" if name != raw else ""
@@ -410,6 +421,9 @@ class TemplateExtractor:
         path = self.saved_files.pop()
         try:
             path.unlink()
+            sidecar = path.with_suffix(".json")
+            if sidecar.exists():
+                sidecar.unlink()
             self.status_var.set(f"Undone — deleted {path.name}")
         except FileNotFoundError:
             self.status_var.set(f"Undo: {path.name} already gone")

@@ -88,7 +88,7 @@ def cmd_stats(types):
 
     header = f"{'TYPE':<{col_w}} {'INSTANCES':>10}  {'UNIQUE':>7}  {'REFERENCE':>10}  {'COVERAGE':>9}"
     print(header)
-    print("─" * len(header))
+    print("-" * len(header))
 
     for r in rows:
         if r["reference"]:
@@ -98,12 +98,12 @@ def cmd_stats(types):
         print(f"{r['type']:<{col_w}} {r['instances']:>10}  {r['unique']:>7}  {r['reference']:>10}  {pct:>9}")
         if r["missing"]:
             preview = ", ".join(r["missing"][:6])
-            tail = f"  … +{len(r['missing']) - 6} more" if len(r["missing"]) > 6 else ""
+            tail = f"  +{len(r['missing']) - 6} more" if len(r["missing"]) > 6 else ""
             print(f"  {'missing:':>{col_w - 2}} {preview}{tail}")
 
     total_inst = sum(r["instances"] for r in rows)
     total_uniq = sum(r["unique"] for r in rows)
-    print("─" * len(header))
+    print("-" * len(header))
     print(f"{'TOTAL':<{col_w}} {total_inst:>10}  {total_uniq:>7}")
 
 

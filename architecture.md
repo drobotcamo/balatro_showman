@@ -19,7 +19,7 @@ Tool that will make informed decisions in Balatro at the highest difficulty (Gol
 
 ## Precision: Important
 
-Accuracy of the tool requires near-100% recognition of gameplay elements. For this reason, there is a separate detection layer per element category rather than one general-purpose model.
+Accuracy of the tool requires near-100% recognition of gameplay elements. For this reason, detection uses a single unified YOLOv8 model that detects all asset types in one pass, with type-prefixed class names (`joker:Strength`, `tarot:Death`, etc.) to make detections self-describing.
 
 Gameplay element categories (sorted by importance):
 
@@ -30,10 +30,8 @@ Gameplay element categories (sorted by importance):
 4. Booster Packs
 5. Tarot Cards
 6. Planet Cards
-7. Vouchers (easiest)
+7. Vouchers
 8. Spectral Cards
-
-Elements often appear at different locations, angles, or partially obscured. Detection must handle this.
 
 ## Gameplay States
 
@@ -48,16 +46,36 @@ State transitions that need to be detected:
 7. Selling a purchaseable
 8. Buying a purchaseable
 
-## CV Approach (Phased)
+## CV Approach
 
-**Phase 0 — Template Matching (try first):** Balatro uses fixed pixel-art sprites at consistent sizes. OpenCV template matching against known asset images (`game_asset_images/`) may achieve near-100% accuracy with no training required. Start here because it's the simplest possible approach.
+**Phase 0 — Template Matching (abandoned):** Attempted first due to simplicity. Produced zero hits on small assets (stickers). Shop slot positions are not predictable enough for a fixed-slot approach. Superseded.
 
-- If resolution/scale mismatch is an issue: try multi-scale matching.
-- If compression artifacts (from footage frames) are an issue: try grayscale matching with normalized cross-correlation.
+**Phase 1 — YOLOv8 Object Detection (current):** Fine-tune YOLOv8n on footage-labeled bounding boxes. Handles variable asset positions, small assets, and occlusion without per-asset template management.
 
-**Phase 1 — Object Detection (if template matching fails):** Fine-tune a YOLOv8 model on labeled screenshots. This handles occlusion and variable rendering better at the cost of requiring labeled training data.
+- Class naming: `type:name` (e.g. `joker:Strength`, `sticker:Eternal`). Type-prefixed to prevent cross-type name collisions and make detections self-describing.
+- One unified model detects all asset types in a single pass per frame.
+- Base model: `yolov8n.pt` (nano). Upgrade to `yolov8s.pt` if accuracy is insufficient.
+- Training: fine-tune from pretrained weights with `freeze=10` (backbone layers frozen).
 
-Decision detection (identifying *when* a decision was made by comparing consecutive frames for state delta) comes **after** element detection is proven. Approach: compare consecutive frames, detect inventory delta (item appears/disappears from shop).
+Decision detection (identifying *when* a decision was made by comparing consecutive frames for state delta) comes **after** element detection is proven.
+
+## Dataset Pipeline
+
+```
+python main.py extract <video>        # label assets in footage (GUI)
+                                      # saves crop PNG + sidecar JSON per labeled asset
+                                      # sidecar contains: video_path, frame_idx, bbox_xyxy
+
+python main.py dataset build          # reads all sidecars, extracts full frames from videos,
+                                      # writes YOLO-format images/ + labels/ + dataset.yaml
+
+python main.py train                  # fine-tunes YOLOv8n on the built dataset
+                                      # output: runs/detect/balatro/weights/best.pt
+
+python main.py detect <video>         # runs best.pt on sampled frames, saves annotated output
+```
+
+Re-label → rebuild dataset → retrain as coverage grows. Dataset build is idempotent.
 
 ## Data Storage
 
@@ -67,73 +85,62 @@ A database with related objects to represent everything in a run. Architecture T
 
 Focus on purchase decisions in a shop. "Not buying" is also a decision and carries weight. Given a detected game state, compare against the knowledge base to recommend an action.
 
-# Implementation Plan
-
-## Phase 0: Skip Tag Template Matching PoC
-
-Skip Tags are the first target because they are:
-
-- Common in every run
-- Usually unobstructed
-- In a consistent screen location
-- Limited in number (~30 tags total)
-
-**Deliverables:**
-
-1. `detectors/skip_tags.py` — takes a screenshot, runs `cv2.matchTemplate` against each asset in `game_asset_images/`, returns bounding boxes + tag names above confidence threshold
-2. `test_harness.py` — takes a folder of test screenshots, runs detector on each, saves visual output (screenshot with colored bounding boxes and labels drawn on) for manual evaluation
-
-**Success criteria:** Correctly identifies tags in 90%+ of test screenshots with no false positives on non-tag UI elements.
-
-Once skip tags work, this same pattern (detector + test harness) becomes the reusable template for all other element types.
-
-## Repo Structure
+# Repo Structure
 
 ```text
 main.py                          # unified CLI entry point (python main.py <command>)
 test_harness.py                  # detection test harness (detect subcommand)
 
 ./gameplay_sources
-  /gameplay_footage              # mp4 files — aliased as BU1, BU2, … by mtime
+  /gameplay_footage              # mp4 files — aliased as BU1, BU2, ... by mtime
   downloader.py                  # yt-dlp wrapper: downloads YouTube footage at 1080p
-  video_parser.py                # interval-based frame extractor (util)
 
-./game_asset_images              # wiki PNG sprites — name reference ONLY, not templates
+./game_asset_images              # wiki PNG sprites — name reference ONLY, not for detection
   /blind_images
   /booster_images
   /joker_images
   /tag_images
   ... (etc.)
 
-./recorded_gameplay_asset_images # footage-extracted templates (source of truth for CV)
-  /tags                          # crops from real footage, named to match game_asset_images
-  /jokers
+./recorded_gameplay_asset_images # footage-extracted crops + sidecar JSONs (source of truth)
+  /jokers                        # each PNG has a matching .json with bbox metadata
+  /tags
   ... (etc.)
 
 ./game_asset_urls                # scraped asset URLs and HTML from Balatro wiki
   /htmls
   *.json
-  web_scraper.py
 
-./detectors                      # one detector module per element category
-  skip_tags.py                   # Phase 0 detector (template matching, ROI, multi-scale)
+./detectors
+  yolo_detector.py               # YoloDetector: wraps ultralytics YOLO, parses type:name classes
+  assets.py                      # (deprecated) template-matching detector, kept for reference
 
 ./tools
-  extract_templates.py           # labeling GUI: voice input, zoom/pan, asset autocomplete
-  assets.py                      # asset inspector: stats + thumbnail browse
+  extract_templates.py           # labeling GUI: draws bbox, names asset, saves crop + sidecar JSON
+  build_dataset.py               # builds YOLO dataset from sidecars (images/ + labels/ + yaml)
+  train.py                       # wraps ultralytics YOLO train
+  assets.py                      # asset inspector: coverage stats + thumbnail browse
   videos.py                      # BU alias resolver and video listing
 
-./training_data                  # labeled images for ML phases (future)
+./dataset                        # YOLO-format training dataset (gitignored)
+  images/train/  images/val/
+  labels/train/  labels/val/
+  dataset.yaml
+  classes.txt
+
+./runs                           # ultralytics training output (gitignored)
+  /detect/balatro/weights/best.pt
+
 ./runs_db                        # run and decision storage (future)
 ```
 
 # Tech Stack
 
 - **Python** — primary language
-- **OpenCV (cv2)** — template matching, image preprocessing, bounding box rendering
-- **Pillow** — image handling
-- **YOLOv8 (Ultralytics)** — object detection if template matching insufficient (Phase 1+)
+- **YOLOv8 (Ultralytics)** — object detection, fine-tuned from pretrained weights
 - **PyTorch** — model training backbone
+- **OpenCV (cv2)** — frame extraction, image preprocessing, bounding box rendering
+- **Pillow** — image handling
 - **SQLite or PostgreSQL** — run/decision knowledge base storage (TBD)
 - `argcomplete` — CLI tab completion (bash)
 - `openai-whisper` + `sounddevice` — voice input in labeling tool

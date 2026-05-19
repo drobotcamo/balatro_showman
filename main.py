@@ -2,12 +2,14 @@
 """
 Balatro Showman — unified CLI entry point.
 
-    python main.py videos                          list footage with BU aliases
-    python main.py download <url> [url ...]        download YouTube footage
-    python main.py detect   <video|BU#> [options]  run skip tag detection
-    python main.py extract  <video|BU#> [options]  extract template crops (GUI)
-    python main.py assets   stats  [type]          print asset coverage
-    python main.py assets   browse [type]          open thumbnail grid browser
+    python main.py videos                           list footage with BU aliases
+    python main.py download <url> [url ...]         download YouTube footage
+    python main.py extract  <video|BU#> [options]   label assets in footage (GUI)
+    python main.py dataset  build [options]         build YOLO dataset from labeled sidecars
+    python main.py train    [options]               train YOLOv8 on the built dataset
+    python main.py detect   <video|BU#> [options]   run YOLO asset detection (--model, --asset-type)
+    python main.py assets   stats  [type]           print asset coverage
+    python main.py assets   browse [type]           open thumbnail grid browser
 
 Tab completion (run once):
     echo 'eval "$(register-python-argcomplete main.py)"' >> ~/.bashrc
@@ -33,7 +35,7 @@ def main():
         description="Balatro Showman toolkit",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "Video arguments accept BU aliases (BU1, BU2, …) or full paths.\n"
+            "Video arguments accept BU aliases (BU1, BU2, ...) or full paths.\n"
             "Run 'python main.py videos' to see the current alias mapping."
         ),
     )
@@ -48,20 +50,38 @@ def main():
     from gameplay_sources.downloader import _add_args as _dl_args
     _dl_args(p_dl)
 
-    # ── detect ────────────────────────────────────────────────────────────────
-    p_detect = sub.add_parser("detect", help="Run skip tag detection on footage")
-    from test_harness import _add_args as _detect_args
-    _detect_args(p_detect)
-    _attach_video_completer(p_detect)
-
     # ── extract ───────────────────────────────────────────────────────────────
-    p_extract = sub.add_parser("extract", help="Extract template crops (GUI)")
+    p_extract = sub.add_parser("extract", help="Label assets in footage (GUI, writes sidecar JSONs)")
     from tools.extract_templates import _add_args as _extract_args
     _extract_args(p_extract)
     _attach_video_completer(p_extract)
 
+    # ── dataset ───────────────────────────────────────────────────────────────
+    p_dataset = sub.add_parser("dataset", help="Manage YOLO training dataset")
+    ds_sub = p_dataset.add_subparsers(dest="cmd", metavar="action")
+    ds_sub.required = True
+
+    p_build = ds_sub.add_parser("build", help="Build YOLO dataset from labeled sidecar JSONs")
+    from tools.build_dataset import _add_args as _build_args
+    _build_args(p_build)
+
+    p_synth = ds_sub.add_parser("synthetic", help="Build synthetic dataset from wiki sprites")
+    from tools.build_synthetic_dataset import _add_args as _synth_args
+    _synth_args(p_synth)
+
+    # ── train ─────────────────────────────────────────────────────────────────
+    p_train = sub.add_parser("train", help="Train YOLOv8 on the built dataset")
+    from tools.train import _add_args as _train_args
+    _train_args(p_train)
+
+    # ── detect ────────────────────────────────────────────────────────────────
+    p_detect = sub.add_parser("detect", help="Run YOLO asset detection on footage")
+    from test_harness import _add_args as _detect_args
+    _detect_args(p_detect)
+    _attach_video_completer(p_detect)
+
     # ── assets ────────────────────────────────────────────────────────────────
-    p_assets = sub.add_parser("assets", help="Inspect recorded asset crops")
+    p_assets = sub.add_parser("assets", help="Inspect labeled asset crops")
     assets_sub = p_assets.add_subparsers(dest="cmd", metavar="action")
     assets_sub.required = True
 
@@ -90,12 +110,24 @@ def main():
         from gameplay_sources.downloader import run
         run(args)
 
-    elif args.command == "detect":
-        from test_harness import run
-        run(args)
-
     elif args.command == "extract":
         from tools.extract_templates import run
+        run(args)
+
+    elif args.command == "dataset":
+        if args.cmd == "build":
+            from tools.build_dataset import run
+            run(args)
+        elif args.cmd == "synthetic":
+            from tools.build_synthetic_dataset import run
+            run(args)
+
+    elif args.command == "train":
+        from tools.train import run
+        run(args)
+
+    elif args.command == "detect":
+        from test_harness import run
         run(args)
 
     elif args.command == "assets":
