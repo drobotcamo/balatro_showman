@@ -21,15 +21,17 @@ RECORDED = Path("recorded_gameplay_asset_images")
 REFERENCE = Path("game_asset_images")
 
 ASSET_TYPE_TO_DIR = {
-    "jokers":    "joker_images",
-    "tarots":    "tarot_images",
-    "vouchers":  "voucher_images",
-    "tags":      "tag_images",
-    "planets":   "planet_images",
-    "boosters":  "booster_images",
-    "spectrals": "spectral_images",
-    "blinds":    "blind_images",
-    "stickers":  "sticker_images",
+    "joker":    "joker_images",
+    "tarot":    "tarot_images",
+    "voucher":  "voucher_images",
+    "tag":      "tag_images",
+    "planet":   "planet_images",
+    "booster":  "booster_images",
+    "spectral": "spectral_images",
+    "blind":    "blind_images",
+    "sticker":  "sticker_images",
+    "modifier": "modifier_images",
+    "stake":    "stake_images",
 }
 
 THUMB_SIZE = 80

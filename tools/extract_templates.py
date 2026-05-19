@@ -16,15 +16,14 @@ try:
 except ImportError:
     AUDIO_AVAILABLE = False
 
-from tools.assets import ASSET_TYPE_TO_DIR
 from tools.videos import list_videos, resolve_video
+from game_assets import ASSET_NAMES
 
 OUTPUT_ROOT = Path("recorded_gameplay_asset_images")
-GAME_ASSET_IMAGES = Path("game_asset_images")
 MAX_DISPLAY = (1280, 720)
 SAMPLE_RATE = 16000
 
-ASSET_TYPES = list(ASSET_TYPE_TO_DIR.keys())
+ASSET_TYPES = list(ASSET_NAMES.keys())
 
 
 _FUZZY_THRESHOLD = 0.4
@@ -39,20 +38,7 @@ def _best_match(raw, names):
 
 
 def _names_for_type(asset_type):
-    names = set()
-    dir_name = ASSET_TYPE_TO_DIR.get(asset_type)
-    if dir_name:
-        asset_dir = GAME_ASSET_IMAGES / dir_name
-        if asset_dir.exists():
-            names.update(p.stem.replace("_", " ") for p in asset_dir.glob("*.png"))
-    recorded_dir = OUTPUT_ROOT / asset_type
-    if recorded_dir.exists():
-        for p in recorded_dir.glob("*.json"):
-            try:
-                names.add(json.loads(p.read_text())["asset_name"])
-            except Exception:
-                pass
-    return sorted(names)
+    return list(ASSET_NAMES.get(asset_type, []))
 
 
 def _build_pool(video_paths, pool_size):
@@ -478,6 +464,11 @@ class TemplateExtractor:
 
         name = _best_match(raw, self._all_names)
 
+        known = ASSET_NAMES.get(self.asset_type.get(), [])
+        if name not in known:
+            self.status_var.set(f"Unknown asset '{name}' -- not in registry for {self.asset_type.get()}")
+            return
+
         # First Enter: show matched name as confirmation, wait for second Enter
         if not self._confirm_pending:
             self.name_var.set(name)
@@ -639,10 +630,6 @@ def run(args):
     print(f"Sampling from {len(selected)} video(s): {', '.join(selected.values())}")
     print(f"Pool: {args.pool_size} random frames")
     print(f"Saving labels to: {OUTPUT_ROOT.resolve()}\n")
-
-    missing = [t for t, d in ASSET_TYPE_TO_DIR.items() if d and not (GAME_ASSET_IMAGES / d).exists()]
-    if missing:
-        print(f"Warning: game_asset_images/ subdirs missing for: {', '.join(missing)}")
 
     video_paths = [Path(p) for p in selected]
     TemplateExtractor(video_paths, pool_size=args.pool_size,
