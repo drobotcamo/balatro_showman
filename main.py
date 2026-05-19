@@ -12,6 +12,7 @@ Balatro Showman — unified CLI entry point.
     python main.py detect   <video|BU#> [options]   run YOLO asset detection
     python main.py assets   stats  [type]           print asset coverage
     python main.py assets   browse [type]           open thumbnail grid browser
+    python main.py migrate  [--execute] [--cleanup] migrate JSON sidecars to labels.db
 
 Tab completion (run once):
     echo 'eval "$(register-python-argcomplete main.py)"' >> ~/.bashrc
@@ -88,6 +89,16 @@ def main():
     _detect_args(p_detect)
     _attach_video_completer(p_detect)
 
+    # ── migrate ───────────────────────────────────────────────────────────────
+    p_migrate = sub.add_parser("migrate", help="Migrate JSON sidecar labels to labels.db")
+    from tools.migrate_labels import main as _migrate_main  # noqa: F401 — for arg registration
+    p_migrate.add_argument("--execute", action="store_true",
+                           help="Write to labels.db (default is dry run)")
+    p_migrate.add_argument("--cleanup", action="store_true",
+                           help="Delete old JSON+PNG pairs after insert (requires --execute)")
+    p_migrate.add_argument("--force", action="store_true",
+                           help="Migrate even if labels.db already has rows")
+
     # ── assets ────────────────────────────────────────────────────────────────
     p_assets = sub.add_parser("assets", help="Inspect labeled asset crops")
     assets_sub = p_assets.add_subparsers(dest="cmd", metavar="action")
@@ -143,6 +154,10 @@ def main():
 
     elif args.command == "detect":
         from tools.detect import run
+        run(args)
+
+    elif args.command == "migrate":
+        from tools.migrate_labels import run
         run(args)
 
     elif args.command == "assets":

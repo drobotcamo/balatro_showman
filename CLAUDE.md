@@ -19,7 +19,8 @@ A tool that advises on shop decisions in Balatro at **Gold Stake** (hardest diff
 
 - **Template matching was abandoned.** Produced zero hits on small assets (stickers). Shop slot positions are not fixed enough for a two-pass (slot detect → classify) approach.
 - **Current approach:** Fine-tune YOLO26s (`yolo26s.pt`) on footage-labeled bounding boxes. One unified model detects all asset types in a single pass per frame.
-- **Class naming convention:** `type:name` (e.g. `joker:Strength`, `tarot:Death`, `sticker:Eternal`). Type-prefixed to prevent cross-type name collisions and make detections self-describing.
+- **Class naming convention:** `type:name` (e.g. `joker:Strength`, `tarot:Death`, `sticker:Eternal`). Type is always singular. Type-prefixed to prevent cross-type name collisions and make detections self-describing.
+- **Intra-class visual variants:** Multiple visual variants of the same game object map to a single class. E.g. booster packs have different art per pack size but all "Arcana Jumbo" variants are labeled `booster:Arcana Jumbo`. The model learns to recognize all variants as one class — this is intentional and makes the detector more robust.
 - Training: freeze first 10 backbone layers (`freeze=10`), fine-tune from pretrained weights. Upgrade to `yolo26m.pt` if accuracy is insufficient after more data.
 
 ### Labeling Suite
@@ -27,10 +28,9 @@ A tool that advises on shop decisions in Balatro at **Gold Stake** (hardest diff
 `python main.py extract BU1` — draw bbox around every visible asset in a frame, name it, press Enter. Repeat for all visible assets, move to next frame.
 
 - Voice input (Whisper), zoom/pan, asset name autocomplete + fuzzy match, undo, Tab/Shift+Tab to cycle asset types.
-- Each save writes two files to `recorded_gameplay_asset_images/<type>/`:
-  - `AssetName.png` — cropped region (for `assets browse/stats`)
-  - `AssetName.json` — sidecar with `video_path`, `frame_idx`, `frame_w`, `frame_h`, `asset_type`, `asset_name`, `bbox_xyxy`
-- The sidecar JSON is what enables YOLO dataset building. **Crops without sidecars cannot be used for training.**
+- Each save writes one row to `recorded_gameplay_asset_images/labels.db` and one PNG crop to `recorded_gameplay_asset_images/<type>/<id:06d>.png`.
+- **`labels.db` is the source of truth.** The PNG crop is a derived cache used only by `assets browse`. A label is defined entirely by its DB row.
+- `asset_type` in the DB and directory names use **singular** form (`joker`, `tarot`, `sticker`, etc.) matching the YOLO class prefix.
 
 **Keyboard shortcuts:**
 
@@ -48,11 +48,11 @@ A tool that advises on shop decisions in Balatro at **Gold Stake** (hardest diff
 | 0 / Home | Reset zoom to full frame |
 | Q | Quit |
 
-**Autocomplete** sources names from both `game_asset_images/` (wiki sprites) and existing sidecar JSONs in `recorded_gameplay_asset_images/`. Fuzzy match fires only above a 0.4 similarity threshold — below that the raw spoken/typed string is kept so the mismatch is visible.
+**Autocomplete** sources names exclusively from `game_assets.py` (`ASSET_NAMES` dict). Fuzzy match fires only above a 0.4 similarity threshold. **If the resolved name is not in the registry, the save is blocked** — unknown asset names cannot be created. To add a new asset, add it to `game_assets.py` first.
 
-**Label index:** On startup, the tool builds a `(video_name, frame_idx) → count` index from all existing sidecars in the background. While labeling, the nav bar shows `[N labeled]` next to any frame that already has labels, so you know whether to skip it or add more.
+**Label index:** On startup, the tool queries `labels.db` in a background thread (`SELECT ... GROUP BY video_path, frame_idx`) and builds a `(video_name, frame_idx) → count` index. While labeling, the nav bar shows `[N labeled]` next to any frame that already has labels.
 
-**`assets browse` undo:** Ctrl+Z restores the last deleted crop and its sidecar JSON from in-memory bytes. Closing the window discards the undo history.
+**`assets browse` undo:** Ctrl+Z re-inserts the deleted DB row and restores the PNG from in-memory bytes captured at delete time. Closing the window discards the undo history.
 
 ### Decision Detection (deferred)
 Compare consecutive frames for inventory delta (item appears/disappears from shop). Comes after element detection is proven.
@@ -71,19 +71,22 @@ Dataset build is idempotent. Re-label → rebuild → retrain as coverage grows.
 
 ## Repo Contents
 
-- `game_asset_images/` — wiki PNG sprites (name reference only, NOT for detection)
-- `recorded_gameplay_asset_images/` — labeled crops + sidecar JSONs (source of truth)
+- `game_assets.py` — **single source of truth** for all valid asset names, keyed by singular type (`joker`, `tarot`, etc.). Edit this to add/remove valid names. Labeling tool enforces it — saves with unknown names are blocked.
+- `label_store.py` — `Label` (Pydantic model), `LabelStore` (SQLite data access), exceptions (`LabelStoreError`, `SchemaMismatchError`, `LabelNotFoundError`), constants `LABEL_ROOT`/`DB_PATH`. **All label reads and writes go through this.**
+- `game_asset_images/` — wiki PNG sprites (visual reference only, NOT used for detection or autocomplete)
+- `recorded_gameplay_asset_images/` — label store root; `labels.db` is the DB; subdirs `<type>/` hold PNG crops named `<id:06d>.png`
 - `gameplay_sources/gameplay_footage/` — Gold Stake mp4 files (aliased as BU1, BU2, ...)
 - `gameplay_sources/downloader.py` — yt-dlp wrapper
 - `detectors/yolo_detector.py` — YoloDetector: wraps ultralytics YOLO, parses `type:name` classes
 - `detectors/assets.py` — (deprecated) template-matching detector, kept for reference
 - `tools/detect.py` — `detect` command: samples frames, runs YOLO, writes annotated JPEGs + detections.jsonl
-- `tools/extract_templates.py` — labeling GUI (voice + zoom, writes crop + sidecar JSON)
-- `tools/build_dataset.py` — builds YOLO dataset from labeled sidecar JSONs
+- `tools/extract_templates.py` — labeling GUI (voice + zoom, writes to `LabelStore`)
+- `tools/build_dataset.py` — builds YOLO dataset by reading all labels from `LabelStore`
 - `tools/build_synthetic_dataset.py` — builds synthetic YOLO dataset by compositing wiki sprites onto footage frames
+- `tools/migrate_labels.py` — one-time migration from old JSON sidecars to `labels.db` (already run)
 - `tools/train.py` — wraps ultralytics YOLO train
 - `tools/models.py` — trained model registry; active model tracking via `.model` file
-- `tools/assets.py` — asset inspector (`stats`, `browse`); defines `ASSET_TYPE_TO_DIR`
+- `tools/assets.py` — asset inspector (`stats`, `browse`); defines `ASSET_TYPE_TO_DIR` (singular keys → `game_asset_images/` subdir names)
 - `tools/videos.py` — BU alias resolver
 - `main.py` — unified CLI entry point
 - `architecture.md` — full architecture plan (keep in sync with this file)
@@ -96,7 +99,7 @@ Everything runs through `main.py`:
 python main.py videos                                           # list footage BU aliases
 python main.py download <url>                                   # download YouTube footage
 python main.py extract BU1                                     # labeling GUI
-python main.py dataset build [--output-dir dataset]            # build YOLO dataset from sidecars
+python main.py dataset build [--output-dir dataset]            # build YOLO dataset from labels.db
 python main.py dataset synthetic [--output-dir dataset_synthetic]  # build synthetic dataset from wiki sprites
 python main.py train [--name balatro] [--epochs 100]           # train YOLO26s
 python main.py models                                           # list trained models + mAP50
@@ -105,6 +108,7 @@ python main.py detect BU1                                       # run detection 
 python main.py detect BU1 --model balatro_v2                    # run detection (override model)
 python main.py assets stats [type]                             # coverage report
 python main.py assets browse [type]                            # thumbnail grid
+python main.py migrate [--execute] [--cleanup]                 # migrate JSON sidecars → labels.db (already run)
 ```
 
 Tab completion: `echo 'eval "$(register-python-argcomplete main.py)"' >> ~/.bashrc`
@@ -116,6 +120,8 @@ Tab completion: `echo 'eval "$(register-python-argcomplete main.py)"' >> ~/.bash
 - `argcomplete` — CLI tab completion
 - `openai-whisper` + `sounddevice` — voice input in labeling tool
 - `pyyaml` — dataset YAML writing
+- `pydantic` (v1) — `Label` data model validation in `label_store.py`
+- `sqlite3` (stdlib) — label store (`recorded_gameplay_asset_images/labels.db`)
 - SQLite or PostgreSQL — run/decision knowledge base (TBD, not started)
 
 ## Working Style Notes

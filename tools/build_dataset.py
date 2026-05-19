@@ -13,7 +13,6 @@ Re-running is idempotent: already-extracted frames are skipped.
 """
 
 import argparse
-import json
 import random
 import sys
 from collections import defaultdict
@@ -23,24 +22,18 @@ import cv2
 import yaml
 
 from utils import progress
+from label_store import Label, LabelStore
 
-RECORDED = Path("recorded_gameplay_asset_images")
 FOOTAGE_DIR = Path("gameplay_sources/gameplay_footage")
 
 
-def _load_sidecars():
-    sidecars = []
-    for p in sorted(RECORDED.rglob("*.json")):
-        try:
-            data = json.loads(p.read_text())
-            sidecars.append(data)
-        except Exception as e:
-            print(f"  WARNING: could not read {p}: {e}")
-    return sidecars
+def _load_labels() -> list:
+    with LabelStore() as store:
+        return store.all()
 
 
-def _class_label(sidecar):
-    return f"{sidecar['asset_type']}:{sidecar['asset_name']}"
+def _class_label(label: Label) -> str:
+    return f"{label.asset_type}:{label.asset_name}"
 
 
 def _resolve_video_path(value: str) -> str:
@@ -51,17 +44,16 @@ def _resolve_video_path(value: str) -> str:
     return str(FOOTAGE_DIR / p.name)
 
 
-def _frame_key(sidecar):
-    return (sidecar["video_path"], sidecar["frame_idx"])
+def _frame_key(label: Label) -> tuple:
+    return (label.video_path, label.frame_idx)
 
 
-def _yolo_bbox(sidecar):
-    x0, y0, x1, y1 = sidecar["bbox_xyxy"]
-    fw, fh = sidecar["frame_w"], sidecar["frame_h"]
-    cx = (x0 + x1) / 2 / fw
-    cy = (y0 + y1) / 2 / fh
-    w  = (x1 - x0) / fw
-    h  = (y1 - y0) / fh
+def _yolo_bbox(label: Label) -> tuple:
+    x0, y0, x1, y1 = label.bbox_xyxy
+    cx = (x0 + x1) / 2 / label.frame_w
+    cy = (y0 + y1) / 2 / label.frame_h
+    w  = (x1 - x0) / label.frame_w
+    h  = (y1 - y0) / label.frame_h
     return cx, cy, w, h
 
 
@@ -115,21 +107,21 @@ def run(args):
         (out_dir / "images" / split).mkdir(parents=True, exist_ok=True)
         (out_dir / "labels" / split).mkdir(parents=True, exist_ok=True)
 
-    sidecars = _load_sidecars()
-    if not sidecars:
-        print("No sidecar JSONs found under recorded_gameplay_asset_images/.")
+    labels = _load_labels()
+    if not labels:
+        print("No labels found in the label store.")
         print("Label some footage first:  python main.py extract <video>")
         sys.exit(1)
 
-    print(f"Found {len(sidecars)} labeled instances.")
+    print(f"Found {len(labels)} labeled instances.")
 
     # Build class list
-    all_labels = sorted({_class_label(s) for s in sidecars})
+    all_labels = sorted({_class_label(s) for s in labels})
     label_to_idx = {lbl: i for i, lbl in enumerate(all_labels)}
 
     # Group by (video_path, frame_idx)
     groups: dict[tuple, list] = defaultdict(list)
-    for s in sidecars:
+    for s in labels:
         groups[_frame_key(s)].append(s)
 
     class_to_groups: dict[str, list] = defaultdict(list)

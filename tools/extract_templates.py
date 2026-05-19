@@ -1,6 +1,5 @@
 import argparse
 import difflib
-import json
 import random
 import threading
 import tkinter as tk
@@ -18,8 +17,8 @@ except ImportError:
 
 from tools.videos import list_videos, resolve_video
 from game_assets import ASSET_NAMES
+from label_store import LABEL_ROOT, Label, LabelStore, LabelNotFoundError, LabelStoreError
 
-OUTPUT_ROOT = Path("recorded_gameplay_asset_images")
 MAX_DISPLAY = (1280, 720)
 SAMPLE_RATE = 16000
 
@@ -103,12 +102,15 @@ class TemplateExtractor:
         self.audio_chunks = []
         self.audio_thread = None
 
+        self._store = LabelStore()
+
         self._build_ui()
         self._load_pool_frame(0)
         threading.Thread(target=self._load_whisper, args=(whisper_model_name,), daemon=True).start()
         threading.Thread(target=self._build_label_index, daemon=True).start()
         self.root.mainloop()
 
+        self._store.close()
         for cap in self._caps.values():
             cap.release()
 
@@ -160,19 +162,7 @@ class TemplateExtractor:
         return result["text"].strip().strip(".,!? ")
 
     def _build_label_index(self):
-        index = {}
-        for asset_type in ASSET_TYPES:
-            asset_dir = OUTPUT_ROOT / asset_type
-            if not asset_dir.exists():
-                continue
-            for json_file in asset_dir.glob("*.json"):
-                try:
-                    data = json.loads(json_file.read_text())
-                    key = (data["video_path"], data["frame_idx"])
-                    index[key] = index.get(key, 0) + 1
-                except Exception:
-                    pass
-        self._label_index = index
+        self._label_index = self._store.count_by_frame()
 
     # ── UI ────────────────────────────────────────────────────────────────────
 
@@ -314,7 +304,7 @@ class TemplateExtractor:
         existing = self._label_index.get(key, 0)
         badge = f"  [{existing} labeled]" if existing else ""
         self.frame_label.set(f"{alias}   frame {self.frame_idx:,}   ({ts:.1f}s){badge}")
-        out_dir = OUTPUT_ROOT / self.asset_type.get()
+        out_dir = LABEL_ROOT / self.asset_type.get()
         self.save_label.set(f"-> {out_dir}")
 
     def _redraw(self):
@@ -489,25 +479,23 @@ class TemplateExtractor:
             self.status_var.set("Selection too small.")
             return
 
-        out_dir = OUTPUT_ROOT / self.asset_type.get()
-        out_dir.mkdir(parents=True, exist_ok=True)
-        stem = name.replace(" ", "_")
-        out_path = out_dir / f"{stem}.png"
-        n = 1
-        while out_path.exists():
-            out_path = out_dir / f"{stem}_{n}.png"
-            n += 1
-        cv2.imwrite(str(out_path), crop)
-        out_path.with_suffix(".json").write_text(json.dumps({
-            "video_path": self.video_path.name,
-            "frame_idx":  self.frame_idx,
-            "frame_w":    self.frame_w,
-            "frame_h":    self.frame_h,
-            "asset_type": self.asset_type.get(),
-            "asset_name": name,
-            "bbox_xyxy":  [x0, y0, x1, y1],
-        }, indent=2))
-        self.saved_files.append((out_path, self.video_path.name, self.frame_idx))
+        _, png_buf = cv2.imencode(".png", crop)
+        label = Label(
+            video_path=self.video_path.name,
+            frame_idx=self.frame_idx,
+            frame_w=self.frame_w,
+            frame_h=self.frame_h,
+            asset_type=self.asset_type.get(),
+            asset_name=name,
+            bbox_xyxy=(x0, y0, x1, y1),
+        )
+        try:
+            saved = self._store.add(label, png_buf.tobytes())
+        except LabelStoreError as e:
+            self.status_var.set(f"Save failed: {e}")
+            return
+
+        self.saved_files.append(saved)
         key = (self.video_path.name, self.frame_idx)
         self._label_index[key] = self._label_index.get(key, 0) + 1
         self.session_count += 1
@@ -515,7 +503,7 @@ class TemplateExtractor:
         self._update_info()
 
         matched = f"  (matched '{raw}')" if name != raw else ""
-        self.status_var.set(f"Saved {out_path.name}{matched}   -- draw next box or [R] next frame")
+        self.status_var.set(f"Saved label #{saved.id} ({name}){matched}   -- draw next box or [R] next frame")
         self.name_var.set("")
         self._clear_selection()
         self.root.focus_set()
@@ -563,20 +551,17 @@ class TemplateExtractor:
         if not self.saved_files:
             self.status_var.set("Nothing to undo.")
             return
-        path, video_name, frame_idx = self.saved_files.pop()
+        saved = self.saved_files.pop()
         self.session_count = max(0, self.session_count - 1)
         self.count_label.set(f"Session: {self.session_count} labels")
-        key = (video_name, frame_idx)
+        key = (saved.video_path, saved.frame_idx)
         self._label_index[key] = max(0, self._label_index.get(key, 0) - 1)
         self._update_info()
         try:
-            path.unlink()
-            sidecar = path.with_suffix(".json")
-            if sidecar.exists():
-                sidecar.unlink()
-            self.status_var.set(f"Undone -- deleted {path.name}")
-        except FileNotFoundError:
-            self.status_var.set(f"Undo: {path.name} already gone")
+            self._store.delete(saved.id)
+            self.status_var.set(f"Undone -- deleted label #{saved.id} ({saved.asset_name})")
+        except LabelNotFoundError:
+            self.status_var.set(f"Undo: label #{saved.id} already gone")
 
     def _cycle_asset_type(self, direction):
         idx = (ASSET_TYPES.index(self.asset_type.get()) + direction) % len(ASSET_TYPES)
@@ -629,7 +614,7 @@ def run(args):
 
     print(f"Sampling from {len(selected)} video(s): {', '.join(selected.values())}")
     print(f"Pool: {args.pool_size} random frames")
-    print(f"Saving labels to: {OUTPUT_ROOT.resolve()}\n")
+    print(f"Saving labels to: {LABEL_ROOT.resolve()}\n")
 
     video_paths = [Path(p) for p in selected]
     TemplateExtractor(video_paths, pool_size=args.pool_size,

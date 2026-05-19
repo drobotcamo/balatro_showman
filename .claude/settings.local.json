@@ -44,7 +44,23 @@
       "Read(//c/Users/camgr/.claude/**)",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\camgr\\\\.claude\\\\projects\\\\\" -Force | ForEach-Object { $_.Name })",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\camgr\\\\.claude\\\\projects\\\\\" -Recurse -Force | Where-Object { !$_.PSIsContainer } | ForEach-Object { \"$\\($_.DirectoryName.Replace\\('C:\\\\Users\\\\camgr\\\\.claude\\\\projects\\\\',''\\)\\)  \\\\  $\\($_.Name\\)\" })",
-      "Bash(.venv/Scripts/python main.py videos)"
+      "Bash(.venv/Scripts/python main.py videos)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\camgr\\\\Documents\\\\code_projects\\\\balatro_showman\" -Recurse -Directory)",
+      "PowerShell(Get-ChildItem \"c:\\\\Users\\\\camgr\\\\Documents\\\\code_projects\\\\balatro_showman\" -Depth 0 | Where-Object { -not $_.PSIsContainer } | Select-Object Name)",
+      "Bash(python -c \"import pydantic; print\\(pydantic.__version__\\)\")",
+      "Bash(python -m pytest tests/test_label_store.py -v)",
+      "Bash(python -c \"import label_store; print\\('label_store OK'\\)\")",
+      "Bash(python -c \"import tools.build_dataset; print\\('build_dataset OK'\\)\")",
+      "Bash(python -c \"import tools.migrate_labels; print\\('migrate_labels OK'\\)\")",
+      "Bash(python tools/migrate_labels.py)",
+      "Bash(python main.py migrate)",
+      "Bash(python main.py migrate --execute)",
+      "Bash(python -c \"from label_store import LabelStore; s = LabelStore\\(\\); labels = s.all\\(\\); print\\(f'{len\\(labels\\)} labels in DB'\\); print\\('First:', labels[0]\\); s.close\\(\\)\")",
+      "Bash(python main.py migrate --execute --cleanup --force)",
+      "WebFetch(domain:github.com)",
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "Bash(xargs -I {} curl -s {})"
     ],
     "additionalDirectories": [
       "C:\\Users\\camgr\\.claude\\projects\\c--Users-camgr-Documents-code_projects-balatro_showman"

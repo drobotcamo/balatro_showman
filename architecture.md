@@ -63,10 +63,10 @@ Decision detection (identifying *when* a decision was made by comparing consecut
 
 ```
 python main.py extract <video>        # label assets in footage (GUI)
-                                      # saves crop PNG + sidecar JSON per labeled asset
-                                      # sidecar contains: video_path, frame_idx, bbox_xyxy
+                                      # writes one DB row to labels.db + one PNG crop per label
+                                      # DB row contains: video_path, frame_idx, bbox_xyxy, asset_type, asset_name
 
-python main.py dataset build          # reads all sidecars, extracts full frames from videos,
+python main.py dataset build          # reads all labels from labels.db, extracts full frames from videos,
                                       # writes YOLO-format images/ + labels/ + dataset.yaml
 
 python main.py train                  # fine-tunes YOLO26s on the built dataset
@@ -102,9 +102,10 @@ test_harness.py                  # detection test harness (detect subcommand)
   /tag_images
   ... (etc.)
 
-./recorded_gameplay_asset_images # footage-extracted crops + sidecar JSONs (source of truth)
-  /jokers                        # each PNG has a matching .json with bbox metadata
-  /tags
+./recorded_gameplay_asset_images # label store root (gitignored)
+  labels.db                      # SQLite DB — source of truth for all labels
+  /joker                         # PNG crops named <id:06d>.png (derived cache for browse)
+  /tarot
   ... (etc.)
 
 ./game_asset_urls                # scraped asset URLs and HTML from Balatro wiki
@@ -116,8 +117,9 @@ test_harness.py                  # detection test harness (detect subcommand)
   assets.py                      # (deprecated) template-matching detector, kept for reference
 
 ./tools
-  extract_templates.py           # labeling GUI: draws bbox, names asset, saves crop + sidecar JSON
-  build_dataset.py               # builds YOLO dataset from sidecars (images/ + labels/ + yaml)
+  extract_templates.py           # labeling GUI: draws bbox, names asset, writes to LabelStore
+  build_dataset.py               # builds YOLO dataset from LabelStore (images/ + labels/ + yaml)
+  migrate_labels.py              # one-time migration: JSON sidecars → labels.db (already run)
   train.py                       # wraps ultralytics YOLO train
   assets.py                      # asset inspector: coverage stats + thumbnail browse
   videos.py                      # BU alias resolver and video listing
@@ -141,7 +143,9 @@ test_harness.py                  # detection test harness (detect subcommand)
 - **PyTorch** — model training backbone
 - **OpenCV (cv2)** — frame extraction, image preprocessing, bounding box rendering
 - **Pillow** — image handling
+- **SQLite** (`sqlite3` stdlib) — label store (`recorded_gameplay_asset_images/labels.db`)
 - **SQLite or PostgreSQL** — run/decision knowledge base storage (TBD)
+- **pydantic** (v1) — `Label` data model with validation (`label_store.py`)
 - `argcomplete` — CLI tab completion (bash)
 - `openai-whisper` + `sounddevice` — voice input in labeling tool
 - Labeling suite: custom-built (`tools/extract_templates.py`) with voice, zoom, autocomplete
