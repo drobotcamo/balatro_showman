@@ -90,23 +90,41 @@ Once skip tags work, this same pattern (detector + test harness) becomes the reu
 ## Repo Structure
 
 ```text
+main.py                          # unified CLI entry point (python main.py <command>)
+test_harness.py                  # detection test harness (detect subcommand)
+
 ./gameplay_sources
-  /gameplay_footage        # mp4 files (YouTube footage, Gold Stake runs)
-  downloader.py            # yt-dlp wrapper: downloads YouTube footage at 1080p
-  video_parser.py          # interval-based frame extractor (util)
-./game_asset_images        # PNGs of each game asset, organized by type
+  /gameplay_footage              # mp4 files — aliased as BU1, BU2, … by mtime
+  downloader.py                  # yt-dlp wrapper: downloads YouTube footage at 1080p
+  video_parser.py                # interval-based frame extractor (util)
+
+./game_asset_images              # wiki PNG sprites — name reference ONLY, not templates
   /blind_images
   /booster_images
   /joker_images
   /tag_images
   ... (etc.)
-./game_asset_urls          # scraped asset URLs and HTML from Balatro wiki
+
+./recorded_gameplay_asset_images # footage-extracted templates (source of truth for CV)
+  /tags                          # crops from real footage, named to match game_asset_images
+  /jokers
+  ... (etc.)
+
+./game_asset_urls                # scraped asset URLs and HTML from Balatro wiki
   /htmls
-  *.json                   # image URL lists per asset category
+  *.json
   web_scraper.py
-./detectors                # one detector module per element category (to be built)
-./training_data            # labeled images for ML phases (future)
-./runs_db                  # run and decision storage (future)
+
+./detectors                      # one detector module per element category
+  skip_tags.py                   # Phase 0 detector (template matching, ROI, multi-scale)
+
+./tools
+  extract_templates.py           # labeling GUI: voice input, zoom/pan, asset autocomplete
+  assets.py                      # asset inspector: stats + thumbnail browse
+  videos.py                      # BU alias resolver and video listing
+
+./training_data                  # labeled images for ML phases (future)
+./runs_db                        # run and decision storage (future)
 ```
 
 # Tech Stack
@@ -117,4 +135,6 @@ Once skip tags work, this same pattern (detector + test harness) becomes the reu
 - **YOLOv8 (Ultralytics)** — object detection if template matching insufficient (Phase 1+)
 - **PyTorch** — model training backbone
 - **SQLite or PostgreSQL** — run/decision knowledge base storage (TBD)
-- Labeling suite TBD — possibly Label Studio or custom with voice input for speed
+- `argcomplete` — CLI tab completion (bash)
+- `openai-whisper` + `sounddevice` — voice input in labeling tool
+- Labeling suite: custom-built (`tools/extract_templates.py`) with voice, zoom, autocomplete
