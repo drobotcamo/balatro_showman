@@ -20,7 +20,8 @@ with a single shared stabilization model for objects and OCR fields.
 - Track IDs, per-frame boxes, confidence history, and lifecycle status.
 - Cleaned detection tables.
 - Track-quality diagnostics.
-- A shared stabilization/age record also consumed by OCR.
+- A shared stabilization/age record covering object tracks and OCR fields,
+  consumed by state composition (Phase 7). OCR does not consume it.
 
 ## Invariants
 

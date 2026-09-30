@@ -18,18 +18,20 @@ using a recognizer trained on synthetic glyph crops and canonical regions.
 ## Outputs
 
 - Raw OCR records with text, confidence, region, and frame.
-- Validated/stabilized field values.
+- Validated field values (parser and range checks; temporal stabilization is
+  not applied here).
 - Field-level quality and unknown reasons.
 
 ## Invariants
 
-- Raw OCR is never overwritten by stabilization.
+- Raw OCR is never overwritten; any downstream stabilization is attributed,
+  not in-place.
 - Each field has its own parser, valid range, and `X/Y` handling where relevant.
-- Carry-forward values retain provenance and age.
 - Regions come from the coordinates stage; no per-video hardcoded pixels.
-- Tracking (Phase 6) owns the single shared stabilization/provenance model;
-  OCR emits raw and validated values and does not carry values forward on its
-  own. The two stages never double-carry.
+- Tracking (Phase 6) owns the single shared stabilization/provenance model and
+  is the only stage that carries values forward. OCR emits per-frame raw and
+  validated values and neither consumes the stabilized record nor carries
+  values forward itself. The two stages never double-carry.
 
 ## Acceptance Criteria
 

@@ -148,7 +148,8 @@ Status: `planned`
 
 Extract chips, mult, money, blind values, ante, hands, discards, and other text
 fields using canonical coordinate regions, a synthetically trained recognizer,
-per-field validation, and temporal stabilization.
+and per-field validation. Temporal stabilization is owned by Phase 6; OCR emits
+per-frame raw and validated values only.
 
 Gate:
 
@@ -161,9 +162,9 @@ Gate:
 
 Status: `planned`
 
-Turn frame-level detections into temporally consistent object tracks, handling
-brief misses, movement, duplicate boxes, and changing confidence, with a defined
-interface to OCR stabilization.
+Turn frame-level detections and per-frame OCR fields into temporally consistent
+observations, handling brief misses, movement, duplicate boxes, and changing
+confidence, with one shared stabilization model for objects and OCR fields.
 
 Gate:
 

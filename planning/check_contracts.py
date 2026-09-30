@@ -8,11 +8,11 @@ Checks (mechanical only; it does not judge prose quality or gate thresholds):
 - planning/DECISIONS.md uses ADR-lite entry headers, unique IDs, and
   append-only (strictly increasing) ID order.
 - planning/LEARNINGS.md entries use the documented date-title format.
-- Every open question in planning/DECISIONS.md is linked from
-  planning/ROADMAP.md.
+- Every open question in planning/DECISIONS.md has a row in the ROADMAP
+  `## Open Questions And Gates` table.
 - Every component contract has the required sections and a valid status.
-- Every ROADMAP phase has a status and a gate, and every component file has an
-  owning phase or cross-cutting reference in planning/ROADMAP.md.
+- Every ROADMAP phase has a status and a gate, and every component file is
+  listed in the ROADMAP `## Component Ownership` table.
 - Backtick file references in the core agent/planning documents resolve to real
   files. Inventory documents that intentionally reference external or vendored
   artifacts (e.g. `planning/PHASE0_INVENTORY.md`) are excluded, because those
@@ -91,6 +91,16 @@ def strip_fenced(text: str) -> str:
     return re.sub(r"```.*?```", "", text, flags=re.S)
 
 
+def section(text: str, heading: str) -> str | None:
+    """Return the body of a `## heading` section, or None if absent."""
+    match = re.search(rf"(?m)^{re.escape(heading)}[ \t]*$", text)
+    if not match:
+        return None
+    rest = text[match.end():]
+    next_heading = re.search(r"(?m)^## ", rest)
+    return rest[: next_heading.start()] if next_heading else rest
+
+
 def check_decisions() -> None:
     path = PLANNING / "DECISIONS.md"
     text = strip_fenced(path.read_text(encoding="utf-8"))
@@ -120,10 +130,16 @@ def check_open_questions() -> None:
     decisions = (PLANNING / "DECISIONS.md").read_text(encoding="utf-8")
     roadmap = (PLANNING / "ROADMAP.md").read_text(encoding="utf-8")
     questions = re.findall(r"\*\*(Q\d{2})\*\*", decisions)
+    table = section(roadmap, "## Open Questions And Gates")
+    if table is None:
+        fail("ROADMAP.md: missing '## Open Questions And Gates' section")
+        return
+    linked = set(re.findall(r"\|\s*(Q\d{2})\s*\|", table))
     for question in questions:
-        if question not in roadmap:
+        if question not in linked:
             fail(
-                f"ROADMAP.md: open question {question} is not linked from the roadmap"
+                f"ROADMAP.md: open question {question} has no row in the "
+                "Open Questions And Gates table"
             )
 
 
@@ -157,11 +173,21 @@ def check_roadmap() -> None:
             fail(f"ROADMAP.md: {phase} has no valid `Status: ` line")
         if not re.search(r"^Gate\b", part, re.M):
             fail(f"ROADMAP.md: {phase} has no gate")
+    ownership = section(text, "## Component Ownership")
+    if ownership is None:
+        fail("ROADMAP.md: missing '## Component Ownership' section")
+        return
+    rows = "\n".join(
+        line
+        for line in ownership.splitlines()
+        if line.strip().startswith("|")
+    )
+    listed = set(re.findall(r"components/[A-Za-z0-9._-]+\.md", rows))
     for component in sorted((PLANNING / "components").glob("*.md")):
-        if component.name not in text:
+        if f"components/{component.name}" not in listed:
             fail(
-                f"ROADMAP.md: component {component.name!r} has no owning phase "
-                "or cross-cutting reference"
+                f"ROADMAP.md: component {component.name!r} is not in the "
+                "Component Ownership table"
             )
 
 

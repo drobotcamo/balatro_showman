@@ -32,8 +32,11 @@ ONLINE VIDEO INFERENCE
                        page + zone assignment
                                  |
                                  v
-            OCR + tracking and temporal stabilization
-            (one shared stabilization/provenance model)
+                  OCR (raw + validated fields)
+                                 |
+                                 v
+        tracking and temporal stabilization
+        (one shared model for object tracks and OCR fields)
                                  |
                                  v
                        structured state composition
@@ -55,10 +58,10 @@ GROUND-TRUTH CHANNEL
 ```
 
 Page/zone identity is inferred from detections, coordinates, and the ontology
-before OCR; OCR consumes the page/zone assignment for field-region context, and
-tracking owns the one stabilization model shared with OCR (D007, D020). This is
-the acyclic bootstrap order: detect -> page/zone -> OCR + tracking -> compose ->
-reduce -> infer events.
+before OCR; OCR consumes the page/zone assignment for field-region context and
+emits per-frame values; tracking then owns the single stabilization model for
+object tracks and OCR fields (D007, D020). This is the acyclic bootstrap order:
+detect -> page/zone -> OCR -> tracking -> compose -> reduce -> infer events.
 
 Feedback edges (not drawn): tracking feeds duplicate/miss cleanup back into
 detection reconciliation; the oracle scores page classification, zone
