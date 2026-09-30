@@ -76,7 +76,20 @@ py -3 -m unittest tests.test_file_ipc_bridge tests.test_balatro_mod
 
 ## Status
 
-The Lua producer exists and is syntax-checked and executed against a synthetic
-game state repository-side. Real-game verification is the remaining step: a
-live run through the procedure above is required before this is a Phase 0
-oracle claim. Steamodded's debug socket is not used as a transport.
+Verified end to end against the installed runtime (Balatro `1.0.1o-FULL`,
+Steamodded `26.926.0~dev-a`, Lovely `0.10.0`). Two real runs were captured:
+
+- `win`, 433 aligned steps: `F:\OBS_RECORDINGS\oracle_runs\2026-09-30_14-50-37_1790805058-5327\`
+  with video `F:\OBS_RECORDINGS\2026-09-30 14-50-37.mkv`.
+- `loss`, 43 verified-mapping steps: `F:\OBS_RECORDINGS\oracle_runs\2026-09-30_15-31_verify_1790807319-8546\`.
+
+Both have one `run_id`, unique `request_id`s, `action_taken` on every step, and
+real per-step runtime metadata. Steamodded patches `G.STATES` with
+`SMODS_BOOSTER_OPENED = 999` and `SMODS_REDEEM_VOUCHER = 998`; the producer maps
+999 to a pack page via `SMODS.OPENED_BOOSTER.config.center.kind` and 998 to
+`In_Shop`, so no `Unknown_*` pages remain in the captured data.
+
+Sparse `persistent_state`, coarse action labels, and the field/storage
+conformance review are tracked in Issue #10. Steamodded's debug socket is not
+used as a transport.
+

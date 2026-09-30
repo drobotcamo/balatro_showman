@@ -96,9 +96,36 @@ local PAGE_BY_STATE = {
   [4] = "Game_Over",
 }
 
+-- Steamodded re-implements the booster UI and patches G.STATES itself:
+--   SMODS_BOOSTER_OPENED = 999, SMODS_REDEEM_VOUCHER = 998
+-- (smods-main/lovely/booster.toml). Pack kind distinguishes the two pack pages.
+local function opened_booster_field(field)
+  local ok, value = pcall(function()
+    local booster = SMODS and SMODS.OPENED_BOOSTER
+    local center = booster and booster.config and booster.config.center
+    return center and center[field] or nil
+  end)
+  if ok then return value end
+  return nil
+end
+
+local function pack_kind()
+  return opened_booster_field("kind")
+end
+
+local function pack_key()
+  return opened_booster_field("key")
+end
+
 local function current_page()
   local state = G and G.STATE
   if state == nil then return "Unknown" end
+  if state == 999 then
+    local kind = pack_kind()
+    if kind == "Arcana" or kind == "Spectral" then return "In_TarotSpectral_Pack" end
+    return "In_JokerStandardPlanet_Pack"
+  end
+  if state == 998 then return "In_Shop" end
   return PAGE_BY_STATE[state] or ("Unknown_" .. tostring(state))
 end
 
@@ -268,10 +295,19 @@ local function encode_meta(page)
   local runtime = '{"balatro":' .. j_str((G and G.VERSION) or "unknown")
     .. ',"steamodded":' .. j_str(steamodded_version())
     .. ',"lovely":' .. j_str(lovely_version()) .. "}"
+  local kind = nil
+  local key = nil
+  if G and G.STATE == 999 then
+    kind = pack_kind()
+    key = pack_key()
+  end
   local parts = {
     '"run_id":' .. j_str(run_id),
     '"game_state_id":' .. tostring(request_counter),
     '"game_stage_id":' .. tostring((G and G.STAGE) or 0),
+    '"game_state":' .. j_num((G and G.STATE) or -1),
+    '"pack_kind":' .. (kind and j_str(kind) or "null"),
+    '"pack_key":' .. (key and j_str(key) or "null"),
     '"sent_at_real_time":' .. j_num(os.time()),
     '"producer":"balatro_showman_bridge"',
     '"smoke_subset":true',
