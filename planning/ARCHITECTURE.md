@@ -75,8 +75,10 @@ steer synthetic generation.
   the consumer interface undefined.
 - Every stage writes a versioned, inspectable artifact.
 - Uncertainty and unknown values are represented explicitly.
-- CPU and DirectML execution are supported for development; batch GPU execution
-  is an optimization, not a different pipeline.
+- Models are exported to the ONNX format with a pinned opset and executed
+  through ONNX Runtime execution providers (D017): CPU and DirectML execution
+  are supported for development; batch GPU execution is an optimization, not
+  a different pipeline.
 - Object identity, object attributes, and object relationships are separate
   concepts.
 - The pipeline must support the whole visible game, not only shop decisions.
