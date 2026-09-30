@@ -93,6 +93,17 @@ non-model tensor code. This concretizes D012; it does not supersede any prior
 decision — D011 and D012 remain in force, D012 as the goal this mechanism
 implements.
 
+### D018 — accepted — Delegation is evidence-driven and minimal
+Agents use direct repository tools for routine inspection, editing, checks, and
+GitHub metadata. At most one implementation agent is used per issue; exploratory
+agents are reserved for information unavailable through local inspection, and a
+reviewer is deferred until a final T2 diff exists. Routine conflict resolution
+does not spawn another agent, existing sessions are resumed where practical, and
+agent prompts/results stay concise. Alternative: unconstrained delegation was
+rejected because Issue #6 demonstrated that duplicate research, implementation,
+conflict-resolution, and review sessions create token cost without proportional
+evidence.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the
