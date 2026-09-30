@@ -63,6 +63,22 @@ Working directory: repository root. Stdlib only, no inputs. Success:
 `planning contracts OK`, exit code 0. Failure: one `FAIL:` line per problem
 and exit code 1; CI runs the same script (`.github/workflows/planning-check.yml`).
 
+### Audit a persisted oracle run
+
+```powershell
+py -3 planning\audit_oracle_runs.py RUN_DIR [RUN_DIR ...]
+```
+
+Working directory: repository root. Inputs: one or more run directories, each
+containing `session.json` and `steps.ndjson` as written by
+`ground_truth/file_ipc_bridge.py`. Success: per-run JSON summaries followed by
+`oracle run integrity OK`, exit code 0. Failure: `FAIL:` lines and exit code 1
+when an integrity invariant breaks (step-count mismatch, duplicate/missing
+`request_id`, run-id mismatch, invalid outcome, missing required field).
+Conformance gaps (coarse actions, empty `persistent_state`, missing
+`frame_idx`) are reported as findings but do not fail the audit. Verified
+2026-09-30 against the two `F:\OBS_RECORDINGS\oracle_runs\` runs from Issue #6.
+
 Add commands here only after they have been run successfully in this repository.
 Each recipe must state its working directory, inputs, expected result, and known
 failure modes.

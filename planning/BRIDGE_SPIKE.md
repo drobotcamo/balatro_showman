@@ -101,4 +101,7 @@ are emitted as an explicit `Unknown_PackKind_*`, never guessed) and 998 to
 
 A capture pinned to this exact revision is still pending, as are the
 `persistent_state`/action-space and field/storage conformance questions tracked
-in Issue #10. Steamodded's debug socket is not used as a transport.
+in Issue #10. Issue #10's integrity and conformance findings are in
+`planning/ORACLE_DATA_REVIEW.md`; both persisted runs above are pre- or
+intermediate-revision, so no persisted run yet reflects this exact file.
+Steamodded's debug socket is not used as a transport.
