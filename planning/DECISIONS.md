@@ -76,6 +76,23 @@ command allow-list and absolute local paths present in history are accepted as
 innocuous; machine-specific paths in `TOOLING.md` are intentional. Vendored
 submodules point to public upstream repositories.
 
+### D017 — accepted — Model inference targets the ONNX format executed through ONNX Runtime
+
+ONNX (the versioned model format) plus ONNX Runtime execution providers is the
+default inference mechanism: models are exported to `.onnx` with a pinned
+opset, and execution device is a provider-ordered session option, not pipeline
+code — CPU and DirectML providers for laptop development, CUDA/TensorRT
+providers for batch GPU. Numerical agreement across providers is required
+within a pinned tolerance, not byte-identity: different providers legitimately
+differ in low-order float bits. Alternatives considered: JAX (no DirectML
+path), MLIR/StableHLO/IREE/TVM compiler stacks (maintenance cost too high for
+a laptop-first project), Triton Inference Server (solves serving, not laptop
+development), and SYCL/Kokkos (wrong ecosystem for a Python pipeline). The
+Python array API standard is the analogous device-neutral interface for
+non-model tensor code. This concretizes D012; it does not supersede any prior
+decision — D011 and D012 remain in force, D012 as the goal this mechanism
+implements.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the

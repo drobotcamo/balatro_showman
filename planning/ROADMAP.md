@@ -66,8 +66,10 @@ Gate:
 
 Status: `planned`
 
-Train and evaluate a broad detector using synthetic data, with laptop-friendly
-CPU/DirectML inference and a batch GPU path sharing one model contract.
+Train and evaluate a broad detector using synthetic data. Models are exported
+to the ONNX format with a pinned opset (D017) and executed through ONNX
+Runtime execution providers: CPU/DirectML for laptop development and a batch
+GPU path sharing one model contract.
 
 Gate (all measured on the Phase 0 real eval set):
 
@@ -75,7 +77,10 @@ Gate (all measured on the Phase 0 real eval set):
   reported but not sufficient.
 - Small-object recall (editions/stickers/seals) meets threshold.
 - False-positive rate per family is under threshold.
-- CPU/DirectML and batch-GPU inference produce byte-compatible contract output.
+- CPU/DirectML and batch GPU inference run the same ONNX artifact through
+  ONNX Runtime execution providers and produce contract-compatible output
+  within a pinned numeric tolerance; byte-identity across providers is not
+  expected (D012, D017).
 - Inference is resumable for long videos.
 
 ## Phase 4: Page Classification and Zone Assignment
