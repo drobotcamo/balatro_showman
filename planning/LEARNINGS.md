@@ -77,3 +77,20 @@ under its Decisions section. This file is a knowledge base, not a task log.
 - Verification/source: onnxruntime.ai execution-provider docs and
   data-apis.org array API standard fetched 2026-09-30; MIT licenses stated in
   the ONNX and ONNX Runtime repository licenses.
+
+## 2026-09-30: Oracle step identity and producer diagnostics need explicit scoping
+
+- Context: The Issue #10 integrity review audited the two persisted runs
+  (`F:\OBS_RECORDINGS\oracle_runs\`, 433-step win and 43-step loss).
+- Observation: `request_id` restarts at `1` each run, so it is unique only
+  within a run and must be keyed with `run_id`. Producer diagnostic fields
+  (`meta.game_state`, `meta.pack_kind`, `meta.pack_key`) are not part of any
+  storage contract, are absent from the older win run, and in the loss run hold
+  a stale pack key across non-pack `G.STATE` values because the field was not
+  yet gated to state 999.
+- Implication: Never aggregate or join oracle steps on `request_id` alone, and
+  do not treat producer diagnostics as observed state. When reading an
+  intermediate-revision run, gate `pack_kind`/`pack_key` to `G.STATE == 999`
+  before use.
+- Verification/source: `planning/audit_oracle_runs.py` output and direct JSON
+  inspection, recorded in `planning/ORACLE_DATA_REVIEW.md` §4.2 and §4.4.
