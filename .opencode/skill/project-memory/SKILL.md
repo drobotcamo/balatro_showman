@@ -6,7 +6,7 @@ description: Maintain project decisions, learnings, and agent handoffs. Use when
 # Project Memory
 
 Route knowledge to the correct layer; do not duplicate it. Procedures go in
-`.opencode/skills/` only when repeatable with a clear trigger.
+`.opencode/skill/` only when repeatable with a clear trigger.
 
 - Current work and next actions →
   `planning/agent-state/threads/<issue-number>-<short-name>.md` (template in

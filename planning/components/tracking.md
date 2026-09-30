@@ -11,6 +11,7 @@ with a single shared stabilization model for objects and OCR fields.
 
 - Raw detections.
 - Page/zone assignment.
+- Raw OCR fields, to be stabilized under the shared model.
 - Frame timing and canonical-coordinate metadata.
 - Ontology family and movement rules.
 

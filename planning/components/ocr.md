@@ -10,6 +10,7 @@ using a recognizer trained on synthetic glyph crops and canonical regions.
 ## Inputs
 
 - Canonical-coordinate frames or frame references.
+- Page/zone assignment for field-region context (Phase 4).
 - Field definitions and canonical-space regions.
 - Synthetic OCR glyph training crops.
 - Synthetically trained recognizer output.
@@ -26,8 +27,9 @@ using a recognizer trained on synthetic glyph crops and canonical regions.
 - Each field has its own parser, valid range, and `X/Y` handling where relevant.
 - Carry-forward values retain provenance and age.
 - Regions come from the coordinates stage; no per-video hardcoded pixels.
-- Stabilization shares one provenance model with tracking; values are not
-  double-carried by two stages.
+- Tracking (Phase 6) owns the single shared stabilization/provenance model;
+  OCR emits raw and validated values and does not carry values forward on its
+  own. The two stages never double-carry.
 
 ## Acceptance Criteria
 

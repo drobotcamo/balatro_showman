@@ -21,24 +21,25 @@ OFFLINE TRAINING DATA
         |
   detector + OCR training datasets
         |
-        +------------------------------------------------------+
-                                                               |
-ONLINE VIDEO INFERENCE                                          |
-  video --> normalize --> frame sampler --> object detector <--+
-            (canonical coords)            OCR
-                     |                       |
-                     +-----------+-----------+
+        v
+  trained detector and OCR models (used by the online stages below)
+
+ONLINE VIDEO INFERENCE
+  video --> normalize --> frame sampler --> object detector
+            (canonical coords)
+                                 |
                                  v
                        page + zone assignment
                                  |
                                  v
-                       tracking and temporal stabilization
+            OCR + tracking and temporal stabilization
+            (one shared stabilization/provenance model)
                                  |
                                  v
                        structured state composition
                                  |
                                  v
-                       persistent-state reduction (+ action space + masks)
+                       persistent-state reduction (action space + masks)
                                  |
                                  v
                        event / action inference  <-- oracle validation
@@ -52,6 +53,12 @@ ONLINE VIDEO INFERENCE                                          |
 GROUND-TRUTH CHANNEL
   Lua bridge --> aligned (state, action, outcome) --> eval manifests, oracle scoring
 ```
+
+Page/zone identity is inferred from detections, coordinates, and the ontology
+before OCR; OCR consumes the page/zone assignment for field-region context, and
+tracking owns the one stabilization model shared with OCR (D007, D020). This is
+the acyclic bootstrap order: detect -> page/zone -> OCR + tracking -> compose ->
+reduce -> infer events.
 
 Feedback edges (not drawn): tracking feeds duplicate/miss cleanup back into
 detection reconciliation; the oracle scores page classification, zone

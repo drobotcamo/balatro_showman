@@ -9,7 +9,49 @@ strategy.
 
 Gate conventions: every gate states a metric and a threshold. Thresholds are
 fixed in the Phase 0 evaluation protocol so a gate can pass or fail. Where a
-threshold is not yet known, the gate says `threshold: set in Phase 0`.
+threshold is not yet known, the gate says `threshold: set in Phase 0`. Phases
+4-10 currently name their metric and owner and defer the numeric threshold to
+Q03.
+
+## Component Ownership
+
+Every active component has an owning phase or an explicit cross-cutting role.
+A cross-cutting component is a prerequisite consumed across phases rather than
+the deliverable of one phase.
+
+| Phase | Owning components |
+| --- | --- |
+| 0 | `components/ground-truth.md` |
+| 1 | `components/ontology.md` |
+| 2 | `components/synthetic-data.md` |
+| 3 | `components/detection.md` |
+| 4 | `components/page-classification.md` |
+| 5 | `components/ocr.md` |
+| 6 | `components/tracking.md` |
+| 7 | `components/state-composition.md`, `components/state-reduction.md` |
+| 8 | `components/events.md` |
+| 9 | `components/dataset.md` |
+| 10 | `components/learning.md` |
+| Cross-cutting | `components/coordinates.md` |
+
+Coordinates and stream-layout normalization (D007) are defined once and
+consumed by detection (Phase 3), page classification (4), OCR (5), tracking
+(6), and composition (7). They are a foundation, not a phase of their own, so
+they are not renumbered into the phase sequence.
+
+## Open Questions And Gates
+
+Questions in `DECISIONS.md` that block a gate are linked here. A question that
+blocks a gate must appear in this table.
+
+| Question | Blocks | Why |
+| --- | --- | --- |
+| Q01 | Phase 1 | The initial Balatro version and mod configuration that define the ontology are unresolved. |
+| Q02 | Phase 0-1 | Asset redistribution legality gates the active, provenance-backed asset store. |
+| Q03 | Phase 0 | Numeric gate thresholds are fixed in the Phase 0 evaluation protocol; every later gate depends on it. |
+| Q04 | Phase 0, 7 | Which visible state is unrecoverable from video alone bounds reduction and the oracle boundary. |
+| Q05 | Phase 8 | Event labels are trusted only after a stated oracle agreement rate is met. |
+| Q06 | Phase 7-8 | Confidence propagation crosses detection, OCR, composition, reduction, and events. |
 
 ## Phase 0: Boundary, Ground Truth, and Evaluation
 
@@ -69,7 +111,8 @@ Status: `planned`
 Train and evaluate a broad detector using synthetic data. Models are exported
 to the ONNX format with a pinned opset (D017) and executed through ONNX
 Runtime execution providers: CPU/DirectML for laptop development and a batch
-GPU path sharing one model contract.
+GPU path executing the same ONNX artifact through ONNX Runtime execution
+providers.
 
 Gate (all measured on the Phase 0 real eval set):
 
@@ -134,8 +177,10 @@ Gate:
 Status: `planned`
 
 Attach modifiers to parents, assign zones and ordering, emit versioned visible
-state, then reduce it into the declared persistent-state contract with action
-space and legality masks.
+state, then reduce it into the declared persistent-state contract and
+deterministic legality masks over the declared action space. The reducer
+defines the action-space index and the masks; observed action labels and
+`target_action_id` belong to Phase 8 (D020).
 
 Gate:
 
@@ -150,8 +195,10 @@ Gate:
 Status: `planned`
 
 Infer transitions such as buying, selling, playing, discarding, rerolling,
-selecting blinds, and opening packs from state deltas and temporal context, with
-confidence propagated from upstream.
+selecting blinds, and opening packs from state deltas and temporal context, and
+emit each event's canonical action label, target, and `target_action_id` within
+the action-space index defined by Phase 7, with confidence propagated from
+upstream (D020).
 
 Gate:
 

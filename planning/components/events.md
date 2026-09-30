@@ -10,8 +10,10 @@ ground-truth oracle.
 
 ## Inputs
 
-- Versioned state sequence.
+- Versioned state sequence and persistent state (Phase 7).
+- State deltas over the composed and reduced state.
 - Page/zone transitions.
+- The declared action-space index and legality masks (Phase 7).
 - Temporal thresholds and event rules.
 - Ground-truth oracle records for validation.
 
@@ -19,6 +21,8 @@ ground-truth oracle.
 
 - Event type, frame interval, targets, before/after state references, confidence,
   and inference explanation.
+- The canonical action label, target, and `target_action_id` for each inferred
+  action, indexed within the Phase 7 action space (D020).
 - Explicit `unknown` or `ambiguous` events.
 - Oracle-agreement reports per event family.
 

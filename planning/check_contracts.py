@@ -2,12 +2,18 @@
 
 Run from the repository root: python planning/check_contracts.py
 
-Checks:
+Checks (mechanical only; it does not judge prose quality or gate thresholds):
 - Thread files are named <issue-number>-<short-name>.md and contain the
   handoff template fields defined in planning/agent-workflow.md.
-- planning/DECISIONS.md uses ADR-lite entry headers and unique IDs.
+- planning/DECISIONS.md uses ADR-lite entry headers, unique IDs, and
+  append-only (strictly increasing) ID order.
 - planning/LEARNINGS.md entries use the documented date-title format.
-- Backtick file references in core agent documents resolve to real files.
+- Every open question in planning/DECISIONS.md is linked from
+  planning/ROADMAP.md.
+- Every component contract has the required sections and a valid status.
+- Every ROADMAP phase has a status and a gate, and every component file has an
+  owning phase or cross-cutting reference in planning/ROADMAP.md.
+- Backtick file references in governed documents resolve to real files.
 
 Stdlib only; exit code 1 on any failure.
 """
@@ -20,6 +26,15 @@ from pathlib import Path
 
 PLANNING = Path(__file__).resolve().parent
 ROOT = PLANNING.parent
+
+STATUS_VOCABULARY = {
+    "planned",
+    "designing",
+    "building",
+    "validated",
+    "blocked",
+    "retired",
+}
 
 errors: list[str] = []
 
@@ -41,6 +56,14 @@ THREAD_REQUIRED_FIELDS = (
     "Dependencies:",
     "Next:",
     "Validation:",
+)
+
+COMPONENT_REQUIRED_SECTIONS = (
+    "## Purpose",
+    "## Inputs",
+    "## Outputs",
+    "## Invariants",
+    "## Acceptance Criteria",
 )
 
 
@@ -71,8 +94,12 @@ def check_decisions() -> None:
     headers = re.findall(r"^### (D\d{3})", text, re.M)
     if not headers:
         fail("DECISIONS.md: no `### D### — status — title` entries found")
+        return
     if len(headers) != len(set(headers)):
         fail("DECISIONS.md: duplicate decision IDs")
+    numbers = [int(header[1:]) for header in headers]
+    if numbers != sorted(numbers):
+        fail("DECISIONS.md: decision IDs are not in append-only order")
     for header in re.findall(r"^### .*$", text, re.M):
         if not re.match(r"^### D\d{3} — (accepted|superseded|retired) — ", header):
             fail(f"DECISIONS.md: malformed entry header: {header!r}")
@@ -86,11 +113,63 @@ def check_learnings() -> None:
             fail(f"LEARNINGS.md: malformed entry header: {header!r}")
 
 
+def check_open_questions() -> None:
+    decisions = (PLANNING / "DECISIONS.md").read_text(encoding="utf-8")
+    roadmap = (PLANNING / "ROADMAP.md").read_text(encoding="utf-8")
+    questions = re.findall(r"\*\*(Q\d{2})\*\*", decisions)
+    for question in questions:
+        if question not in roadmap:
+            fail(
+                f"ROADMAP.md: open question {question} is not linked from the roadmap"
+            )
+
+
+def check_components() -> None:
+    components = PLANNING / "components"
+    if not components.is_dir():
+        fail("missing planning/components/")
+        return
+    for path in sorted(components.glob("*.md")):
+        rel = path.relative_to(ROOT)
+        text = path.read_text(encoding="utf-8")
+        for section in COMPONENT_REQUIRED_SECTIONS:
+            if section not in text:
+                fail(f"{rel}: missing required section {section!r}")
+        match = re.search(r"^Status: `([a-z]+)`", text, re.M)
+        if not match:
+            fail(f"{rel}: missing or malformed `Status: ` line")
+        elif match.group(1) not in STATUS_VOCABULARY:
+            fail(f"{rel}: invalid status {match.group(1)!r}")
+
+
+def check_roadmap() -> None:
+    path = PLANNING / "ROADMAP.md"
+    text = path.read_text(encoding="utf-8")
+    for part in re.split(r"(?m)^## ", text):
+        header = part.splitlines()[0] if part else ""
+        if not header.startswith("Phase "):
+            continue
+        phase = header.split(":", 1)[0]
+        if not re.search(r"^Status: `[a-z]+`", part, re.M):
+            fail(f"ROADMAP.md: {phase} has no valid `Status: ` line")
+        if not re.search(r"^Gate\b", part, re.M):
+            fail(f"ROADMAP.md: {phase} has no gate")
+    for component in sorted((PLANNING / "components").glob("*.md")):
+        if component.name not in text:
+            fail(
+                f"ROADMAP.md: component {component.name!r} has no owning phase "
+                "or cross-cutting reference"
+            )
+
+
 def check_references() -> None:
     docs = (
         ROOT / "AGENTS.md",
         ROOT / "CLAUDE.md",
         PLANNING / "README.md",
+        PLANNING / "ROADMAP.md",
+        PLANNING / "ARCHITECTURE.md",
+        PLANNING / "PHASE0_INVENTORY.md",
         PLANNING / "agent-workflow.md",
         PLANNING / "agent-state" / "README.md",
     )
@@ -117,6 +196,9 @@ def main() -> int:
     check_threads()
     check_decisions()
     check_learnings()
+    check_open_questions()
+    check_components()
+    check_roadmap()
     check_references()
     for error in errors:
         print(f"FAIL: {error}")

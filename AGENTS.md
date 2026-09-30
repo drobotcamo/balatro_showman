@@ -37,8 +37,10 @@ against a Lua ground-truth oracle. `planning/README.md` is the planning index.
 ## Completion Standard
 
 - Run the narrowest relevant tests or checks and report their output.
-  Planning documents are validated by running python on
-  `planning/check_contracts.py`.
+  Planning documents are mechanically validated by `planning/check_contracts.py`
+  (thread naming and handoff fields, decision/learning formats, open-question
+  linkage, component sections, roadmap ownership and gates, and reference
+  resolution), not for prose quality or gate thresholds.
 - Report what changed, what was verified, and what remains uncertain.
 - Update the affected contract and work-thread file; capture reusable findings.
 - A completion claim requires a runnable check's output or an independent
