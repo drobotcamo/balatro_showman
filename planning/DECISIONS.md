@@ -55,16 +55,26 @@ Do not optimize exclusively for wins.
 ### D014 — accepted — Markdown is the planning and progress format
 
 ### D015 — accepted — The approval policy is risk-tiered evidence
-T0 planning/process artifacts commit directly to `master` with CI as the
-gate; T1 contract/decision surfaces (AGENTS.md, agent-workflow.md,
-DECISIONS.md, ROADMAP.md, components) are user-approved for substantive
-edits and agent-safe for routine status flips; T2 pipeline code is merged by
-agents with pasted test output, a recorded `@reviewer` verdict, and required
-CI; T3 irreversible or unverifiable actions are user-decided. Alternatives
+T0 planning/process artifacts reach `master` through an auto-PR the agent
+opens and merges itself once required CI is green (no review); T1
+contract/decision surfaces (AGENTS.md, agent-workflow.md, DECISIONS.md,
+ROADMAP.md, components) are user-approved for substantive edits and
+agent-safe for routine status flips; T2 pipeline code is merged by agents
+with pasted test output, a recorded `@reviewer` verdict, and required CI;
+T3 irreversible or unverifiable actions are user-decided. Alternatives
 considered: uniform strictness (user reviews everything — bottleneck for a
 solo project) and uniform laxity (runnable checks only — no protection
 against self-preference bias on untestable claims). `planning-check` is a
-required status check on `master` via branch protection.
+required status check on `master` via branch protection. Amendment: T0 was
+originally direct commits, but required checks mechanically block direct
+pushes (GH006), so T0 became auto-PR at enforcement time.
+
+### D016 — accepted — The repository is public
+All history is permanently exposed. No secrets, private data, or unreviewed
+vendored artifacts may ever be committed (T3). The `.claude/settings.local.json`
+command allow-list and absolute local paths present in history are accepted as
+innocuous; machine-specific paths in `TOOLING.md` are intentional. Vendored
+submodules point to public upstream repositories.
 
 ## Open Questions
 

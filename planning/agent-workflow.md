@@ -29,9 +29,9 @@ GitHub is the coordination authority for parallel work:
   work is closed with a reason.
 - A dedicated branch and worktree implement the Issue; one or more agent
   sessions may continue the same branch and worktree.
-- A Pull Request is the review, validation, and merge boundary for T1–T2 work
-  (see Approval And Merging); T0 planning artifacts commit directly to
-  `master` with CI as the gate.
+- A Pull Request is the review, validation, and merge boundary for all work:
+  T0 auto-PRs merge without review once required CI is green; T1–T2 require
+  the evidence in Approval And Merging.
 - Thread files supplement the Issue with session-level execution context; they
   are not live locks. GitHub Issue, branch, and PR state are the cross-worktree
   coordination authority. Never use Markdown as a concurrency lock.
@@ -90,9 +90,12 @@ Approval cost scales with blast radius. Tiers:
 
 - **T0 — planning/process artifacts**: thread files, `LEARNINGS.md`,
   `TOOLING.md`, `.opencode/` configs and agents, `.github/` templates, and
-  planning prose that is not listed under T1. The agent commits directly to
-  `master` without a PR. Required evidence: `planning/check_contracts.py`
-  passes and `git diff --check` is clean.
+  planning prose that is not listed under T1. The agent opens a PR and merges
+  it itself once required CI is green (no review required). Required
+  evidence: `planning/check_contracts.py` passes locally, `git diff --check`
+  is clean, and the PR's required CI check passes. Required status checks
+  mechanically block direct pushes to protected branches (GH006), so T0
+  always travels as an auto-PR.
 - **T1 — contracts and durable decisions**: `AGENTS.md`,
   `planning/agent-workflow.md`, `planning/DECISIONS.md`, `ROADMAP.md`, and
   `planning/components/*`. Agent-safe only for routine status flips backed by
