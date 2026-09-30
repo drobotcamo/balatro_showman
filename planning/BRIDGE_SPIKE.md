@@ -1,18 +1,20 @@
 # File-IPC Bridge Spike
 
-This spike exercises the existing file-IPC oracle contract end to end:
+This spike exercises the existing file-IPC oracle contract:
 
 ```
 Lua producer (game)                 Python client (repo)
 snapshot.json  ───────────────▶     record aligned step
-action.txt     ◀───────────────     acknowledgement
+action.txt     ◀───────────────     acknowledgement (not consumed by observe producer)
 run_end.json   ───────────────▶     finalize outcome
 ```
 
 ## Contract
 
 - Input: the Lua-side `snapshot.json` in the shared `agent_io` directory.
-- Acknowledgement: `<request_id>\t<action>\n` in `action.txt`.
+- Acknowledgement: `<request_id>\t<action>\n` in `action.txt`, written by the
+  client. The observe-mode producer records the player's real action and does
+  not read or dispatch `action.txt`; the acknowledgement is advisory.
 - Record: `<out-dir>/<run_id>/steps.ndjson`, with `_recorded_action` added.
 - Outcome: a Lua-side `run_end.json` containing `run_id` and `outcome`
   (`win` or `loss`) finalizes `session.json`.
@@ -76,20 +78,27 @@ py -3 -m unittest tests.test_file_ipc_bridge tests.test_balatro_mod
 
 ## Status
 
-Verified end to end against the installed runtime (Balatro `1.0.1o-FULL`,
-Steamodded `26.926.0~dev-a`, Lovely `0.10.0`). Two real runs were captured:
+The producer is verified against the installed runtime (Balatro `1.0.1o-FULL`,
+Steamodded `26.926.0~dev-a`, Lovely `0.10.0`) with two real runs, and the
+current revision is exercised by the synthetic harness (blind/select, Arcana
+and Buffoon packs, voucher 998, win/loss finalize). Provenance of the persisted
+runs:
 
-- `win`, 433 aligned steps: `F:\OBS_RECORDINGS\oracle_runs\2026-09-30_14-50-37_1790805058-5327\`
-  with video `F:\OBS_RECORDINGS\2026-09-30 14-50-37.mkv`.
-- `loss`, 43 verified-mapping steps: `F:\OBS_RECORDINGS\oracle_runs\2026-09-30_15-31_verify_1790807319-8546\`.
+- `win`, 433 steps: `F:\OBS_RECORDINGS\oracle_runs\2026-09-30_14-50-37_1790805058-5327\`
+  with video `F:\OBS_RECORDINGS\2026-09-30 14-50-37.mkv`. Captured before the
+  Steamodded page-map fix, so it contains 38 `Unknown_999` pack steps.
+- `loss`, 43 steps: `F:\OBS_RECORDINGS\oracle_runs\2026-09-30_15-31_verify_1790807319-8546\`.
+  Captured with the mapping fix; zero `Unknown_*` pages, packs resolved
+  `Buffoon`/`Celestial`/`Standard`, but an intermediate revision (the diagnostic
+  `pack_kind` was not yet gated to state 999).
 
-Both have one `run_id`, unique `request_id`s, `action_taken` on every step, and
-real per-step runtime metadata. Steamodded patches `G.STATES` with
+Both runs have one `run_id`, unique `request_id`s, `action_taken` on every step,
+and real per-step runtime metadata. Steamodded patches `G.STATES` with
 `SMODS_BOOSTER_OPENED = 999` and `SMODS_REDEEM_VOUCHER = 998`; the producer maps
-999 to a pack page via `SMODS.OPENED_BOOSTER.config.center.kind` and 998 to
-`In_Shop`, so no `Unknown_*` pages remain in the captured data.
+999 to a pack page via `SMODS.OPENED_BOOSTER.config.center.kind` (unknown kinds
+are emitted as an explicit `Unknown_PackKind_*`, never guessed) and 998 to
+`In_Shop`.
 
-Sparse `persistent_state`, coarse action labels, and the field/storage
-conformance review are tracked in Issue #10. Steamodded's debug socket is not
-used as a transport.
-
+A capture pinned to this exact revision is still pending, as are the
+`persistent_state`/action-space and field/storage conformance questions tracked
+in Issue #10. Steamodded's debug socket is not used as a transport.

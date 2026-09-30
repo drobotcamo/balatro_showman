@@ -123,7 +123,10 @@ local function current_page()
   if state == 999 then
     local kind = pack_kind()
     if kind == "Arcana" or kind == "Spectral" then return "In_TarotSpectral_Pack" end
-    return "In_JokerStandardPlanet_Pack"
+    if kind == "Celestial" or kind == "Standard" or kind == "Buffoon" then
+      return "In_JokerStandardPlanet_Pack"
+    end
+    return "Unknown_PackKind_" .. tostring(kind)
   end
   if state == 998 then return "In_Shop" end
   return PAGE_BY_STATE[state] or ("Unknown_" .. tostring(state))
