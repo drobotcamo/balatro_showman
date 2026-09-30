@@ -32,6 +32,31 @@ under its Decisions section. This file is a knowledge base, not a task log.
   schema docs fetched 2026-09-30; Anthropic, “Building effective agents,”
   published 2024-12-19; repository workflow in `planning/agent-workflow.md`.
 
+## 2026-09-30: Legacy references do not satisfy the Phase 0 boundary
+
+- Context: Phase 0 inventory checked the legacy CV/policy trees, annotation
+  helpers, sample runs, and planning contracts.
+- Observation: Candidate checkpoints, OCR geometry, schemas, and labeling code
+  exist only under `legacy/`; no active provenance records, runnable checked-in
+  Lua bridge, real eval clips, or exported eval manifest were found.
+- Implication: Legacy artifacts may guide research, but cannot be treated as
+  active dependencies or as evidence that the oracle/evaluation gate passed.
+- Verification/source: `planning/PHASE0_INVENTORY.md`,
+  `planning/ARCHITECTURE.md:84-99`, and the ground-truth contract.
+
+## 2026-09-30: A usable local modded runtime is available
+
+- Context: The local machine was inspected for the Phase 0 bridge feasibility
+  work.
+- Observation: Steamodded, Lovely, multiple mods, Lovely game dumps/logs, and a
+  Steamodded debug socket are present under the user's Balatro data directory.
+  The latest log reports version `26.926.0~dev-a` and Lovely `0.10.0`, but also
+  reports blacklisted mods and invalid metadata warnings.
+- Implication: Bridge work can begin with a read-only compatibility audit and a
+  controlled smoke test; the runtime must not yet be treated as a clean oracle.
+- Verification/source: `planning/BALATRO_RUNTIME.md` and the verified Lovely
+  launch log recorded there.
+
 ## 2026-09-30: ONNX + ONNX Runtime is the "Docker" layer for device-portable inference
 
 - Context: D012 required batch GPU to remain possible without changing data
