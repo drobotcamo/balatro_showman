@@ -6,9 +6,9 @@ Owner: opencode Phase 0 lead session
 Branch: issue-6-bridge-spike
 Worktree: `C:\Users\camgr\Documents\code_projects\balatro_showman-issue-6`
 Objective: Ship the smallest runtime-compatible Lua producer for the file-IPC oracle contract and prove one real aligned (state, action, outcome) run.
-Status: ready-for-review
+Status: complete
 Scope: `ground_truth/balatro_mod/` (Lua producer), its manifest test, `planning/BRIDGE_SPIKE.md`
-Dependencies: T2 fresh-context review; follow-up Issue #10 owns data/storage-conformance review
+Dependencies: merged via PR #9; follow-up Issue #10 owns data/storage-conformance review
 Completed:
 - Verified PR #7 is repository-only: it adds a stdlib client for `snapshot.json -> action.txt` and explicit `run_end.json` finalization, but no Lua producer. It is reference material, not oracle evidence.
 - Confirmed the installed runtime is suitable in principle: Balatro `1.0.1o-FULL`, Lovely `0.10.0`, Steamodded `26.926.0~dev-a`, mod root `%APPDATA%\Balatro\Mods`. Only `BalatroMultiplayer-0.5.5` and `Brainstorm-2.0.0-alpha-1` are blacklisted; `HandyBalatro`/`JokerDisplay` emit metadata/patch warnings but load. No `agent_bridge.lua` exists in repo or runtime.
@@ -17,11 +17,10 @@ Completed:
 - Added `tests/test_balatro_mod.py` guarding the manifest shape and the single-JSON-metadata loader invariant.
 - Validation: `main.lua` parses and executes against a synthetic game state using an external, not-checked-in lupa/luaparser harness (no project dependency) producing valid, aligned `snapshot.json` + `run_end.json`; `py -3 -m unittest tests.test_file_ipc_bridge tests.test_balatro_mod` and `py -3 planning\check_contracts.py` pass; `git diff --check origin/master...HEAD` clean.
 Next:
-1. Commit the 999/998 page-mapping fix and this doc update to PR #9.
-2. Run the prescribed T2 fresh-context `@reviewer`; record the verdict on PR #9.
-3. Merge PR #9 once CI is green and the reviewer verdict holds, then close Issue #6.
-4. Hand off evidence + storage-contract review to Issue #10 in a new session.
+1. Merge PR #9 and close Issue #6 (this session).
+2. Start Issue #10 in a new session: oracle data integrity + storage-contract conformance, including a capture pinned to the merged revision.
 Decisions: No architecture, component contract, or durable policy changed.
+Reviewer: fresh-context `@reviewer`, task `ses_f0b8a052cffeGAaoRSb1QECe4F`, final verdict `holds` (claims 1/2/3/5 hold; claim 4 holds with disclosed, tracked gaps). Round 1 `refuted` the `git diff --check` claim and found the PR conflict and stale mapping wording; all fixed and re-verified. Evidence: `git diff --check origin/master...HEAD` clean, 6 tests OK, `check_contracts.py` OK, PR mergeable; residuals (pinned-revision capture, external harness, Issue #10 conformance) explicitly disclosed.
 Risks: Real-run coverage is two sessions (one win, one loss); `In_TarotSpectral_Pack` and voucher 998 are verified synthetically but not live. Action labels are coarse and `persistent_state` is empty by design; Issue #10 must decide whether that satisfies the Phase 0 gate or requires canonical action space. No Phase 0 gate is claimed yet.
 Validation: external lupa/luaparser harness (not checked in; no project dependency) exercised the producer against a synthetic game state; `py -3 -m unittest tests.test_file_ipc_bridge tests.test_balatro_mod` -> OK; `py -3 planning\check_contracts.py` -> `planning contracts OK`; `git diff --check origin/master...HEAD` -> clean.
 Evidence (2026-09-30, real run, outcome `win`; captured before the Steamodded page-map fix, so it contains 38 `Unknown_999` pack steps):
