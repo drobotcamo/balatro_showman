@@ -21,7 +21,7 @@ game state, ready for persistent reduction.
 - Per-frame state snapshot.
 - Object records with attributes, zone, ordering, provenance, and confidence.
 - State-quality summary.
-- A handoff to persistent reduction (state sequence plus events).
+- A handoff to persistent reduction (the composed state sequence).
 
 ## Invariants
 

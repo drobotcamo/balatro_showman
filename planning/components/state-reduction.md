@@ -5,22 +5,21 @@ Status: `planned`
 ## Purpose
 
 Declare and implement the downstream contract the pipeline targets: reduce the
-composed state/event stream into persistent state, map actions into a fixed
-action space, and emit legality masks. This is the interface learning consumes.
+composed state sequence into persistent state and deterministic legality masks
+over the declared action space. This is the interface learning consumes.
 
 ## Inputs
 
 - Composed per-frame state sequence.
-- Event/action sequence.
 - Ontology and composition rules.
-- Declared downstream contract version.
+- Declared downstream contract and action-space version.
 
 ## Outputs
 
 - Persistent state per step (model-visible, per-step observation, and internal
   bookkeeping clearly separated).
-- Action-space mapping and `target_action_id` for each step.
-- Legality masks per step.
+- The declared action-space index (the coordinate space the masks index).
+- Deterministic legality masks per step.
 - Explicit schema and contract versions.
 
 ## Invariants
@@ -29,6 +28,9 @@ action space, and emit legality masks. This is the interface learning consumes.
   distinguishable and versioned; promotion between them is a version bump.
 - No future-frame information leaks into a step's state.
 - Masks are deterministic for a fixed input and configuration.
+- The reducer defines the action-space index and the masks; it does not label
+  observed actions. Canonical action labels and `target_action_id` are produced
+  by event/action inference (Phase 8, D020).
 - Unresolved action labels are emitted as unresolved, never guessed.
 
 ## Acceptance Criteria

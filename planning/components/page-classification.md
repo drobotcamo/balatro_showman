@@ -11,9 +11,9 @@ event inference depend on.
 ## Inputs
 
 - Canonical-coordinate detections.
-- Stabilized OCR fields.
 - Ontology page/zone vocabulary.
 - Coordinate region map.
+- Raw OCR records only as optional supporting evidence, never a prerequisite.
 
 ## Outputs
 
@@ -25,6 +25,9 @@ event inference depend on.
 
 - Page and zones are inferred outputs, not assumptions encoded from a known
   sequence.
+- Page identity depends only on detections, the coordinate region map, and the
+  ontology. Raw OCR may support it; stabilized OCR is never a prerequisite
+  because stabilization is owned by tracking (Phase 6).
 - Unrecognized pages are emitted as `unknown`; an unknown page never resolves
   to a known page by default.
 - Assignment is deterministic for a fixed input and configuration.

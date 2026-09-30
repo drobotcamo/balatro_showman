@@ -15,7 +15,7 @@ other document restates these rules — they link to this one.
 - `planning/agent-state/threads/<issue-number>-<short-name>.md`: a work-thread
   baton that can be continued by multiple sessions on the same branch/worktree.
 - `.opencode/agents/`: configured subagents; `.opencode/command/`: workflow
-  commands; `.opencode/skills/`: triggered procedures.
+  commands; `.opencode/skill/`: triggered procedures.
 - Chat: temporary interaction, never the only place a conclusion exists.
 
 ## Work Item Model

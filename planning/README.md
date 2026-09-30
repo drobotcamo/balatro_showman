@@ -17,8 +17,13 @@ other work. Winning plays are not a special objective at this stage.
 
 ## Document Map
 
-- `ROADMAP.md`: phased development plan and phase gates.
+- `ROADMAP.md`: phased development plan, phase gates, and component ownership.
 - `ARCHITECTURE.md`: system boundaries and data flow.
+- `PHASE0_INVENTORY.md`: Phase 0 artifact inventory, provenance, and boundary.
+- `BRIDGE_SPIKE.md`: file-IPC oracle contract and the Lua producer spike.
+- `ORACLE_DATA_REVIEW.md`: issue #10 integrity and storage-conformance findings.
+- `BALATRO_RUNTIME.md`: discovered local Balatro/Steamodded/Lovely runtime facts.
+- `audit_oracle_runs.py`: read-only oracle-run integrity audit.
 - `agent-workflow.md`: single definition of work-item, approval, subagent, and
   handoff rules.
 - `DECISIONS.md`: durable decisions and open questions.
@@ -28,7 +33,7 @@ other work. Winning plays are not a special objective at this stage.
 - `../.opencode/agents/`: configured subagents.
 - `../.opencode/command/`: workflow commands (`/work`, `/resume`, `/handoff`,
   `/verify`).
-- `../.opencode/skills/`: reusable triggered procedures.
+- `../.opencode/skill/`: reusable triggered procedures.
 - `components/ontology.md`: asset, class, page/zone, and typography vocabulary.
 - `components/ground-truth.md`: Lua oracle, evaluation set, annotation/QA tool.
 - `components/coordinates.md`: canonical coordinate and stream-layout contract.
@@ -43,12 +48,19 @@ other work. Winning plays are not a special objective at this stage.
 - `components/dataset.md`: storage, manifests, and reproducible exports.
 - `components/learning.md`: downstream analytics and learning consumers.
 
-Planning documents are validated by running python on
-`planning/check_contracts.py`.
+Planning documents are mechanically validated by running python on
+`planning/check_contracts.py`: thread naming and handoff fields, decision and
+learning formats and append-only ordering, open-question linkage, component
+sections and status, roadmap ownership and gates, and resolvable backtick file
+references in the core agent/planning documents. It does not judge prose
+quality or validate gate thresholds; the
+numeric thresholds are a Phase 0 evaluation-protocol deliverable (Q03).
 
 ## Status Vocabulary
 
 Use one of: `planned`, `designing`, `building`, `validated`, `blocked`, or
 `retired`.
 
-Current status: `planned`.
+Current status: `building`. Phase 0 is the active phase; the Lua-oracle
+transport is validated, but contract conformance, video-to-engine alignment,
+and the evaluation set are pending (see `PHASE0_INVENTORY.md`).

@@ -54,7 +54,7 @@ Do not optimize exclusively for wins.
 
 ### D014 — accepted — Markdown is the planning and progress format
 
-### D015 — accepted — The approval policy is risk-tiered evidence
+### D015 — superseded — The approval policy is risk-tiered evidence
 T0 planning/process artifacts reach `master` through an auto-PR the agent
 opens and merges itself once required CI is green (no review); T1
 contract/decision surfaces (AGENTS.md, agent-workflow.md, DECISIONS.md,
@@ -67,7 +67,8 @@ solo project) and uniform laxity (runnable checks only — no protection
 against self-preference bias on untestable claims). `planning-check` is a
 required status check on `master` via branch protection. Amendment: T0 was
 originally direct commits, but required checks mechanically block direct
-pushes (GH006), so T0 became auto-PR at enforcement time.
+pushes (GH006), so T0 became auto-PR at enforcement time. Superseded by D019;
+the inline amendment above is preserved as history.
 
 ### D016 — accepted — The repository is public
 All history is permanently exposed. No secrets, private data, or unreviewed
@@ -103,6 +104,33 @@ agent prompts/results stay concise. Alternative: unconstrained delegation was
 rejected because Issue #6 demonstrated that duplicate research, implementation,
 conflict-resolution, and review sessions create token cost without proportional
 evidence.
+
+### D019 — accepted — T0 planning/process artifacts reach `master` as auto-PRs
+T0 planning/process artifacts (thread files, `LEARNINGS.md`, `TOOLING.md`,
+`.opencode/` configs and agents, `.github/` templates, and non-T1 planning
+prose) are merged by the agent through an auto-PR once the required status
+check (`planning-check` workflow, context `check`) is green; no human review
+is required. T1
+contract/decision surfaces are user-approved for substantive edits and
+agent-safe for routine status flips; T2 pipeline code is merged with pasted
+test output, a recorded `@reviewer` verdict, and required CI; T3 irreversible
+or unverifiable actions are user-decided. Alternatives considered: direct
+commits to `master` (rejected — required status checks mechanically block
+direct pushes, GH006, so T0 must travel as a PR); human review of T0 (rejected
+as a bottleneck for a solo project); runnable-checks-only (rejected because
+checks cannot protect untestable claims). This supersedes D015 and keeps the
+`planning-check` workflow (context `check`) a required status check on
+`master`.
+
+### D020 — accepted — The reducer owns the action-space index; events label observed actions
+Persistent reduction (Phase 7) defines the action-space index and emits
+deterministic legality masks over it. Event/action inference (Phase 8) consumes
+state deltas and emits each event's canonical action label, target, and
+`target_action_id` within that index. This gives the mask coordinate space and
+observed-action labeling single, separate owners, avoiding two divergent action
+mappings. Alternative considered: the reducer also emitting `target_action_id`
+(rejected because it would need the inferred action before events exist, or
+would duplicate the event mapper).
 
 ## Open Questions
 
