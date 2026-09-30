@@ -12,6 +12,8 @@ special objective at this stage.
 ## How To Use These Documents
 
 - Read `ROADMAP.md` before starting work.
+- Read the relevant `agent-state/threads/<issue-number>-<short-name>.md` to resume work from
+  another session or worktree.
 - Read the relevant component contract before changing that component.
 - Treat each contract's inputs, outputs, invariants, and acceptance criteria as
   the interface between agents and development phases.
@@ -23,6 +25,12 @@ special objective at this stage.
 - `ROADMAP.md`: phased development plan and phase gates.
 - `ARCHITECTURE.md`: system boundaries and data flow.
 - `DECISIONS.md`: durable decisions and unresolved questions.
+- `LEARNINGS.md`: verified reusable findings and failure modes.
+- `TOOLING.md`: verified project and machine-specific command recipes.
+- `agent-workflow.md`: session, subagent, and handoff procedures.
+- `agent-state/`: branch/worktree-scoped work-thread handoffs.
+- `../.opencode/skills/`: reusable triggered procedures.
+- `../.opencode/command/`: common agent workflow commands.
 - `components/ontology.md`: asset, class, page/zone, and typography vocabulary.
 - `components/ground-truth.md`: Lua oracle, evaluation set, annotation/QA tool.
 - `components/coordinates.md`: canonical coordinate and stream-layout contract.
