@@ -17,10 +17,14 @@ Completed:
 - DECISIONS.md reformatted to ADR-lite (D001-D014 + Q01-Q06), all content preserved; LEARNINGS.md template fenced so its example is not parsed as an entry.
 - Enforcement added: opencode.json permission rules (deny force-push/hard-reset; ask push/clean/restore/merge/rm -rf), .opencode/agents/explorer.md + reviewer.md (read-only subagents encoding the writer/reviewer pattern), .github work-item issue template + PR template checklist, .github/workflows/planning-check.yml running planning/check_contracts.py.
 - Cleanup: stray .opencode/node_modules + package files deleted; .claude/settings.local.json untracked (git rm --cached, gitignored); broken .venv recorded in TOOLING.md with py -3 fallback.
+- Agent loop strengthened: project `lead` is now the default primary agent with
+  a finite 40-step loop, explicit delegation limits, evidence checkpoints, and
+  handoff requirements; `/work` and `/verify` make execution and fresh-context
+  verification first-class; automatic compaction retains recent turns.
 Next:
+- Restart OpenCode to load the new project agent and command configuration; exercise `/work` and `/verify` on the first Phase 0 issue.
 - Push master and confirm the planning-check workflow runs green on GitHub.
-- Comment on Issue #1 pointing at the temp approval rule location; close it when the full policy is decided.
 - File first Phase 0 work issues using the new Work item template to exercise the workflow.
 Decisions: enforcement design (permissions + CI + templates) follows this session's audit references; recorded here, promote to DECISIONS.md if made durable.
-Risks: opencode.json permission schema verified against docs 2026-09-30 but not exercised end-to-end; CI unrun until pushed to GitHub.
-Validation: py -3 planning\check_contracts.py → "planning contracts OK"; git diff --check clean; opencode.json parses (json.load OK).
+Risks: opencode.json permission schema verified against docs 2026-09-30 and resolved config loads in OpenCode 1.18.33, but the loop has not been exercised end-to-end; an uncommitted policy edit in `planning/agent-workflow.md` conflicts with D015 and requires owner reconciliation; CI unrun until pushed to GitHub.
+Validation: py -3 planning\check_contracts.py → "planning contracts OK" before edits; rerun after edits plus `git diff --check` and JSON/schema validation.
