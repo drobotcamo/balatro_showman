@@ -66,6 +66,13 @@ solo project) and uniform laxity (runnable checks only — no protection
 against self-preference bias on untestable claims). `planning-check` is a
 required status check on `master` via branch protection.
 
+### D016 — accepted — The repository is public
+All history is permanently exposed. No secrets, private data, or unreviewed
+vendored artifacts may ever be committed (T3). The `.claude/settings.local.json`
+command allow-list and absolute local paths present in history are accepted as
+innocuous; machine-specific paths in `TOOLING.md` are intentional. Vendored
+submodules point to public upstream repositories.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the
