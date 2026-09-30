@@ -39,5 +39,11 @@ py -3 -m unittest tests.test_file_ipc_bridge
    themselves, in Issue #6. Keep saves, logs, dumps, and game assets local.
 
 The Lua bridge source and runtime hook remain a user-side blocker: no
-`agent_bridge.lua` is present in the repository or verified local runtime, and
-Steamodded's debug socket protocol is undocumented in the available evidence.
+`agent_bridge.lua` is present in the repository or verified local runtime.
+The legacy references document the expected fields and end signal in
+`legacy/policy/record_server.py` and `legacy/policy/NEXTUP.md`, but they do not
+provide a verified producer for the installed runtime. Steamodded's debug
+socket starts in the local log, but its protocol is not documented, so it is
+not used as the first transport. The next materially different approach is a
+user-confirmed minimal Steamodded mod hook, not initialization or import of
+the legacy vendor code.

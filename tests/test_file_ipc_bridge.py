@@ -75,6 +75,30 @@ class FileIpcBridgeTests(unittest.TestCase):
                 1,
             )
 
+    def test_request_ids_can_restart_after_run_end(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir = root / "io"
+            io_dir.mkdir()
+            bridge = FileIpcBridge(io_dir, root / "runs")
+            for run_id in ("smoke-4", "smoke-5"):
+                (io_dir / "snapshot.json").write_text(json.dumps({
+                    "request_id": 1,
+                    "meta": {"run_id": run_id},
+                    "legal_actions": ["SkipBlind"],
+                    "action_taken": "SkipBlind",
+                }), encoding="utf-8")
+                self.assertTrue(bridge.step_once())
+                (io_dir / "run_end.json").write_text(json.dumps({
+                    "run_id": run_id,
+                    "outcome": "loss",
+                }), encoding="utf-8")
+                self.assertTrue(bridge.step_once())
+            self.assertEqual(
+                json.loads((root / "runs" / "smoke-5" / "session.json").read_text())["n_steps"],
+                1,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

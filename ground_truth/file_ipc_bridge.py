@@ -43,6 +43,7 @@ class FileIpcBridge:
         self.run_end_path = io_dir / "run_end.json"
         self._seen_requests: set[str] = set()
         self._request_actions: dict[str, str] = {}
+        self._request_runs: dict[str, str] = {}
         self._sessions: dict[str, dict[str, Any]] = {}
 
     def _read_json(self, path: Path) -> dict[str, Any] | None:
@@ -108,6 +109,7 @@ class FileIpcBridge:
             raise ValueError(f"action {action!r} is not in legal_actions")
         self._seen_requests.add(request_key)
         self._request_actions[request_key] = action
+        self._request_runs[request_key] = run_id
 
         session = self._session(run_id)
         record = {**snapshot, "_recorded_action": action}
@@ -130,11 +132,16 @@ class FileIpcBridge:
         for target in targets:
             session = self._sessions.get(target)
             if session is None:
-                raise ValueError(f"run_end.json references unknown run_id {target!r}")
+                continue
             session["outcome"] = outcome
             session["ended_at"] = datetime.now(timezone.utc).isoformat()
             self._write_session(session)
             del self._sessions[target]
+            request_ids = [request for request, owner in self._request_runs.items() if owner == target]
+            for request in request_ids:
+                self._seen_requests.remove(request)
+                del self._request_actions[request]
+                del self._request_runs[request]
         return True
 
     def step_once(self) -> bool:
