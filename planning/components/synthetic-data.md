@@ -5,11 +5,11 @@ Status: `planned`
 ## Purpose
 
 Generate realistic training scenes and exact labels without manual bounding-box
-annotation.
+annotation, and generate synthetic OCR glyph crops for UI text.
 
 ## Inputs
 
-- Ontology and asset metadata.
+- Ontology, typography, and asset metadata.
 - Transparent or extracted asset sprites.
 - Real gameplay backgrounds and/or programmatic scene layouts.
 - Randomization configuration and seed.
@@ -18,6 +18,8 @@ annotation.
 
 - Images or image shards.
 - Exact object annotations with class IDs and boxes.
+- Synthetic OCR glyph crops in the recognizer's training format, labeled across
+  all fields and visual states.
 - Scene manifest containing seed, assets, transforms, background, and generator
   version.
 
@@ -25,7 +27,9 @@ annotation.
 
 - Every annotation is generated from the same transform as its visual asset.
 - Seeds make scenes reproducible.
-- Train/validation/test backgrounds and seeds are separated.
+- Train/validation/test backgrounds, seeds, and source videos are separated.
+- Background pools used for training are disjoint from the Phase 0 evaluation
+  set; eval failure surfaces are never trained on.
 - Synthetic-only metadata never masquerades as observed game state.
 
 ## Acceptance Criteria
@@ -34,4 +38,6 @@ annotation.
 - Coverage reports expose class imbalance and missing combinations.
 - The generator can create difficult small, occluded, modified, and overlapping
   objects.
+- Glyph crops match the OCR training format and cover all fields and states.
+- Resolution and aspect-ratio diversity meets the Phase 0 protocol.
 - A real-frame smoke set shows transfer beyond synthetic imagery.

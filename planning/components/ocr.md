@@ -4,13 +4,15 @@ Status: `planned`
 
 ## Purpose
 
-Recover visible text and numeric fields that object detection cannot represent.
+Recover visible text and numeric fields that object detection cannot represent,
+using a recognizer trained on synthetic glyph crops and canonical regions.
 
 ## Inputs
 
-- Video frames or frame references.
-- Field definitions and coordinate regions.
-- OCR engine output.
+- Canonical-coordinate frames or frame references.
+- Field definitions and canonical-space regions.
+- Synthetic OCR glyph training crops.
+- Synthetically trained recognizer output.
 
 ## Outputs
 
@@ -21,10 +23,15 @@ Recover visible text and numeric fields that object detection cannot represent.
 ## Invariants
 
 - Raw OCR is never overwritten by stabilization.
-- Each field has its own parser and valid range.
+- Each field has its own parser, valid range, and `X/Y` handling where relevant.
 - Carry-forward values retain provenance and age.
+- Regions come from the coordinates stage; no per-video hardcoded pixels.
+- Stabilization shares one provenance model with tracking; values are not
+  double-carried by two stages.
 
 ## Acceptance Criteria
 
-- Core economy, blind, score, hand, and discard fields have measured accuracy.
+- Core economy, blind, score, hand, and discard fields have measured accuracy
+  against the ground-truth oracle.
+- Accuracy holds across resolutions and aspect ratios without retuning.
 - Flicker and transient OCR errors are visible in debug output.

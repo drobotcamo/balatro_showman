@@ -5,31 +5,41 @@ Status: `planned`
 ## Purpose
 
 Define stable identities and composition rules for every visible gameplay object
-the pipeline may detect or reconstruct.
+the pipeline may detect or reconstruct, plus the page/zone vocabulary and the
+typography needed for synthetic OCR.
 
 ## Inputs
 
 - Existing asset sprites and names.
+- The existing vendored class-ID map (cards, jokers, consumables, vouchers,
+  blinds, stickers, and the like).
 - Balatro screenshots and UI observations.
 - Public model class mappings where useful.
 
 ## Outputs
 
-- Canonical asset IDs and human-readable names.
-- Class-family definitions.
+- Canonical asset IDs and human-readable names, extended from the adopted class
+  map rather than invented fresh.
+- Class-family definitions, including page and zone vocabulary.
 - Asset source and visual-variant metadata.
-- Modifier and parent-child composition rules.
+- Modifier/edition/seal composition rules attached to parent objects.
+- Typography assets: every glyph, digit, symbol, and modifier state (negative,
+  debuffed, highlighted) needed by synthetic OCR.
 - Versioned class map usable by training and inference.
 
 ## Invariants
 
-- IDs are stable once published.
+- IDs are stable once published; existing IDs are extended, never renumbered.
 - Names are unique within their declared family.
-- Modifier combinations do not require an unbounded class explosion.
+- Modifier combinations do not require an unbounded class explosion; they are
+  composition labels with a dedicated visible-attribute channel.
 - Unknown assets can be represented without corrupting known IDs.
+- Every typography glyph declares its source and license.
 
 ## Acceptance Criteria
 
 - Every initial asset has a source, family, ID, and expected visual footprint.
-- A class-map version can translate detector IDs back to canonical metadata.
+- A class-map version can translate detector IDs back to canonical metadata and
+  is compatible with existing granularized data and published weights.
 - At least one example exists for every composition rule.
+- Typography coverage is complete for all OCR fields and states.

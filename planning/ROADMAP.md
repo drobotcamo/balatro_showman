@@ -3,104 +3,183 @@
 ## Objective
 
 Build a laptop-developable, scalable game-state reconstruction pipeline for
-Balatro video. The first success criterion is trustworthy structured data, not
-an autonomous agent or a winning strategy.
+Balatro video, validated against a Lua ground-truth oracle. The first success
+criterion is trustworthy structured data, not an autonomous agent or a winning
+strategy.
 
-## Phase 0: Boundary and Evidence
+Gate conventions: every gate states a metric and a threshold. Thresholds are
+fixed in the Phase 0 evaluation protocol so a gate can pass or fail. Where a
+threshold is not yet known, the gate says `threshold: set in Phase 0`.
+
+## Phase 0: Boundary, Ground Truth, and Evaluation
 
 Status: `building`
 
-Inventory Marco Costa's public artifacts, preserve reusable local assets, define
-the ontology, and establish representative real-video evaluation clips.
+Inventory Marco Costa's public artifacts, move required assets into a versioned
+active store with provenance, stand up the Lua ground-truth oracle, build the
+minimal annotation/QA tool, and define the real-frame evaluation set and
+protocol.
 
-Gate: the team can state what every planned output means and has a small,
-manually inspectable evaluation set.
+Gate:
 
-## Phase 1: Asset Ontology and Metadata
+- Every planned output has a stated meaning and owning component.
+- The Lua oracle emits aligned `(state, action, outcome)` for at least one run.
+- An evaluation set exists (real clips, disjoint from synthetic backgrounds and
+  training video) with a documented annotation protocol.
+- Required assets/weights are versioned with provenance and are not gitignored.
+- Gate thresholds for Phases 1-10 are recorded.
 
-Status: `planned`
-
-Define canonical IDs for cards, jokers, consumables, packs, vouchers, tags,
-blinds, stakes, deck types, editions, seals, stickers, and visible UI elements.
-
-Gate: every supported class has stable identity, type, source asset, geometry
-expectations, and composition rules.
-
-## Phase 2: Synthetic Scene Generation
+## Phase 1: Ontology, Class Map, and Typography
 
 Status: `planned`
 
-Generate realistic gameplay scenes by compositing known assets onto gameplay
-backgrounds or programmatic layouts. Emit images and exact annotations without
-manual bounding-box labeling.
+Define canonical IDs by adopting and extending the existing class-ID map.
+Cover cards, jokers, consumables, packs, vouchers, tags, blinds, stakes, deck
+types, editions, seals, stickers, visible UI, page/zone vocabulary, and OCR
+typography.
 
-Gate: generated annotations round-trip correctly, class coverage is measurable,
-and a held-out real-frame smoke set shows useful detections.
+Gate:
+
+- Every supported class has stable identity, type, source asset, geometry
+  expectations, and composition rules.
+- A class-map version translates detector IDs back to canonical metadata.
+- Typography assets cover every OCR glyph and modifier state.
+- At least one example exists for every composition rule.
+
+## Phase 2: Synthetic Scene and Glyph Generation
+
+Status: `planned`
+
+Generate realistic gameplay scenes by compositing known assets onto backgrounds,
+and generate synthetic OCR glyph crops for UI text. Emit images and exact
+annotations without manual labeling.
+
+Gate:
+
+- Generated annotations round-trip correctly.
+- Coverage reports expose class imbalance and missing combinations.
+- Glyph crops match the OCR training format and cover all fields and states.
+- Background/seed pools are separated from the Phase 0 evaluation set.
+- Resolution and aspect-ratio diversity meets the Phase 0 protocol.
 
 ## Phase 3: Object Detection
 
 Status: `planned`
 
 Train and evaluate a broad detector using synthetic data, with laptop-friendly
-CPU/DirectML inference and a batch GPU path that uses the same model contract.
+CPU/DirectML inference and a batch GPU path sharing one model contract.
 
-Gate: real-frame performance is measured by class family and small-object recall,
-not only aggregate mAP.
+Gate (all measured on the Phase 0 real eval set):
 
-## Phase 4: OCR and Numeric State
+- Per-class-family recall meets `threshold: set in Phase 0`; aggregate mAP is
+  reported but not sufficient.
+- Small-object recall (editions/stickers/seals) meets threshold.
+- False-positive rate per family is under threshold.
+- CPU/DirectML and batch-GPU inference produce byte-compatible contract output.
+- Inference is resumable for long videos.
+
+## Phase 4: Page Classification and Zone Assignment
+
+Status: `planned`
+
+Identify the current screen/page and assign detected objects to zones with
+ordering. This owns `page_name` and zone semantics that all downstream target
+resolution depends on.
+
+Gate:
+
+- Page classification accuracy meets threshold on the eval set, including
+  modded-UI variants.
+- Zone assignment and ordering match ground-truth zones on benchmarked frames.
+- Unknown/unrecognized pages are emitted explicitly, never guessed as a known
+  page.
+
+## Phase 5: OCR and Numeric State
 
 Status: `planned`
 
 Extract chips, mult, money, blind values, ante, hands, discards, and other text
-fields using fixed regions, OCR, validation, and temporal stabilization.
+fields using canonical coordinate regions, a synthetically trained recognizer,
+per-field validation, and temporal stabilization.
 
-Gate: each field has an explicit error policy and stable output on representative
-clips.
+Gate:
 
-## Phase 5: Tracking and Cleanup
+- Each field has an explicit error policy, valid range, and measured accuracy
+  against the oracle.
+- Resolution/aspect changes do not require per-video retuning.
+- Flicker and transient OCR errors are visible in debug output.
+
+## Phase 6: Tracking and Cleanup
 
 Status: `planned`
 
 Turn frame-level detections into temporally consistent object tracks, handling
-brief misses, movement, duplicate boxes, and changing confidence.
+brief misses, movement, duplicate boxes, and changing confidence, with a defined
+interface to OCR stabilization.
 
-Gate: track identities remain stable through ordinary animations and short gaps.
+Gate:
 
-## Phase 6: Structured State Composition
+- Track identities remain stable through ordinary animations and short gaps.
+- Duplicate boxes are handled deterministically.
+- Fast transitions do not silently interpolate across incompatible objects.
+- OCR and tracking share one stabilization/provenance model with no double-carry.
+
+## Phase 7: Structured State Composition and Persistent Reduction
 
 Status: `planned`
 
-Attach modifiers to parent objects, assign objects to zones, preserve ordering,
-and emit a versioned full visible-state representation.
+Attach modifiers to parents, assign zones and ordering, emit versioned visible
+state, then reduce it into the declared persistent-state contract with action
+space and legality masks.
 
-Gate: state can be inspected frame-by-frame and reconstructed consistently from
-the component outputs.
+Gate:
 
-## Phase 7: Event and Action Inference
+- A human can inspect a frame and its structured representation together.
+- State can be reconstructed consistently from component outputs by class family
+  and region, not only in aggregate.
+- The reducer reproduces reference persistent state from ground-truth runs.
+- Masks agree with oracle legal actions on benchmarked steps.
+
+## Phase 8: Event and Action Inference
 
 Status: `planned`
 
 Infer transitions such as buying, selling, playing, discarding, rerolling,
-selecting blinds, and opening packs from state deltas and temporal context.
+selecting blinds, and opening packs from state deltas and temporal context, with
+confidence propagated from upstream.
 
-Gate: high-confidence events are validated manually; ambiguous events remain
-explicitly unknown instead of being silently guessed.
+Gate:
 
-## Phase 8: Dataset Production
+- Event precision and recall against the Lua oracle meet threshold.
+- Confidence is propagated from detection/OCR/composition, not asserted.
+- Low-confidence and ambiguous events remain explicitly `unknown`/`ambiguous`.
+
+## Phase 9: Dataset Production
 
 Status: `planned`
 
 Process large video collections into partitioned, reproducible state and event
-datasets with provenance, quality scores, and reprocessing support.
+datasets with a declared storage format, schema versions, provenance, quality
+scores, and reprocessing support.
 
-Gate: a new video can be processed end-to-end with resumability and traceable
-outputs.
+Gate:
 
-## Phase 9: Analysis and Learning
+- A small video runs end-to-end locally.
+- A larger batch resumes after interruption.
+- Schema versions are explicit and migrations are defined.
+- Dataset splits avoid neighboring-frame, source-video, and synthetic/eval
+  leakage.
+
+## Phase 10: Analysis and Learning
 
 Status: `planned`
 
 Explore descriptive statistics, behavior cloning baselines, representation
 learning, and other approaches only after data quality is established.
 
-Gate: downstream claims report dataset coverage, uncertainty, and leakage risks.
+Gate:
+
+- A simple state-to-action baseline trains and is evaluated by event type
+  against the declared contract.
+- Downstream claims report dataset coverage, uncertainty, and leakage risks.
+- Any imitation-learning claim includes an out-of-distribution or rollout test.
