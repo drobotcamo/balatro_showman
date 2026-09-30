@@ -8,7 +8,19 @@ This is a maintained runbook, not a log of every command ever attempted.
 - Platform: Windows
 - Shell: PowerShell 7+
 - Repository root: `C:\Users\camgr\Documents\code_projects\balatro_showman`
-- Python environment: repository `.venv` when available
+- Python environment: repository `.venv` when available; `py -3` as fallback
+
+### Python interpreter
+
+```powershell
+.venv\Scripts\python.exe --version
+py -3 --version
+```
+
+Known failure modes: the checked-in `.venv` can point at a missing base
+interpreter (verified 2026-09-30: it referenced `C:\Python311\python.exe`,
+which does not exist) and then fail for any command. When `.venv` is broken,
+use `py -3`. Plain `python` is not on PATH in this shell.
 
 ## Git And GitHub
 
@@ -40,6 +52,16 @@ git diff --check
 Success: no whitespace errors are reported.
 
 ## Project Checks
+
+### Validate planning documents
+
+```powershell
+py -3 planning\check_contracts.py
+```
+
+Working directory: repository root. Stdlib only, no inputs. Success:
+`planning contracts OK`, exit code 0. Failure: one `FAIL:` line per problem
+and exit code 1; CI runs the same script (`.github/workflows/planning-check.yml`).
 
 Add commands here only after they have been run successfully in this repository.
 Each recipe must state its working directory, inputs, expected result, and known

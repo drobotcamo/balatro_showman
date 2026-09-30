@@ -1,21 +1,17 @@
 # Agent State
 
-This directory stores supplemental handoffs for GitHub-Issue work items. A work
-thread is not an OpenCode session: multiple sessions may continue the same
-branch/worktree, and one session may work on more than one issue.
+Work-thread handoff batons for GitHub-Issue work items. A thread is not an
+OpenCode session: multiple sessions may continue one thread, and one session
+may work on more than one issue.
 
 ## Layout
 
-- `threads/<issue-number>-<short-name>.md`: one handoff per Issue/work item.
-- `archive/`: completed or abandoned threads when history is useful.
+- `threads/<issue-number>-<short-name>.md`: one handoff per work item. Use the
+  template in `../agent-workflow.md` → Handoff Protocol; this file does not
+  restate it.
+- `archive/`: completed or abandoned threads, created when first needed.
 
-Each thread should include its ID, owner, branch, worktree, status, objective,
-scope, dependencies, completed work, next actions, risks, and validation.
-
-## Parallel Worktrees
-
-GitHub Issues define work and PRs define integration. These files are
-branch-scoped and become shared through Git; they are not live locks. Coordinate
-parallel worktrees with Issue, branch, Git status, and PR state. Do not assume
-another worktree sees uncommitted edits. Never use Markdown as a concurrency
-lock.
+Thread files are branch-scoped and become shared through Git; they are not
+live locks. Coordinate parallel worktrees with Issue, branch, Git status, and
+PR state. Do not assume another worktree sees uncommitted edits. Never use
+Markdown as a concurrency lock.

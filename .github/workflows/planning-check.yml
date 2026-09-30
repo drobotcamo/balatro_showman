@@ -1,0 +1,22 @@
+name: planning-check
+
+on:
+  push:
+    paths:
+      - "planning/**"
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - ".github/workflows/planning-check.yml"
+  pull_request:
+    paths:
+      - "planning/**"
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - ".github/workflows/planning-check.yml"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 planning/check_contracts.py

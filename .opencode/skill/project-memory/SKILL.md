@@ -5,16 +5,16 @@ description: Maintain project decisions, learnings, and agent handoffs. Use when
 
 # Project Memory
 
-Keep knowledge in the correct layer:
+Route knowledge to the correct layer; do not duplicate it. Procedures go in
+`.opencode/skills/` only when repeatable with a clear trigger.
 
-- Put current work and next actions in the relevant
-  `planning/agent-state/threads/<issue-number>-<short-name>.md`.
-- Put durable choices and unresolved questions in `planning/DECISIONS.md`.
-- Put verified, reusable findings in `planning/LEARNINGS.md`.
-- Put verified command recipes in `planning/TOOLING.md`.
-- Put procedures in `.opencode/skills/` only when they are repeatable and have a
-  clear trigger.
+- Current work and next actions →
+  `planning/agent-state/threads/<issue-number>-<short-name>.md` (template in
+  `planning/agent-workflow.md` → Handoff Protocol).
+- Durable choices and open questions → `planning/DECISIONS.md` (ADR-lite
+  entries; state alternatives when material).
+- Verified reusable findings → `planning/LEARNINGS.md` (use its entry format;
+  check the finding is verified and not already captured).
 
-Before writing a learning, check that it is verified and not already captured.
-Before writing a decision, state the alternatives and why the selected choice
-fits the project tenets. Keep thread handoffs short enough to read in one pass.
+Before writing, run `python planning/check_contracts.py`. Keep batons short
+enough to read in one pass.
