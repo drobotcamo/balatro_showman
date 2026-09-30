@@ -54,6 +54,18 @@ Do not optimize exclusively for wins.
 
 ### D014 — accepted — Markdown is the planning and progress format
 
+### D015 — accepted — The approval policy is risk-tiered evidence
+T0 planning/process artifacts commit directly to `master` with CI as the
+gate; T1 contract/decision surfaces (AGENTS.md, agent-workflow.md,
+DECISIONS.md, ROADMAP.md, components) are user-approved for substantive
+edits and agent-safe for routine status flips; T2 pipeline code is merged by
+agents with pasted test output, a recorded `@reviewer` verdict, and required
+CI; T3 irreversible or unverifiable actions are user-decided. Alternatives
+considered: uniform strictness (user reviews everything — bottleneck for a
+solo project) and uniform laxity (runnable checks only — no protection
+against self-preference bias on untestable claims). `planning-check` is a
+required status check on `master` via branch protection.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the

@@ -2,6 +2,8 @@
 
 Closes #
 
+Tier: T1 contract (user approval required) | T2 code (agent merges when green)
+
 ## What changed
 
 Scope, files, and components touched.

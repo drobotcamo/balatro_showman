@@ -29,8 +29,9 @@ GitHub is the coordination authority for parallel work:
   work is closed with a reason.
 - A dedicated branch and worktree implement the Issue; one or more agent
   sessions may continue the same branch and worktree.
-- A Pull Request is the review, validation, and merge boundary, using the PR
-  template checklist.
+- A Pull Request is the review, validation, and merge boundary for T1–T2 work
+  (see Approval And Merging); T0 planning artifacts commit directly to
+  `master` with CI as the gate.
 - Thread files supplement the Issue with session-level execution context; they
   are not live locks. GitHub Issue, branch, and PR state are the cross-worktree
   coordination authority. Never use Markdown as a concurrency lock.
@@ -85,14 +86,36 @@ work they were asked to perform.
 
 ## Approval And Merging
 
-- Agents may approve Issues and PRs when the stated acceptance criteria and
-  validation are satisfied; approval must state what was checked and any
-  remaining uncertainty.
-- An agent must not be the sole approver of its own changes. A completion or
-  approval claim requires either the output of a runnable check (test,
-  script, or build) or an independent review from a fresh context
-  (`@reviewer` subagent or a separate session). When neither is available,
-  request human review. Detailed policy: GitHub Issue #1.
+Approval cost scales with blast radius. Tiers:
+
+- **T0 — planning/process artifacts**: thread files, `LEARNINGS.md`,
+  `TOOLING.md`, `.opencode/` configs and agents, `.github/` templates, and
+  planning prose that is not listed under T1. The agent commits directly to
+  `master` without a PR. Required evidence: `planning/check_contracts.py`
+  passes and `git diff --check` is clean.
+- **T1 — contracts and durable decisions**: `AGENTS.md`,
+  `planning/agent-workflow.md`, `planning/DECISIONS.md`, `ROADMAP.md`, and
+  `planning/components/*`. Agent-safe only for routine status flips backed by
+  gate evidence and formatting/sync edits. Substantive edits (interfaces,
+  invariants, acceptance criteria, new durable decisions) require user
+  approval; propose with alternatives and a recommendation.
+- **T2 — pipeline code**: anything affecting reconstruction output. Branch
+  and worktree per Issue, PR, pasted output of the narrowest relevant tests,
+  an `@reviewer` fresh-context verdict recorded on the PR, and required CI
+  green. The agent merges when all are satisfied.
+- **T3 — irreversible or unverifiable**: destructive operations, dependency
+  and model-weight additions, CI/permission changes, claims without a runnable
+  protocol. Explicit user decision, no exceptions.
+
+Rules common to all tiers:
+
+- An agent must not be the sole approver of its own changes. Approval is a
+  derived state backed by the tier's evidence; the acting agent records it on
+  the PR or issue: what was checked, check outputs, reviewer verdict, and
+  remaining uncertainty. Never chat-only.
+- `@reviewer` returns a verdict (`holds` | `holds with gaps` | `refuted`); it
+  does not approve. `refuted` or `holds with gaps` blocks merge unless the
+  gaps are T0-level or the user accepts them explicitly.
 - Approval and merge are separate checks. Before merging, verify the PR still
   targets the intended branch, required checks pass, dependent PRs are in the
   correct order, and no newer conflicting work changed the acceptance
