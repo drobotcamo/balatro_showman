@@ -1,49 +1,82 @@
 # File-IPC Bridge Spike
 
-This spike exercises the repository-side half of the existing contract without
-loading game files or importing `legacy/`.
+This spike exercises the existing file-IPC oracle contract end to end:
+
+```
+Lua producer (game)                 Python client (repo)
+snapshot.json  ───────────────▶     record aligned step
+action.txt     ◀───────────────     acknowledgement
+run_end.json   ───────────────▶     finalize outcome
+```
 
 ## Contract
 
 - Input: the Lua-side `snapshot.json` in the shared `agent_io` directory.
 - Acknowledgement: `<request_id>\t<action>\n` in `action.txt`.
 - Record: `<out-dir>/<run_id>/steps.ndjson`, with `_recorded_action` added.
-- Outcome: a Lua-side `run_end.json` containing `run_id` and `outcome` (`win` or
-  `loss`) finalizes `session.json`.
+- Outcome: a Lua-side `run_end.json` containing `run_id` and `outcome`
+  (`win` or `loss`) finalizes `session.json`.
+
+## Lua producer
+
+`ground_truth/balatro_mod/` is a minimal Steamodded mod (`manifest.json` +
+`main.lua`) that emits the contract's Lua side. It hooks the game's own action
+callbacks and writes a snapshot *before* the action runs, so the captured state
+is the decision state and `action_taken` is the player's real action. On game
+over it writes `run_end.json` with the real outcome.
+
+Scope is deliberately small (Issue #6 smoke test):
+
+- Snapshots carry real `state`, `page_name`, hand/pending/joker/consumable
+  `objects`, `request_id`, and runtime metadata.
+- `persistent_state` and `legal_actions` are sparse; action labels are coarse
+  (`PlayHand`, `SelectBlind`, ...), not the canonical zoned action space. This
+  is a transport/liveness proof, not a model-input snapshot.
 
 ## Repository check
 
 ```text
-py -3 -m unittest tests.test_file_ipc_bridge
+py -3 -m unittest tests.test_file_ipc_bridge tests.test_balatro_mod
 ```
 
-## User smoke test
+## Installation (reversible)
 
-1. Confirm the intended Steamodded build and disable warning-producing mods by
-   the user's normal, reversible runtime procedure. Do not copy runtime files
-   into this repository.
-2. Arrange for the Lua mod to emit one `live/2.0.0` snapshot with `meta.run_id`,
-   `request_id`, `legal_actions`, and either `action_taken` or a legal action
-   supplied below. The repository does not invent the Lua hook or modify the
-   installed runtime.
-3. Start the client, using an output directory outside the repository:
+1. Copy the mod folder into the Steamodded mod root:
 
-   ```text
-   py -3 -m ground_truth.file_ipc_bridge --io-dir "%APPDATA%\Balatro\agent_io" --out-dir "%TEMP%\balatro_showman_runs" --action SelectBlind
+   ```powershell
+   Copy-Item -Recurse -Force `
+     "ground_truth\balatro_mod" `
+     "$env:APPDATA\Balatro\Mods\balatro_showman_bridge"
    ```
 
-4. Exercise one game decision, then have the Lua side write
-   `{"run_id":"...","outcome":"win"}` or `{"run_id":"...","outcome":"loss"}`
-   to `run_end.json`.
-5. Report the generated `steps.ndjson` and `session.json` fields, not the files
-   themselves, in Issue #6. Keep saves, logs, dumps, and game assets local.
+   To remove it, delete `$env:APPDATA\Balatro\Mods\balatro_showman_bridge`.
+   Nothing is written outside that folder, `agent_io`, and the Python output
+   directory.
 
-The Lua bridge source and runtime hook remain a user-side blocker: no
-`agent_bridge.lua` is present in the repository or verified local runtime.
-The legacy references document the expected fields and end signal in
-`legacy/policy/record_server.py` and `legacy/policy/NEXTUP.md`, but they do not
-provide a verified producer for the installed runtime. Steamodded's debug
-socket starts in the local log, but its protocol is not documented, so it is
-not used as the first transport. The next materially different approach is a
-user-confirmed minimal Steamodded mod hook, not initialization or import of
-the legacy vendor code.
+2. Launch Balatro and confirm the Lovely log reports the mod loaded:
+   search `$env:APPDATA\Balatro\Mods\lovely\log\` for
+   `[balatro_showman_bridge] loaded; io_dir=...`.
+
+## Smoke test
+
+1. Start the repository client, writing outside the repository:
+
+   ```powershell
+   py -3 -m ground_truth.file_ipc_bridge `
+     --io-dir "$env:APPDATA\Balatro\agent_io" `
+     --out-dir "$env:TEMP\balatro_showman_runs"
+   ```
+
+2. Start a run. `SelectBlind`, play/discard, and shop actions each write one
+   `snapshot.json`; the client records it to `steps.ndjson`.
+3. End the run for real (failing the first blind is a quick `loss`). The
+   producer writes `run_end.json`; the client finalizes `session.json`.
+4. Report the field values from `steps.ndjson` and `session.json` in Issue #6.
+   Keep saves, logs, dumps, and game assets local.
+
+## Status
+
+The Lua producer exists and is syntax-checked and executed against a synthetic
+game state repository-side. Real-game verification is the remaining step: a
+live run through the procedure above is required before this is a Phase 0
+oracle claim. Steamodded's debug socket is not used as a transport.

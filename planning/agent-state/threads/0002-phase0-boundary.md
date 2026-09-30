@@ -1,33 +1,26 @@
 # Work Thread
 Updated: 2026-09-30
 Issue: #6
-PR: https://github.com/drobotcamo/balatro_showman/pull/7
+PR: https://github.com/drobotcamo/balatro_showman/pull/7 (closed, superseded by the new producer PR)
 Owner: opencode Phase 0 lead session
 Branch: issue-6-bridge-spike
 Worktree: `C:\Users\camgr\Documents\code_projects\balatro_showman-issue-6`
-Objective: Exercise the existing file-IPC contract with the smallest active repository-side bridge client.
+Objective: Ship the smallest runtime-compatible Lua producer for the file-IPC oracle contract and prove one real aligned (state, action, outcome) run.
 Status: blocked
-Scope: `ground_truth/file_ipc_bridge.py`, its tests, and bridge smoke-test instructions
-Dependencies: user-confirmed Steamodded build and a user-supplied Lua snapshot/outcome hook
+Scope: `ground_truth/balatro_mod/` (Lua producer), its manifest test, `planning/BRIDGE_SPIKE.md`
+Dependencies: user-run game smoke test; no contract, architecture, or policy change
 Completed:
-- Rebased the branch onto current `origin/master` (`fac4d95`), dropping the
-  duplicated prior integration commit `978fed3`; the old PR head conflicted
-  because current master contains equivalent integration as `ad96cf1` plus
-  merged PR #4. The final diff is limited to the five Issue #6 files below.
-- Resolved the only predicted content overlap (`planning/LEARNINGS.md`) by
-  retaining current master planning history; no Issue #6 implementation or
-  unrelated planning artifact was dropped.
-- Created a stdlib-only active client; it does not import `legacy/` or touch the installed runtime.
-- Added snapshot validation, atomic `action.txt` acknowledgement, aligned `steps.ndjson` recording, and explicit `run_end.json` outcome finalization.
-- Added temporary-directory tests covering the complete record/outcome path and illegal-action rejection.
-- Documented the user-run smoke test and the missing Lua bridge/runtime-hook blocker in `planning/BRIDGE_SPIKE.md`.
-- Incorporated fresh-context review feedback: atomic writes retry on Windows sharing errors, duplicate requests replay their acknowledgement, and malformed JSON is discarded without crashing the loop.
-- Incorporated follow-up review feedback: request IDs reset after run finalization, repeated/unknown end signals are harmless, and the blocker cites the legacy contract references while keeping the producer out of the active implementation.
+- Verified PR #7 is repository-only: it adds a stdlib client for `snapshot.json -> action.txt` and explicit `run_end.json` finalization, but no Lua producer. It is reference material, not oracle evidence.
+- Confirmed the installed runtime is suitable in principle: Balatro `1.0.1o-FULL`, Lovely `0.10.0`, Steamodded `26.926.0~dev-a`, mod root `%APPDATA%\Balatro\Mods`. Only `BalatroMultiplayer-0.5.5` and `Brainstorm-2.0.0-alpha-1` are blacklisted; `HandyBalatro`/`JokerDisplay` emit metadata/patch warnings but load. No `agent_bridge.lua` exists in repo or runtime.
+- Derived verified game facts read-only from `Mods\lovely\game-dump\`: action callbacks `G.FUNCS.{play_cards_from_highlighted, discard_cards_from_highlighted, select_blind, skip_blind, cash_out, reroll_shop, buy_from_shop, sell_card, use_card, skip_booster, toggle_shop}`; `G.STATES`/`G.STAGES`; `G.GAME.won` set true on win and false at `Game:start_run`; card base suit/value and `Card.highlighted`.
+- Added `ground_truth/balatro_mod/` (Steamodded `manifest.json` + `main.lua`) that emits `snapshot.json` (real state/objects/page/action_taken/request_id/runtime meta) and `run_end.json` (win/loss). It does not read saves or copy runtime files.
+- Added `tests/test_balatro_mod.py` guarding the manifest shape and the single-JSON-metadata loader invariant.
+- Validation: `main.lua` parses (luaparser) and executes against a synthetic game state (lupa) producing valid, aligned `snapshot.json` + `run_end.json`; `py -3 -m unittest tests.test_file_ipc_bridge tests.test_balatro_mod` and `py -3 planning\check_contracts.py` pass; `git diff --check` clean.
 Next:
-1. User confirms the target runtime/mod configuration and supplies one real smoke-test sequence, or records the runtime blocker.
-2. Resolve the remaining reviewer gap with real producer evidence before merge.
+1. User installs the mod with the `planning/BRIDGE_SPIKE.md` procedure, runs the Python client, and plays one run to a real win or loss.
+2. Return the `steps.ndjson`/`session.json` field values so the producer can be corrected if the runtime differs from the dump.
+3. Open a new Issue #6 PR for the producer and run a fresh-context `@reviewer` (T2).
 Decisions: No architecture, component contract, or durable policy changed.
-Risks: The Lua bridge entry point and action/outcome hooks are still unverified; no aligned real-game sample exists yet.
-Validation: `py -3 -m unittest tests.test_file_ipc_bridge` -> 4 tests OK; `py -3 planning\\check_contracts.py` -> `planning contracts OK`; `git diff --check` -> clean; final diff is `0` behind and `3` ahead of `origin/master`.
-Reviewer: delegated fresh-context `@reviewer`, task `ses_f0be9a8f4ffe2npbJ5tDUE53Wg`, verdict `holds with gaps` (not approval). Evidence: reviewer reran all three checks and confirmed scope/artifact compliance, but found T2 gaps including late post-finalization snapshots recreating sessions, incomplete Windows atomic-write retry coverage, semantic errors consuming input/crashing the loop, unsanitized `run_id`, overlapping request IDs, and no verified Lua producer or real-game sample. The reviewer also noted the old remote PR head was stale and included nine unrelated integration/planning files; those are absent from the rebased local diff.
-Changed files: `ground_truth/file_ipc_bridge.py`, `ground_truth/__init__.py`, `tests/test_file_ipc_bridge.py`, `planning/BRIDGE_SPIKE.md`, this thread file.
+Risks: The producer is validated only against a synthetic state; real-game load order, field names, and file locking are unverified. Action labels are coarse by design. No Phase 0 gate is claimed.
+Validation: luaparser syntax OK; lupa harness produced aligned `snapshot.json`/`run_end.json`; `py -3 -m unittest tests.test_file_ipc_bridge tests.test_balatro_mod` -> OK; `py -3 planning\check_contracts.py` -> `planning contracts OK`; `git diff --check` -> clean.
+Changed files: `ground_truth/balatro_mod/manifest.json`, `ground_truth/balatro_mod/main.lua`, `tests/test_balatro_mod.py`, `planning/BRIDGE_SPIKE.md`, this thread file.
