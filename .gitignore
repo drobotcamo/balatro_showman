@@ -10,3 +10,8 @@
 __pycache__/
 *.pyc
 /detect_output/
+/legacy/dataset_synthetic/
+/legacy/recorded_gameplay_asset_images/
+/legacy/runs/
+/legacy/dataset/
+/legacy/detect_output/

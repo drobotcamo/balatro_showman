@@ -43,6 +43,55 @@ The `events.json` format needs per-frame: page_name, ocr state dict, zones dict 
 
 ---
 
+## Path B Implementation — DONE
+
+`policy/record_server.py` and `policy/granularize_live.py` are now written and smoke-tested.
+
+**record_server.py** — two modes:
+- `--mode assist`: loads a checkpoint, AI plays, every (snapshot, model_action) is saved. No Lua changes needed.
+- `--mode observe`: expects Lua to set `snapshot.action_taken = "<label>"` before writing snapshot.json; echoes it back so Lua advances.
+
+Sessions saved to `data/live_sessions/<run_id>/steps.ndjson` + `session.json`.
+
+Run-end signals: write `<io_dir>/run_end.json: {"run_id": <id>, "outcome": "win"|"loss"}` to finalize a session with its outcome.
+
+**granularize_live.py** — converts sessions to granularized format:
+- Parses action labels to zone+position
+- Synthesizes SWAP steps between events when CurrentJokers reorder
+- Runs `state_reducer` to produce `data/persistent_state/`
+- Output goes straight into the `tensorize_oc.py` pipeline
+
+**Lua bridge change required (observe mode only)**:
+```lua
+-- In agent_bridge.lua, before writing snapshot.json:
+snapshot.action_taken = action_label  -- e.g. "BuyShopItem_TopShelfShopOfferings_0"
+-- After run ends:
+-- Write <io_dir>/run_end.json: {"run_id": <id>, "outcome": "win"}
+```
+
+**Full recording pipeline**:
+```bash
+# 1. Record (human plays with modified Lua bridge):
+python policy/record_server.py --mode observe
+
+# 2. Convert to granularized format:
+python policy/granularize_live.py
+
+# 3. Label outcomes (or they come from run_end.json signals):
+python policy/label_outcomes.py
+
+# 4. Tensorize:
+python policy/tensorize_oc.py --outcomes policy/data/outcomes.json \
+    --src data/granularized --persistent data/persistent_state \
+    --out data/tensorized_oc
+
+# 5. Train:
+python policy/train_oc.py --tensorized data/tensorized_oc \
+    --splits artifacts/splits_goldstake.json --epochs 20 --win-weight 5
+```
+
+---
+
 ## Two Paths Forward
 
 ### Path A — Reproduce the Event Extractor (medium effort)
