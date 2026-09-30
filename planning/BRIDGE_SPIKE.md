@@ -80,9 +80,9 @@ py -3 -m unittest tests.test_file_ipc_bridge tests.test_balatro_mod
 
 The producer is verified against the installed runtime (Balatro `1.0.1o-FULL`,
 Steamodded `26.926.0~dev-a`, Lovely `0.10.0`) with two real runs, and the
-current revision is exercised by the synthetic harness (blind/select, Arcana
-and Buffoon packs, voucher 998, win/loss finalize). Provenance of the persisted
-runs:
+current revision is exercised by an external, not-checked-in lupa/luaparser
+harness (blind/select, Arcana and Buffoon packs, an unknown kind, voucher 998,
+win/loss finalize). Provenance of the persisted runs:
 
 - `win`, 433 steps: `F:\OBS_RECORDINGS\oracle_runs\2026-09-30_14-50-37_1790805058-5327\`
   with video `F:\OBS_RECORDINGS\2026-09-30 14-50-37.mkv`. Captured before the
