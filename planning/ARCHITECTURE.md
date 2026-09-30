@@ -66,7 +66,9 @@ detect -> page/zone -> OCR -> tracking -> compose -> reduce -> infer events.
 Feedback edges (not drawn): tracking feeds duplicate/miss cleanup back into
 detection reconciliation; the oracle scores page classification, zone
 assignment, persistent reduction, and event inference; eval-set failures
-steer synthetic generation.
+steer synthetic generation; optionally, raw OCR may support page identity when
+detector evidence is ambiguous, but page identity never requires it, so the
+bootstrap order is unchanged.
 
 ## Design Principles
 

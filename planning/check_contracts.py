@@ -134,7 +134,10 @@ def check_open_questions() -> None:
     if table is None:
         fail("ROADMAP.md: missing '## Open Questions And Gates' section")
         return
-    linked = set(re.findall(r"\|\s*(Q\d{2})\s*\|", table))
+    rows = "\n".join(
+        line for line in table.splitlines() if line.strip().startswith("|")
+    )
+    linked = set(re.findall(r"\|\s*(Q\d{2})\s*\|", rows))
     for question in questions:
         if question not in linked:
             fail(
