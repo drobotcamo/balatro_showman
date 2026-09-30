@@ -13,7 +13,10 @@ Checks (mechanical only; it does not judge prose quality or gate thresholds):
 - Every component contract has the required sections and a valid status.
 - Every ROADMAP phase has a status and a gate, and every component file has an
   owning phase or cross-cutting reference in planning/ROADMAP.md.
-- Backtick file references in governed documents resolve to real files.
+- Backtick file references in the core agent/planning documents resolve to real
+  files. Inventory documents that intentionally reference external or vendored
+  artifacts (e.g. `planning/PHASE0_INVENTORY.md`) are excluded, because those
+  targets are not present in a fresh checkout.
 
 Stdlib only; exit code 1 on any failure.
 """
@@ -169,7 +172,6 @@ def check_references() -> None:
         PLANNING / "README.md",
         PLANNING / "ROADMAP.md",
         PLANNING / "ARCHITECTURE.md",
-        PLANNING / "PHASE0_INVENTORY.md",
         PLANNING / "agent-workflow.md",
         PLANNING / "agent-state" / "README.md",
     )

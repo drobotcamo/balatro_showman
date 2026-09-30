@@ -51,8 +51,9 @@ other work. Winning plays are not a special objective at this stage.
 Planning documents are mechanically validated by running python on
 `planning/check_contracts.py`: thread naming and handoff fields, decision and
 learning formats and append-only ordering, open-question linkage, component
-sections and status, roadmap ownership and gates, and backtick file-reference
-resolution. It does not judge prose quality or validate gate thresholds; the
+sections and status, roadmap ownership and gates, and resolvable backtick file
+references in the core agent/planning documents. It does not judge prose
+quality or validate gate thresholds; the
 numeric thresholds are a Phase 0 evaluation-protocol deliverable (Q03).
 
 ## Status Vocabulary
