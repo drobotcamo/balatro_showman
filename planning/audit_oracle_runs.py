@@ -43,6 +43,8 @@ STATE_KEYS = (
 
 REQUIRED_TOP_LEVEL = (
     "schema_version",
+    "step_id",
+    "capture_timestamp_ns",
     "request_id",
     "page_name",
     "state",
@@ -269,6 +271,22 @@ def audit(run_dir: Path) -> dict:
         fail(f"{label}: session.n_steps={session.get('n_steps')} != step lines={n}")
     if len(set(rid)) != n or any(x is None for x in rid):
         fail(f"{label}: request_id is not unique/non-null on every step")
+    step_ids = [r.get("step_id") for r in records]
+    if len(set(step_ids)) != n or any(x is None for x in step_ids):
+        fail(f"{label}: step_id is not unique/non-null on every step")
+    for index, record in enumerate(records):
+        timestamp = record.get("capture_timestamp_ns")
+        meta = record.get("meta") or {}
+        if not isinstance(timestamp, int):
+            fail(f"{label}: step {index} has invalid capture_timestamp_ns")
+        if meta.get("capture_timestamp_ns") != timestamp:
+            fail(f"{label}: step {index} meta capture timestamp disagrees")
+        if not isinstance(meta.get("video_timestamp_ns"), int):
+            fail(f"{label}: step {index} lacks video_timestamp_ns linkage")
+        elif meta["video_timestamp_ns"] != timestamp:
+            fail(f"{label}: step {index} video timestamp disagrees")
+        if index and timestamp <= records[index - 1].get("capture_timestamp_ns", -1):
+            fail(f"{label}: capture timestamps are not strictly ordered")
     if len(run_ids) != 1 or session.get("run_id") not in run_ids:
         fail(f"{label}: step run_id does not match session run_id ({dict(run_ids)})")
     if session.get("outcome") not in {"win", "loss"}:
