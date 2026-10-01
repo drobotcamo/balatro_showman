@@ -59,6 +59,68 @@ def fail(message: str) -> None:
     INTEGRITY_FAILURES.append(message)
 
 
+# Object attribute columns in the adopted object schema. `stickers` is
+# list-valued (empty list when none); modifier/edition/seal are null when absent.
+ATTRIBUTE_COLUMNS = ("modifier", "edition", "seal", "stickers")
+# Playing cards cannot carry rental/perishable/eternal stickers (those attach to
+# jokers/consumables), so `pending_cards.stickers` is structurally empty and is
+# not part of the pending all-null check.
+PENDING_ATTRIBUTE_COLUMNS = ("modifier", "edition", "seal")
+
+
+def _present(value: object) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, (list, dict)) and len(value) == 0:
+        return False
+    return True
+
+
+def _attribute_present_counts(
+    rows: list[dict], columns: tuple[str, ...] = ATTRIBUTE_COLUMNS
+) -> dict:
+    return {
+        column: sum(1 for row in rows if _present(row.get(column)))
+        for column in columns
+    }
+
+
+def _all_null_columns(
+    rows: list[dict], columns: tuple[str, ...] = ATTRIBUTE_COLUMNS
+) -> list[str]:
+    if not rows:
+        return []
+    counts = _attribute_present_counts(rows, columns)
+    return [column for column in columns if counts[column] == 0]
+
+
+def conformance_findings(summary: dict) -> list[str]:
+    """Non-fatal conformance notes for one run summary."""
+    findings: list[str] = []
+    inventory = summary.get("inventory_objects", 0)
+    if inventory and summary.get("inventory_class_id_null"):
+        findings.append(
+            f"{summary['run']}: {summary['inventory_class_id_null']}/{inventory} "
+            "inventory object(s) have class_id:null (unmapped center_key)"
+        )
+    for column in summary.get("object_attribute_all_null", []):
+        findings.append(
+            f"{summary['run']}: object.{column} is null/empty on all "
+            f"{summary.get('objects_total', 0)} objects"
+        )
+    if summary.get("object_stickers_not_list"):
+        findings.append(
+            f"{summary['run']}: object.stickers is not a list on "
+            f"{summary['object_stickers_not_list']} object(s)"
+        )
+    for column in summary.get("pending_attribute_all_null", []):
+        findings.append(
+            f"{summary['run']}: pending_cards.{column} is null/empty on all "
+            f"{summary.get('pending_cards_total', 0)} pending card(s)"
+        )
+    return findings
+
+
 def load_run(run_dir: Path) -> tuple[dict, list[dict]]:
     session = json.loads((run_dir / "session.json").read_text(encoding="utf-8"))
     lines = [
@@ -145,11 +207,35 @@ def audit(run_dir: Path) -> dict:
     summary["object_edition_null"] = sum(1 for o in obj if o.get("edition") is None)
     summary["object_seal_null"] = sum(1 for o in obj if o.get("seal") is None)
     summary["object_class_id_null"] = sum(1 for o in obj if o.get("class_id") is None)
-    inv_types = {"joker", "tarot", "planet", "spectral", "consumable"}
+    summary["object_attribute_present"] = _attribute_present_counts(obj)
+    summary["object_attribute_all_null"] = _all_null_columns(obj)
+    summary["object_stickers_not_list"] = sum(
+        1 for o in obj if o.get("stickers") is not None and not isinstance(o.get("stickers"), list)
+    )
+    inv_types = {"joker", "tarot", "planet", "spectral", "consumable", "voucher"}
     inv = [o for o in obj if o.get("object_type") in inv_types]
     summary["inventory_objects"] = len(inv)
+    summary["inventory_class_id_present"] = sum(
+        1 for o in inv if o.get("class_id") is not None
+    )
+    summary["inventory_class_id_null"] = sum(1 for o in inv if o.get("class_id") is None)
     summary["inventory_center_key_only"] = sum(
         1 for o in inv if o.get("center_key") and o.get("class_id") is None
+    )
+
+    pending = [
+        c
+        for r in records
+        for c in (r.get("pending_cards") or [])
+        if isinstance(c, dict)
+    ]
+    summary["pending_cards_total_attrs"] = len(pending)
+    summary["pending_class_id_null"] = sum(1 for c in pending if c.get("class_id") is None)
+    summary["pending_attribute_present"] = _attribute_present_counts(
+        pending, PENDING_ATTRIBUTE_COLUMNS
+    )
+    summary["pending_attribute_all_null"] = _all_null_columns(
+        pending, PENDING_ATTRIBUTE_COLUMNS
     )
     return summary
 
@@ -167,6 +253,8 @@ def main(argv: list[str]) -> int:
             continue
         summary = audit(run_dir)
         print(json.dumps(summary, indent=2, sort_keys=True))
+        for finding in conformance_findings(summary):
+            print(f"FINDING: {finding}")
         print()
 
     if INTEGRITY_FAILURES:
