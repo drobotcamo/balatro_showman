@@ -1,7 +1,8 @@
 # Oracle vs Reducer Ownership of Persistent State (Issue #14)
 
-Status: proposal — pending user decision (T1). Not yet recorded in
-`planning/DECISIONS.md`.
+Status: decided — option (c), recorded as D021 after explicit user choice
+(2026-09-30). This note is the source for the decision; D021 is the durable
+entry.
 Work item: Issue #14. Parent: Issue #10. Grandparent: Issue #6.
 Related: `planning/ORACLE_DATA_REVIEW.md` §7 (P3), D009 (adopt the published
 downstream contract), D020 (the reducer owns the action-space index), Q04
@@ -102,8 +103,13 @@ canonical shape.
 inseparable from the pipeline's, and because it makes the mask oracle depend on
 our own state-shaping. (b) is rejected because it leaves Phase 7 unscorable.
 
-This matches the unapplied recommendation already recorded in
-`ORACLE_DATA_REVIEW.md` §7 P3; this note adds the schema-boundary detail.
+This matches the recommendation recorded in `ORACLE_DATA_REVIEW.md` §7 P3;
+this note adds the schema-boundary detail.
+
+**Outcome (2026-09-30):** the user selected **(c)**. Recorded as D021 in
+`planning/DECISIONS.md`. Producer follow-up for the raw-field schema is tracked
+separately; #13 depends on this boundary and #12/#16 are annotated as
+independent.
 
 ## 4. Consequences If (c) Is Chosen
 

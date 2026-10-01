@@ -132,6 +132,28 @@ mappings. Alternative considered: the reducer also emitting `target_action_id`
 (rejected because it would need the inferred action before events exist, or
 would duplicate the event mapper).
 
+### D021 — accepted — The oracle emits raw engine fields and legal actions; the reducer owns canonical persistent state
+Canonical `persistent_state` is produced by the single pipeline reducer
+(Phase 7), not by the Lua oracle. The oracle emits engine-truth raw persistent
+fields (deck class ID and flags, stake, tracked deck cards with their
+modifier/edition/seal/stickers, hand levels and played counts, vouchers
+redeemed, bosses used, blind statuses and counters) plus the game's own legal
+actions as the validation reference. The producer transport gains a versioned
+raw-field schema distinct from the granularized `3.0.0`; the reducer documents
+and tests the raw-field mapping to the adopted persistent-state contract
+(`legacy/vendor/balatro-policy-transformer/state_schema.md` §3), including the
+video-only artifacts (tracked-deck FIFO cap, closest-match consumable rule,
+Aura `e_foil` placeholder, unmodeled random/hand-wide spectrals). The
+engine-truth versus video-recoverable gap is the recorded Q04 output.
+Alternatives considered: (a) the oracle computes and emits canonical
+persistent state — rejected because it creates a second reducer that can drift
+from the pipeline's and makes the mask oracle depend on our own state-shaping;
+(b) the producer emits observations only with no persistent-state reference —
+rejected because the Phase 7 state-reproduction and mask-agreement criteria
+become unscorable. This concretizes D009 and D020; source: Issue #14 design
+note `planning/PERSISTENT_STATE_OWNERSHIP.md` and
+`planning/ORACLE_DATA_REVIEW.md` §7 (P3).
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the

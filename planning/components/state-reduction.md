@@ -13,6 +13,8 @@ over the declared action space. This is the interface learning consumes.
 - Composed per-frame state sequence.
 - Ontology and composition rules.
 - Declared downstream contract and action-space version.
+- Oracle raw engine persistent fields and engine legal actions, used only to
+  validate reduction and masks (D021).
 
 ## Outputs
 
@@ -32,10 +34,15 @@ over the declared action space. This is the interface learning consumes.
   observed actions. Canonical action labels and `target_action_id` are produced
   by event/action inference (Phase 8, D020).
 - Unresolved action labels are emitted as unresolved, never guessed.
+- The reducer is the only producer of canonical `persistent_state`; oracle raw
+  engine fields and engine legality are validation inputs, never inference
+  inputs (D021).
 
 ## Acceptance Criteria
 
-- The reducer reproduces reference persistent state from ground-truth runs.
+- The reducer reproduces reference persistent state from ground-truth runs
+  (oracle raw engine fields projected through the documented reducer mapping;
+  D021).
 - Masks agree with oracle legal actions on benchmarked steps.
 - A consumer can load a step's state plus mask without pipeline internals.
 - The contract is either adopted from the published schemas or explicitly
