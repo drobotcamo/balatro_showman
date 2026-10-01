@@ -59,25 +59,48 @@ py -3 -m unittest tests.test_file_ipc_bridge tests.test_balatro_mod
 
 ## Installation (reversible)
 
-1. Copy the mod folder into the Steamodded mod root:
+1. Stop every existing bridge process before starting a capture. A single
+   consumer must own the shared `agent_io` directory:
 
    ```powershell
-   Copy-Item -Recurse -Force `
-     "ground_truth\balatro_mod" `
-     "$env:APPDATA\Balatro\Mods\balatro_showman_bridge"
+   Get-CimInstance Win32_Process |
+     Where-Object { $_.CommandLine -like '*ground_truth.file_ipc_bridge*' } |
+     Select-Object ProcessId, CommandLine
    ```
 
-   To remove it, delete `$env:APPDATA\Balatro\Mods\balatro_showman_bridge`.
+   Stop any listed process, and verify that the command returns no bridge
+   process before continuing.
+
+2. Copy the mod folder into the Steamodded mod root, preserving a backup of
+   the previous installation:
+
+   ```powershell
+   $target = "$env:APPDATA\Balatro\Mods\balatro_showman_bridge"
+   if (Test-Path $target) {
+     Rename-Item $target "$target.pre-capture-backup"
+   }
+   Copy-Item -Recurse -Force `
+     "ground_truth\balatro_mod" `
+     $target
+   Get-FileHash "ground_truth\balatro_mod\main.lua", "$target\main.lua"
+   ```
+
+   The two hashes must match. To remove it, delete
+   `$env:APPDATA\Balatro\Mods\balatro_showman_bridge` and restore the backup.
    Nothing is written outside that folder, `agent_io`, and the Python output
    directory.
 
-2. Launch Balatro and confirm the Lovely log reports the mod loaded:
+3. Launch Balatro and confirm the Lovely log reports the mod loaded:
    search `$env:APPDATA\Balatro\Mods\lovely\log\` for
    `[balatro_showman_bridge] loaded; io_dir=...`.
+   Before recording, trigger one snapshot and inspect it. It must contain
+   `"schema_version":"producer/1.0.0"`, `step_id`, and
+   `capture_timestamp_ns`; abort if it contains `live/2.0.0` or `live/3.0.0`.
 
 ## Smoke test
 
-1. Start the repository client, writing outside the repository:
+1. With no other bridge process running, start the repository client, writing
+   outside the repository:
 
    ```powershell
    py -3 -m ground_truth.file_ipc_bridge `
@@ -91,6 +114,43 @@ py -3 -m unittest tests.test_file_ipc_bridge tests.test_balatro_mod
    producer writes `run_end.json`; the client finalizes `session.json`.
 4. Report the field values from `steps.ndjson` and `session.json` in Issue #6.
    Keep saves, logs, dumps, and game assets local.
+
+## Video alignment procedure
+
+Before pressing OBS Record, write a start request so the Lua producer samples
+its own monotonic clock. The bridge persists the resulting marker in
+`session.json`:
+
+```powershell
+@{schema_version='producer/1.0.0'; recording_id='obs-2026-09-30-001'; fps=60} |
+  ConvertTo-Json -Compress |
+  Set-Content "$env:APPDATA\Balatro\agent_io\recording_start.json" -Encoding utf8
+```
+
+Verify `session.json` contains the resulting `recording` object after the
+first snapshot is persisted. Never use the wall-clock filename timestamp as a
+substitute.
+
+For an automatic event hook, load `ground_truth/obs_recording_start.py` from
+OBS **Tools > Scripts**. Configure the `agent_io` directory and recording FPS.
+The script writes the request on `OBS_FRONTEND_EVENT_RECORDING_STARTED`; use
+this hook, rather than the manual command above, for Issue #35 evidence.
+
+At the instant OBS recording starts, capture the producer monotonic clock value
+(`capture_timestamp_ns`) from a fresh snapshot or the bridge diagnostic. Pass
+that value as `--recording-start-ns`; do not substitute the wall-clock filename
+timestamp. For a persisted `steps.ndjson`, map each step to a zero-based frame:
+
+```powershell
+py -3 planning\align_oracle_video.py runs\<run>\steps.ndjson
+```
+
+The utility reads the persisted marker from the sibling `session.json`; the
+optional flags override it for diagnostics only.
+
+The utility emits `step_id` and nearest `frame_idx`. Negative indices indicate
+that the producer timestamp predates the recorded start and require capture
+review; they are not silently clamped.
 
 ## Status
 

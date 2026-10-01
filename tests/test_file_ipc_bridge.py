@@ -54,6 +54,28 @@ class FileIpcBridgeTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 FileIpcBridge(io_dir, root / "runs", action="SelectBlind").step_once()
 
+    def test_recording_marker_is_attached_to_first_run_session(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir = root / "io"
+            io_dir.mkdir()
+            (io_dir / "recording_start_marker.json").write_text(json.dumps({
+                "schema_version": "producer/1.0.0",
+                "recording_id": "obs-test-1",
+                "fps": 60,
+                "capture_timestamp_ns": 123,
+            }), encoding="utf-8")
+            (io_dir / "snapshot.json").write_text(json.dumps({
+                "request_id": 1,
+                "meta": {"run_id": "marker-run"},
+                "action_taken": "SkipBlind",
+            }), encoding="utf-8")
+
+            bridge = FileIpcBridge(io_dir, root / "runs")
+            self.assertTrue(bridge.step_once())
+            session = json.loads((root / "runs" / "marker-run" / "session.json").read_text())
+            self.assertEqual(session["recording"]["recording_id"], "obs-test-1")
+
     def test_duplicate_snapshot_replays_ack_without_duplicate_record(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

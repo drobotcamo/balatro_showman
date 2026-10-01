@@ -100,9 +100,11 @@ def _offering(zone, position=0, object_type="joker"):
     }
 
 
-def _record(objects, pending, schema_version="live/2.0.0", extra=None) -> dict:
+def _record(objects, pending, schema_version="producer/1.0.0", extra=None) -> dict:
     record = {
         "schema_version": schema_version,
+        "step_id": "audit-test:1",
+        "capture_timestamp_ns": 1_000_000_000,
         "request_id": 1,
         "page_name": "In_Blind",
         "state": _state(),
@@ -110,7 +112,11 @@ def _record(objects, pending, schema_version="live/2.0.0", extra=None) -> dict:
         "pending_cards": pending,
         "persistent_state": {},
         "action_taken": "PlayHand",
-        "meta": {"run_id": "audit-test"},
+        "meta": {
+            "run_id": "audit-test",
+            "capture_timestamp_ns": 1_000_000_000,
+            "video_timestamp_ns": 1_000_000_000,
+        },
     }
     if schema_version in {"live/3.0.0"}:
         record["raw_persistent"] = _raw_persistent()
