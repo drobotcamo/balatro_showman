@@ -1,10 +1,10 @@
 # Work Thread
 Updated: 2026-10-01
 Issue: #11
-PR: none
+PR: #39
 Owner: project-lead
-Branch: none
-Worktree: none
+Branch: docs-one-shot-work-completion
+Worktree: C:\Users\camgr\Documents\code_projects\balatro_showman
 Objective: Capture a pinned-revision oracle/video run and close or restate the Phase 0 oracle gate.
 Status: complete
 Scope: external capture under `F:\OBS_RECORDINGS\oracle_runs\`; `planning/ORACLE_DATA_REVIEW.md` only after evidence exists.

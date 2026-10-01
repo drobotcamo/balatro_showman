@@ -25,9 +25,10 @@ producer's action space, and event extraction.
 | loss (superseded candidate) | 39 | loss | `F:\OBS_RECORDINGS\oracle_runs\1790821374-5833\` | none recorded |
 | loss (merged revision) | 29 | loss | `F:\OBS_RECORDINGS\oracle_runs\184013382700-5967\` | `F:\OBS_RECORDINGS\2026-10-01 00-58-04.mkv` |
 
-Each directory holds `session.json` (client contract `record/1.0.0`),
+Each run directory holds `session.json` (client contract `record/1.0.0`),
 `steps.ndjson` (client-added `_recorded_action`, snapshot contract
-`live/2.0.0`), and `NOTE.txt`. Runtime is identical in both runs: Balatro
+`live/2.0.0`). The original win and verify directories also contain `NOTE.txt`.
+Runtime is identical across the reviewed runs: Balatro
 `1.0.1o-FULL`, Steamodded `26.926.0~dev-a`, Lovely `0.10.0`.
 
 **Provenance caveat.** The win and verify runs predate the merged producer
@@ -56,7 +57,8 @@ From the repository root:
 ```powershell
 py -3 planning\audit_oracle_runs.py `
   "F:\OBS_RECORDINGS\oracle_runs\2026-09-30_14-50-37_1790805058-5327" `
-  "F:\OBS_RECORDINGS\oracle_runs\2026-09-30_15-31_verify_1790807319-8546"
+  "F:\OBS_RECORDINGS\oracle_runs\2026-09-30_15-31_verify_1790807319-8546" `
+  "F:\OBS_RECORDINGS\oracle_runs\184013382700-5967"
 ```
 
 Result: `oracle run integrity OK` (exit 0). All counts below are this tool's
