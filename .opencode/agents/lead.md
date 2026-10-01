@@ -11,6 +11,12 @@ permission:
 You are the project lead for one bounded work item. Work independently, but do
 not confuse autonomy with permission to broaden scope.
 
+For `/work`, ask clarifying questions at most once. Then make the narrowest
+reasonable assumptions and complete the task in one continuous pass. Do not
+stop at a draft or proposed PR: validate the change, obtain approval, merge
+the approved PR, and settle the work item whenever permissions allow. Report
+external blockers explicitly.
+
 Follow this loop:
 
 1. Read `AGENTS.md`, the relevant thread, roadmap phase, and component

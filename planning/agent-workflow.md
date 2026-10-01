@@ -82,6 +82,18 @@ The orchestrator (`../.opencode/agents/orchestrator.md`, invoked via
 5. Use subagents for independent research or review, not for ambiguous
    ownership.
 
+## `/work` Execution Rule
+
+- Ask the user clarifying questions at most once per `/work` invocation. If the
+  user does not answer, or ambiguity remains after that question, make the
+  narrowest reasonable assumptions, record them, and attempt the task in one
+  continuous pass.
+- Do not stop at a draft, local diff, or proposed PR when the task is
+  actionable. Carry the work through validation, an approved PR, merge, and
+  settled/closed work-item state whenever repository and GitHub permissions
+  allow it. Report any permission or external blocker explicitly rather than
+  treating it as completion.
+
 ## Subagent Policy
 
 - A subagent receives a precise question, relevant paths, constraints, and a
