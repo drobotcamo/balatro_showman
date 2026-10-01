@@ -74,10 +74,10 @@ class RunBundle:
             bad_status = [r.sequence for r in records if r.integrity_status == "invalid"]
             aggregate = s.get(Integrity, run_id)
             aggregate_digest = hashlib.sha256("".join(r.sha256 for r in records).encode()).hexdigest()
-            expected_result = "invalid" if bad or bad_status else "valid"
+            expected_results = {"invalid"} if bad or bad_status else {"unknown", "valid"}
             aggregate_bad = (not aggregate or aggregate.record_count != len(records)
                              or aggregate.bundle_sha256 != aggregate_digest
-                             or aggregate.result != expected_result)
+                             or aggregate.result not in expected_results)
             result = "invalid" if bad or bad_status or aggregate_bad else "valid"
             run.integrity_status = result
             self._integrity(s, run_id, result)

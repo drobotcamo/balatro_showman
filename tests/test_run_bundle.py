@@ -91,6 +91,10 @@ def test_tampered_aggregate_metadata_is_reported(tmp_path, column, value):
     with pytest.raises(BundleError, match="integrity failure"):
         b.validate("r1", strict=True)
 
+def test_healthy_active_run_validates(tmp_path):
+    b = bundle(tmp_path); b.append("r1", 0, "state", {"ok": True})
+    assert b.validate("r1") == {"status": "valid", "record_count": 1, "bad_sequences": []}
+
 def test_explicit_invalid_status_is_strict_failure(tmp_path):
     b = bundle(tmp_path); b.append_raw("r1", 0, "partial", b"bad")
     with pytest.raises(BundleError, match="integrity failure"):
