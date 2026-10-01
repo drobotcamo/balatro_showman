@@ -71,6 +71,18 @@ def test_invalid_raw_integrity_survives_finalization(tmp_path):
         assert db.execute("select integrity_status from runs").fetchone()[0] == "invalid"
         assert db.execute("select result from integrity").fetchone()[0] == "invalid"
 
+def test_valid_append_does_not_mask_invalid_record(tmp_path):
+    b = bundle(tmp_path); b.append_raw("r1", 0, "partial", b"bad")
+    b.append("r1", 1, "state", {"ok": True})
+    assert b.validate("r1")["status"] == "invalid"
+
+def test_tampered_aggregate_is_reported(tmp_path):
+    b = bundle(tmp_path); b.append("r1", 0, "state", {"ok": True})
+    with sqlite3.connect(tmp_path / "run.db") as db:
+        db.execute("update integrity set bundle_sha256 = ?", ("0" * 64,)); db.commit()
+    with pytest.raises(BundleError, match="integrity failure"):
+        b.validate("r1", strict=True)
+
 def test_explicit_invalid_status_is_strict_failure(tmp_path):
     b = bundle(tmp_path); b.append_raw("r1", 0, "partial", b"bad")
     with pytest.raises(BundleError, match="integrity failure"):

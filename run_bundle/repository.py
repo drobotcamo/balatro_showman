@@ -37,8 +37,9 @@ class RunBundle:
             if run.status in FINAL: raise FinalizedEvidenceError("finalized evidence is immutable")
             if s.scalar(select(Record).where(Record.run_id == run_id, Record.sequence == sequence)): raise BundleError("duplicate record")
             s.add(Record(run_id=run_id, sequence=sequence, kind=kind, payload=encoded, sha256=digest))
-            run.integrity_status = "unknown"
-            self._integrity(s, run_id, "unknown")
+            prior_invalid = s.scalar(select(Record).where(Record.run_id == run_id, Record.integrity_status == "invalid"))
+            run.integrity_status = "invalid" if prior_invalid else "unknown"
+            self._integrity(s, run_id, run.integrity_status)
 
     def append_raw(self, run_id, sequence, kind, raw_payload: bytes, *, integrity_status="invalid"):
         """Preserve malformed/partial source bytes without repairing them."""
@@ -71,10 +72,13 @@ class RunBundle:
             records = s.scalars(select(Record).where(Record.run_id == run_id).order_by(Record.sequence)).all()
             bad = [r.sequence for r in records if hashlib.sha256(r.payload if isinstance(r.payload, bytes) else r.payload.encode()).hexdigest() != r.sha256]
             bad_status = [r.sequence for r in records if r.integrity_status == "invalid"]
-            result = "invalid" if bad or bad_status else "valid"
+            aggregate = s.get(Integrity, run_id)
+            aggregate_digest = hashlib.sha256("".join(r.sha256 for r in records).encode()).hexdigest()
+            aggregate_bad = not aggregate or aggregate.record_count != len(records) or aggregate.bundle_sha256 != aggregate_digest
+            result = "invalid" if bad or bad_status or aggregate_bad else "valid"
             run.integrity_status = result
             self._integrity(s, run_id, result)
-            should_raise = strict and bool(bad or bad_status)
+            should_raise = strict and bool(bad or bad_status or aggregate_bad)
             report = {"status": result, "record_count": len(records), "bad_sequences": sorted(set(bad + bad_status))}
         if should_raise: raise BundleError(f"integrity failure: {report['bad_sequences']}")
         return report
