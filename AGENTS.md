@@ -46,6 +46,15 @@ against a Lua ground-truth oracle. `planning/README.md` is the planning index.
 - A completion claim requires a runnable check's output or an independent
   fresh-context review (`planning/agent-workflow.md` → Approval).
 
+## Technical Prose
+
+- Apply `.opencode/skill/deslop/SKILL.md` to pull request descriptions, issue
+  updates, handoffs, review summaries, and other lengthy technical prose.
+- Preserve concrete evidence and uncertainty while removing filler, formulaic
+  AI phrasing, and repetitive summaries.
+- Submit PR and issue bodies with actual line breaks. Before submission, check
+  that literal `\\n` does not appear unless it is intentional code content.
+
 ## Safety
 
 - Never commit secrets, credentials, generated data, or unreviewed vendored
