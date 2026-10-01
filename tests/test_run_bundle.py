@@ -55,6 +55,15 @@ def test_raw_bytes_are_preserved(tmp_path):
     with sqlite3.connect(tmp_path / "run.db") as db:
         assert db.execute("select payload from records").fetchone()[0] == raw
 
+def test_invalid_raw_integrity_survives_finalization(tmp_path):
+    b = bundle(tmp_path); b.append_raw("r1", 0, "partial", b"bad")
+    with sqlite3.connect(tmp_path / "run.db") as db:
+        assert db.execute("select integrity_status from runs").fetchone()[0] == "invalid"
+    b.transition("r1", "aborted")
+    with sqlite3.connect(tmp_path / "run.db") as db:
+        assert db.execute("select integrity_status from runs").fetchone()[0] == "invalid"
+        assert db.execute("select result from integrity").fetchone()[0] == "invalid"
+
 def test_explicit_invalid_status_is_strict_failure(tmp_path):
     b = bundle(tmp_path); b.append_raw("r1", 0, "partial", b"bad")
     with pytest.raises(BundleError, match="integrity failure"):

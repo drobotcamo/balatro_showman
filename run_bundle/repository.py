@@ -49,8 +49,8 @@ class RunBundle:
             if run.status in FINAL: raise FinalizedEvidenceError("finalized evidence is immutable")
             if s.scalar(select(Record).where(Record.run_id == run_id, Record.sequence == sequence)): raise BundleError("duplicate record")
             s.add(Record(run_id=run_id, sequence=sequence, kind=kind, payload=raw_payload, sha256=digest, integrity_status=integrity_status))
-            run.integrity_status = "unknown"
-            self._integrity(s, run_id, "unknown")
+            run.integrity_status = "invalid" if integrity_status == "invalid" else "unknown"
+            self._integrity(s, run_id, run.integrity_status)
 
     def transition(self, run_id, status):
         if status not in STATUSES: raise InvalidTransition(status)
@@ -60,7 +60,9 @@ class RunBundle:
             if not run or status not in ALLOWED.get(run.status, set()): raise InvalidTransition(f"{run and run.status}->{status}")
             run.status = status
             if status in FINAL: run.outcome, run.finalized_at = status, datetime.now(timezone.utc).replace(tzinfo=None)
-            self._integrity(s, run_id, "valid")
+            result = "invalid" if s.scalar(select(Record).where(Record.run_id == run_id, Record.integrity_status == "invalid")) else "valid"
+            run.integrity_status = result
+            self._integrity(s, run_id, result)
 
     def validate(self, run_id, *, strict=False):
         with Session(self._engine) as s, s.begin():
