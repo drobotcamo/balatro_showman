@@ -148,13 +148,29 @@ class FileIpcBridge:
         did_work = self._handle_run_end()
         return self._handle_snapshot() or did_work
 
+    def open_sessions(self) -> dict[str, dict[str, Any]]:
+        """Sessions recorded but not yet finalized by a run_end signal."""
+        return dict(self._sessions)
+
+    def _report(self) -> None:
+        for run_id, session in sorted(self.open_sessions().items()):
+            print(
+                f"[file_ipc_bridge] run {run_id} interrupted before run_end "
+                f"({session['n_steps']} steps recorded, outcome pending)"
+            )
+        print("[file_ipc_bridge] stopped cleanly (Ctrl+C)")
+
     def serve(self, timeout: float | None = None) -> None:
         self.io_dir.mkdir(parents=True, exist_ok=True)
         self.out_dir.mkdir(parents=True, exist_ok=True)
         deadline = None if timeout is None else time.monotonic() + timeout
-        while deadline is None or time.monotonic() < deadline:
-            if not self.step_once():
-                time.sleep(0.02)
+        try:
+            while deadline is None or time.monotonic() < deadline:
+                if not self.step_once():
+                    time.sleep(0.02)
+        except KeyboardInterrupt:
+            pass
+        self._report()
 
 
 def _default_io_dir() -> Path:
