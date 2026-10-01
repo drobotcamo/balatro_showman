@@ -103,11 +103,13 @@ local function table_json_value(value, max_depth, depth)
   if t ~= "table" then return j_scalar(value) end
   local parts = {}
   local keys = {}
-  for key in pairs(value) do keys[#keys + 1] = tostring(key) end
-  table.sort(keys)
+  for key in pairs(value) do
+    keys[#keys + 1] = { raw = key, text = tostring(key) }
+  end
+  table.sort(keys, function(left, right) return left.text < right.text end)
   for _, key in ipairs(keys) do
-    local entry = try(function() return value[key] end)
-    parts[#parts + 1] = j_str(key) .. ":" .. table_json_value(entry, max_depth, depth + 1)
+    local entry = try(function() return value[key.raw] end)
+    parts[#parts + 1] = j_str(key.text) .. ":" .. table_json_value(entry, max_depth, depth + 1)
   end
   return "{" .. table.concat(parts, ",") .. "}"
 end
