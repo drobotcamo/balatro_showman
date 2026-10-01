@@ -17,9 +17,19 @@
 --     Inventory objects carry the canonical `class_id` from the vendored class
 --     map (unmapped keys stay null with `center_key` retained); every object
 --     carries modifier/edition/seal (null when absent) and list-valued
---     stickers. persistent_state and legal_actions remain intentionally sparse
---     for the smoke test; this is not a canonical live/2.0.0 model-input
---     snapshot.
+--     stickers.
+--   * raw_persistent carries the engine-truth raw persistent fields the
+--     reducer needs (D021, Issue #21): deck, stake, deck flags, the full
+--     playing-card deck with attributes, hand levels, vouchers, bosses, blind
+--     statuses, and run counters. It is NOT canonical `persistent_state`
+--     (state_schema.md §3); that shape stays owned by the pipeline reducer,
+--     so `persistent_state` itself remains an empty object here.
+--   * legal_actions / mask_basis carry the engine's own legality for the
+--     coarse base actions (mask_schema.md §2-3) as the Phase 7 mask
+--     validation reference. Shop/pack offering targets are Issue #16 and
+--     canonical zoned labels are Issue #13; neither is attempted here.
+--   * Every engine read is failure-isolated: an unavailable field is emitted
+--     as null, never guessed.
 --   * No game assets, saves, or logs are copied anywhere; only JSON state is
 --     written to the shared agent_io directory.
 
@@ -91,6 +101,51 @@ local function j_scalar(value)
   if t == "boolean" then return tostring(value) end
   if t == "number" then return j_num(value) end
   return j_str(value)
+end
+
+-- Failure-isolated engine read: any error or unavailable field yields nil so
+-- the encoder can emit explicit null instead of guessing.
+local function try(fn)
+  local ok, value = pcall(fn)
+  if ok then return value end
+  return nil
+end
+
+-- Sorted JSON object of a game table, recursing into nested tables up to
+-- max_depth; every leaf is a scalar, an explicit null, or a nested object, so
+-- engine values are never guessed or silently dropped. Depth-capped against
+-- cyclic game tables.
+local function table_json_value(value, max_depth, depth)
+  if depth > max_depth then return "null" end
+  local t = type(value)
+  if t ~= "table" then return j_scalar(value) end
+  local parts = {}
+  local keys = {}
+  for key in pairs(value) do
+    keys[#keys + 1] = { raw = key, text = tostring(key) }
+  end
+  table.sort(keys, function(left, right) return left.text < right.text end)
+  for _, key in ipairs(keys) do
+    local entry = try(function() return value[key.raw] end)
+    parts[#parts + 1] = j_str(key.text) .. ":" .. table_json_value(entry, max_depth, depth + 1)
+  end
+  return "{" .. table.concat(parts, ",") .. "}"
+end
+
+local function table_json(source, max_depth)
+  return table_json_value(try(source), max_depth or 3, 0)
+end
+
+local function game_number_json(fn)
+  local value = try(fn)
+  if type(value) == "number" then return j_num(value) end
+  return "null"
+end
+
+local function game_boolean_json(fn)
+  local value = try(fn)
+  if type(value) == "boolean" then return tostring(value) end
+  return "null"
 end
 
 -- ---------------------------------------------------------------------------
@@ -565,8 +620,7 @@ local function state_values()
   }
 end
 
-local function encode_state()
-  local values = state_values()
+local function encode_state(values)
   local parts = {}
   for _, key in ipairs(STATE_KEYS) do
     parts[#parts + 1] = j_str(key) .. ":" .. j_scalar(values[key])
@@ -855,6 +909,235 @@ local function action_details(action_label, page)
 end
 
 -- ---------------------------------------------------------------------------
+-- Raw persistent fields (D021, Issue #21) — engine truth for the reducer
+-- ---------------------------------------------------------------------------
+
+local function deck_info()
+  -- Steamodded reads the deck center at G.GAME.selected_back.effect.center.key
+  -- (overrides.lua:2401); `selected_back_key` is the vanilla fallback.
+  local key = try(function() return G.GAME.selected_back.effect.center.key end)
+  if type(key) ~= "string" then
+    key = try(function() return G.GAME.selected_back_key end)
+  end
+  if type(key) ~= "string" then
+    return { center_key = nil, class_id = nil }
+  end
+  return { center_key = key, class_id = class_id_for_center_key(key) }
+end
+
+-- The stake's numeric level resolves through the engine's own stake pool
+-- (SMODS.stake_from_index maps G.GAME.stake to G.P_CENTER_POOLS.Stake[level].
+-- key); the stake_level scan over G.P_CENTERS is the fallback. Ties are
+-- broken deterministically by sorting the matching keys.
+local function stake_info()
+  local level = try(function() return G.GAME.stake end)
+  if type(level) ~= "number" then
+    return { level = nil, center_key = nil }
+  end
+  local key = try(function()
+    local center = G.P_CENTER_POOLS and G.P_CENTER_POOLS.Stake and G.P_CENTER_POOLS.Stake[level]
+    return center and center.key or nil
+  end)
+  if type(key) ~= "string" then
+    key = try(function()
+      local matches = {}
+      for center_key, center in pairs(G.P_CENTERS) do
+        if type(center) == "table" and center.set == "Stake" and center.stake_level == level then
+          matches[#matches + 1] = tostring(center_key)
+        end
+      end
+      table.sort(matches)
+      return matches[1]
+    end)
+  end
+  if type(key) ~= "string" then key = nil end
+  return { level = level, center_key = key }
+end
+
+-- G.playing_cards is the run's full playing-card list (cards leave G.deck as
+-- they are drawn), so it is the raw basis for tracked_deck_cards; the
+-- reducer owns the FIFO cap and canonical shaping.
+local function tracked_deck_cards()
+  local cards = try(function() return G.playing_cards end)
+  local out = {}
+  if type(cards) ~= "table" then return out end
+  for _, card in ipairs(cards) do
+    local fields = card_fields(card)
+    if fields then
+      out[#out + 1] = '{"class_id":' .. tostring(fields.class_id)
+        .. ',"object_type":"card",' .. card_attributes_json(card)
+        .. ',"card":' .. encode_card_body(card, fields) .. "}"
+    end
+  end
+  return out
+end
+
+local function hand_levels_json()
+  local hands = try(function() return G.GAME.hands end)
+  local parts = {}
+  if type(hands) == "table" then
+    local names = {}
+    for name in pairs(hands) do names[#names + 1] = tostring(name) end
+    table.sort(names)
+    for _, name in ipairs(names) do
+      local hand = hands[name]
+      parts[#parts + 1] = j_str(name) .. ":{"
+        .. '"level":' .. game_number_json(function() return hand.level end)
+        .. ',"played":' .. game_number_json(function() return hand.played end)
+        .. ',"played_this_round":' .. game_number_json(function() return hand.played_this_round end)
+        .. "}"
+    end
+  end
+  return "{" .. table.concat(parts, ",") .. "}"
+end
+
+local function voucher_keys()
+  local used = try(function() return G.GAME.used_vouchers end)
+  local keys = {}
+  if type(used) == "table" then
+    for key, redeemed in pairs(used) do
+      if redeemed then keys[#keys + 1] = tostring(key) end
+    end
+    table.sort(keys)
+  end
+  return keys
+end
+
+-- bosses_used is emitted verbatim; this runtime nests it as
+-- {boss/small/big: {blind_key: count}} (SMODS.normalize_bosses_used_table),
+-- and the reducer derives the canonical class-id list.
+local function bosses_used_json()
+  return table_json(function() return G.GAME.bosses_used end, 2)
+end
+
+local function encode_raw_persistent()
+  local deck = deck_info()
+  local stake = stake_info()
+  local last_planet = try(function() return G.GAME.last_tarot_planet end)
+  if type(last_planet) ~= "string" then last_planet = nil end
+  local parts = {
+    '"deck":{"center_key":' .. (deck.center_key and j_str(deck.center_key) or "null")
+      .. ',"class_id":' .. (deck.class_id and tostring(deck.class_id) or "null") .. "}",
+    '"stake":{"level":' .. (stake.level and j_num(stake.level) or "null")
+      .. ',"center_key":' .. (stake.center_key and j_str(stake.center_key) or "null") .. "}",
+    '"starting_params_no_faces":' .. game_boolean_json(function() return G.GAME.starting_params.no_faces end),
+    '"modifiers":' .. table_json(function() return G.GAME.modifiers end),
+    '"tracked_deck_cards":[' .. table.concat(tracked_deck_cards(), ",") .. "]",
+    '"hand_levels":' .. hand_levels_json(),
+    '"vouchers_redeemed":' .. j_str_array(voucher_keys()),
+    '"bosses_used":' .. bosses_used_json(),
+    '"blind_states":' .. table_json(function() return G.GAME.round_resets.blind_states end),
+    '"blind_choices":' .. table_json(function() return G.GAME.round_resets.blind_choices end),
+    '"blind_tags":' .. table_json(function() return G.GAME.round_resets.blind_tags end),
+    '"boss_rerolled":' .. game_boolean_json(function() return G.GAME.round_resets.boss_rerolled end),
+    '"skips":' .. game_number_json(function() return G.GAME.skips end),
+    '"hands_played":' .. game_number_json(function() return G.GAME.hands_played end),
+    '"unused_discards":' .. game_number_json(function() return G.GAME.unused_discards end),
+    '"ecto_minus":' .. game_number_json(function() return G.GAME.ecto_minus end),
+    '"last_tarot_planet":' .. (last_planet and j_str(last_planet) or "null"),
+  }
+  return "{" .. table.concat(parts, ",") .. "}"
+end
+
+-- ---------------------------------------------------------------------------
+-- Engine legal actions / mask basis (mask_schema.md §2-3)
+-- ---------------------------------------------------------------------------
+
+local PACK_PAGES = {
+  In_TarotSpectral_Pack = true,
+  In_JokerStandardPlanet_Pack = true,
+}
+
+local function highlighted_count(area)
+  local cards = try(function() return area.cards end)
+  local count = 0
+  if type(cards) == "table" then
+    for _, card in ipairs(cards) do
+      if try(function() return card.highlighted end) then count = count + 1 end
+    end
+  end
+  return count
+end
+
+-- Sellable = highlighted owned joker/consumable without the eternal sticker
+-- (mask_schema.md §3). Playing cards cannot be sold.
+local function sellable_highlighted_count()
+  local count = 0
+  for _, area_name in ipairs({ "jokers", "consumeables" }) do
+    local cards = try(function() return G[area_name].cards end)
+    if type(cards) == "table" then
+      for _, card in ipairs(cards) do
+        local highlighted = try(function() return card.highlighted end)
+        local eternal = try(function() return card.ability.eternal end)
+        if highlighted and not eternal then count = count + 1 end
+      end
+    end
+  end
+  return count
+end
+
+local function encode_mask_basis(basis)
+  local parts = {
+    '"reroll_cost":' .. game_number_json(function() return G.GAME.current_round.reroll_cost end),
+    '"free_rerolls":' .. game_number_json(function() return G.GAME.current_round.free_rerolls end),
+    '"selected_hand_count":' .. tostring(basis.selected_hand),
+    '"selected_consumable_count":' .. tostring(basis.selected_consumables),
+    '"selected_sellable_count":' .. tostring(basis.sellable_selected),
+  }
+  return "{" .. table.concat(parts, ",") .. "}"
+end
+
+-- Coarse base-action legality for the snapshot's decision state. Page gating
+-- follows mask_schema.md §2; the availability facts are §3. Items that need
+-- shop/pack offering contents (per-item BuyShopItem costs, SelectPackItem,
+-- SelectCard) are Issue #16/#13 and are not emitted here. When a §3 fact is
+-- unreadable its gating degrades to the §2 page gate and the null fact is
+-- visible in mask_basis. The action about to run is always included: the
+-- engine allowed it, and the client validates action_taken against this list.
+local function compute_legal_actions(page, action_taken, values, basis)
+  local legal = {}
+  local function add(label) legal[label] = true end
+
+  local blind_states = try(function() return G.GAME.round_resets.blind_states end)
+  local blind_tags = try(function() return G.GAME.round_resets.blind_tags end)
+
+  if page == "Blind_Select" then
+    add("SelectBlind")
+    for _, blind_name in ipairs({ "Small", "Big" }) do
+      local selectable = type(blind_states) == "table" and blind_states[blind_name] == "Select"
+      local offered_tag = type(blind_tags) == "table" and blind_tags[blind_name]
+      if selectable and offered_tag then add("SkipBlind") end
+    end
+  elseif page == "In_Blind" then
+    if basis.selected_hand > 0 then
+      if (values.hands_left or 0) > 0 then add("PlayHand") end
+      if (values.discards_left or 0) > 0 then add("DiscardHand") end
+    end
+  elseif page == "Cash_Out" then
+    add("CashOut")
+  elseif page == "In_Shop" then
+    add("BuyShopItem")
+    add("LeaveShop")
+    local cost = try(function() return G.GAME.current_round.reroll_cost end)
+    local free_rerolls = try(function() return G.GAME.current_round.free_rerolls end)
+    if cost == nil or (type(free_rerolls) == "number" and free_rerolls > 0)
+      or (type(values.dollars) == "number" and values.dollars >= cost) then
+      add("RerollShop")
+    end
+  elseif PACK_PAGES[page] then
+    add("SkipPack")
+  end
+  if basis.selected_consumables > 0 then add("UseConsumable") end
+  if basis.sellable_selected > 0 then add("SellItem") end
+  if action_taken then add(action_taken) end
+
+  local list = {}
+  for label in pairs(legal) do list[#list + 1] = label end
+  table.sort(list)
+  return list
+end
+
+-- ---------------------------------------------------------------------------
 -- Runtime metadata
 -- ---------------------------------------------------------------------------
 
@@ -971,6 +1254,13 @@ local function build_snapshot(rid, page, action_label)
   elseif selected then
     selected_json = encode_offer_object(selected, target_zone, target_position)
   end
+  local values = state_values()
+  local basis = {
+    selected_hand = highlighted_count(G.hand),
+    selected_consumables = highlighted_count(G.consumeables),
+    sellable_selected = sellable_highlighted_count(),
+  }
+  local legal_actions = compute_legal_actions(page, action_label, values, basis)
   local parts = {
     '"schema_version":"producer/1.0.0"',
     '"step_id":' .. j_str(run_id .. ":" .. tostring(rid)),
@@ -981,7 +1271,7 @@ local function build_snapshot(rid, page, action_label)
     '"source_action":' .. j_scalar(source_action),
     '"action_subtype":' .. j_scalar(source_subtype),
     '"source_action_subtype":' .. j_scalar(source_subtype),
-    '"state":' .. encode_state(),
+    '"state":' .. encode_state(values),
     '"objects":[' .. table.concat(objects, ",") .. "]",
     '"pending_cards":[' .. table.concat(pending_cards, ",") .. "]",
     '"target_zone":' .. j_scalar(target_zone),
@@ -990,6 +1280,9 @@ local function build_snapshot(rid, page, action_label)
     '"selected_object":' .. (selected_json and ('{"object":' .. selected_json .. '}') or "null"),
     '"action":' .. j_scalar(action),
     '"persistent_state":{}',
+    '"raw_persistent":' .. encode_raw_persistent(),
+    '"legal_actions":' .. j_str_array(legal_actions),
+    '"mask_basis":' .. encode_mask_basis(basis),
     '"action_taken":' .. j_str(action_label),
     '"meta":' .. encode_meta(page):sub(1, -2)
       .. ',"capture_timestamp_ns":' .. j_num(timestamp_ns)

@@ -121,6 +121,53 @@ class FileIpcBridgeTests(unittest.TestCase):
                 1,
             )
 
+    def test_serve_stops_cleanly_on_keyboard_interrupt(self) -> None:
+        import contextlib
+        import io as io_module
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir = root / "io"
+            io_dir.mkdir()
+            snapshot = {
+                "request_id": 1,
+                "meta": {"run_id": "smoke-6"},
+                "legal_actions": ["SkipBlind"],
+                "action_taken": "SkipBlind",
+            }
+            bridge = FileIpcBridge(io_dir, root / "runs")
+            (io_dir / "snapshot.json").write_text(json.dumps(snapshot), encoding="utf-8")
+
+            calls = {"n": 0}
+            original_step = bridge.step_once
+
+            def interrupting_step() -> bool:
+                calls["n"] += 1
+                if calls["n"] >= 3:
+                    raise KeyboardInterrupt
+                return original_step()
+
+            bridge.step_once = interrupting_step
+            captured = io_module.StringIO()
+            with contextlib.redirect_stdout(captured):
+                bridge.serve()
+            output = captured.getvalue()
+            self.assertIn("stopped cleanly", output)
+            self.assertIn("smoke-6", output)
+            self.assertIn("1 steps recorded, outcome pending", output)
+            self.assertEqual(
+                json.loads((root / "runs" / "smoke-6" / "session.json").read_text())["n_steps"],
+                1,
+            )
+
+    def test_open_sessions_reports_unfinalized_runs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir = root / "io"
+            io_dir.mkdir()
+            bridge = FileIpcBridge(io_dir, root / "runs")
+            self.assertEqual(bridge.open_sessions(), {})
+
 
 if __name__ == "__main__":
     unittest.main()
