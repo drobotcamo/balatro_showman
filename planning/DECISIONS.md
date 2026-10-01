@@ -195,6 +195,40 @@ one durable lifecycle boundary. Owning all future dataset storage was rejected
 because it couples operational capture to Phase 9 scale concerns. Source:
 user-approved Issue #34 scope revision, 2026-10-01.
 
+### D024 — accepted — Run bundles use SQLite and include an explicit endless outcome
+Run bundles are SQLite databases rather than directory-based JSONL event logs.
+SQLite is selected because the project will accumulate many oracle and
+video-synthesized runs and needs indexed, low-latency queries without coupling
+the operational bundle to the later Phase 9 dataset format. The database must
+remain inspectable with standard SQLite tooling, use explicit schema and
+producer versions, preserve append-only evidence semantics at the application
+boundary, and support atomic transactions, integrity records, interrupted
+writes, and read-only inspection. Large-scale Phase 9 exports and partitioning
+remain separate consumers of the bundle.
+
+The lifecycle outcomes are `active`, `interrupted`, `completed`, `endless`,
+`won`, `lost`, and `aborted`. `endless` means the run ended without a win, loss,
+or abort outcome; it is not an alias for `completed`. Existing evidence is
+never rewritten when a lifecycle outcome or external recording evidence is
+added. Validation is diagnostic by default and strict on request, and uses
+SHA-256 over canonical records and database-level integrity metadata without
+repairing evidence. Query results retain the stable status/provenance envelope
+(`observed`, `derived`, `missing`, `unknown`, or `unsupported`).
+
+Compatibility is read-only in the initial implementation: adapters may inspect
+currently available oracle artifacts but must not silently upgrade unstable
+fields. No in-place migration is supported. If conversion is later needed, it
+must write a new SQLite bundle that records the source identity and hash,
+adapter/version, source references, and field-level diagnostics.
+
+Alternatives considered: a directory of immutable JSONL files was rejected for
+query latency and indexing across many runs; a future Phase 9 database was
+rejected because operational capture and scale-out dataset concerns have
+different lifecycle and migration requirements. This decision changes the
+physical representation proposed in Issue #43, but does not change D023's
+ownership boundaries or the contracts owned by Issues #13, #15, #21, and #35.
+Source: user-approved Issue #43 design revision, 2026-10-01.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the

@@ -213,7 +213,9 @@ Status: `planned`
 
 Process large video collections into partitioned, reproducible state and event
 datasets with a declared storage format, schema versions, provenance, quality
-scores, and reprocessing support.
+scores, and reprocessing support. Operational capture and inspection begin from
+the versioned SQLite run bundles established by Issue #34; this phase owns
+scale-out exports and partitioning rather than replacing that run boundary.
 
 Gate:
 
