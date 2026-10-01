@@ -19,4 +19,4 @@ Completed:
 - Record fresh-context reviewer verdict on PR #53, then merge once required CI is green.
 Decisions: D024; malformed source bytes are preserved through append_raw without repair.
 Risks: required CI and final reviewer verdict remain pending.
-Validation: `python -m pytest tests/test_run_bundle.py -q` => 15 passed, including populated legacy upgrade; `python planning/check_contracts.py` => planning contracts OK; `git diff --check` => clean.
+Validation: `python -m pytest tests/test_run_bundle.py -q` => 17 passed, including populated legacy upgrade, aggregate tamper detection, and invalid-state preservation; `python planning/check_contracts.py` => planning contracts OK; `git diff --check` => clean.

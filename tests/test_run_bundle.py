@@ -83,6 +83,14 @@ def test_tampered_aggregate_is_reported(tmp_path):
     with pytest.raises(BundleError, match="integrity failure"):
         b.validate("r1", strict=True)
 
+@pytest.mark.parametrize("column,value", [("record_count", "99"), ("result", "invalid")])
+def test_tampered_aggregate_metadata_is_reported(tmp_path, column, value):
+    b = bundle(tmp_path); b.append("r1", 0, "state", {"ok": True})
+    with sqlite3.connect(tmp_path / "run.db") as db:
+        db.execute(f"update integrity set {column} = ?", (value,)); db.commit()
+    with pytest.raises(BundleError, match="integrity failure"):
+        b.validate("r1", strict=True)
+
 def test_explicit_invalid_status_is_strict_failure(tmp_path):
     b = bundle(tmp_path); b.append_raw("r1", 0, "partial", b"bad")
     with pytest.raises(BundleError, match="integrity failure"):
