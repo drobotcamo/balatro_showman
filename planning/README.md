@@ -22,6 +22,7 @@ other work. Winning plays are not a special objective at this stage.
 - `PHASE0_INVENTORY.md`: Phase 0 artifact inventory, provenance, and boundary.
 - `BRIDGE_SPIKE.md`: file-IPC oracle contract and the Lua producer spike.
 - `ORACLE_DATA_REVIEW.md`: issue #10 integrity and storage-conformance findings.
+- `PERSISTENT_STATE_OWNERSHIP.md`: issue #14 oracle-vs-reducer decision note.
 - `BALATRO_RUNTIME.md`: discovered local Balatro/Steamodded/Lovely runtime facts.
 - `audit_oracle_runs.py`: read-only oracle-run integrity audit.
 - `agent-workflow.md`: single definition of work-item, approval, subagent, and
