@@ -18,6 +18,9 @@ minimal annotation/QA tooling the other phase gates depend on.
 ## Outputs
 
 - Ground-truth run records: per-step state, action label, and run outcome.
+- Versioned run bundles with active, interrupted, and finalized lifecycle
+  states, provenance, integrity metadata, and read-only inspection access
+  (Issue #34).
 - Raw engine persistent fields and the game's own legal actions/mask basis, as
   the reducer validation reference (D021).
 - Aligned video frames for benchmarked steps.
@@ -31,6 +34,10 @@ minimal annotation/QA tooling the other phase gates depend on.
 - The oracle emits raw engine fields and engine legality; it does not compute
   canonical `persistent_state` — the pipeline reducer owns that shape (D021).
 - Video-to-engine alignment is explicit and auditable (timestamps, offsets).
+- Recording coordination is human-confirmed: a tool may request OBS recording
+  and associate its marker, but it never assumes video exists without evidence.
+- The run-bundle storage boundary does not own the low-level OBS hook or the
+  timestamp-to-frame alignment algorithm.
 - Evaluation clips are disjoint from synthetic backgrounds and from training
   video.
 - The oracle scores page classification, zone assignment, persistent reduction,

@@ -177,6 +177,24 @@ dependencies and gates, and adopting a new coordination authority is a larger
 architecture change than this phase needs. Source: Issue #25 and user-approved
 design conversation of 2026-09-30.
 
+### D023 — accepted — Issue #34 owns run-bundle storage and human-confirmed recording coordination
+Issue #34 builds the first durable, versioned run-bundle storage layer and the
+read-only inspection API over it. A bundle supports active, interrupted, and
+finalized runs, preserves provenance, and can be audited without knowing the
+future Phase 9 dataset storage technology. The tool may request and associate
+an OBS recording, but must notify a present user and require explicit or
+verified recording-start confirmation. It must not silently assume that video
+exists or replace the low-level OBS marker hook and timestamp-to-frame
+alignment owned by the recording/alignment work (Issues #15 and #35).
+
+Canonical persistent state, canonical action-space labels, video alignment
+semantics, large-batch partitioning, and migration of legacy recording roots
+remain owned by their existing components or later phases. Read-only access to
+pre-existing artifacts alone was rejected because recording and inspection need
+one durable lifecycle boundary. Owning all future dataset storage was rejected
+because it couples operational capture to Phase 9 scale concerns. Source:
+user-approved Issue #34 scope revision, 2026-10-01.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the
