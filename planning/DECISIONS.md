@@ -206,6 +206,11 @@ boundary, and support atomic transactions, integrity records, interrupted
 writes, and read-only inspection. Large-scale Phase 9 exports and partitioning
 remain separate consumers of the bundle.
 
+The persistence implementation uses SQLAlchemy 2.x for ORM and SQL toolkit
+access, with Alembic as the only schema migration system. The repository/API
+boundary must not expose ORM sessions or make a competing ORM part of the
+implementation.
+
 The lifecycle outcomes are `active`, `interrupted`, `completed`, `endless`,
 `won`, `lost`, and `aborted`. `endless` means the run ended without a win, loss,
 or abort outcome; it is not an alias for `completed`. Existing evidence is
