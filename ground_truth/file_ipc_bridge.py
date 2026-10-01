@@ -41,10 +41,35 @@ class FileIpcBridge:
         self.snapshot_path = io_dir / "snapshot.json"
         self.action_path = io_dir / "action.txt"
         self.run_end_path = io_dir / "run_end.json"
+        self.recording_marker_path = io_dir / "recording_start_marker.json"
         self._seen_requests: set[str] = set()
         self._request_actions: dict[str, str] = {}
         self._request_runs: dict[str, str] = {}
         self._sessions: dict[str, dict[str, Any]] = {}
+        self._recording_marker: dict[str, Any] | None = None
+
+    def _attach_recording_marker(self) -> None:
+        marker = self._recording_marker
+        if self.recording_marker_path.exists():
+            try:
+                marker = json.loads(self.recording_marker_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                return
+            if (
+                not isinstance(marker, dict)
+                or marker.get("schema_version") != "producer/1.0.0"
+                or not isinstance(marker.get("recording_id"), str)
+                or not isinstance(marker.get("fps"), (int, float))
+                or marker["fps"] <= 0
+                or not isinstance(marker.get("capture_timestamp_ns"), int)
+            ):
+                raise ValueError("invalid recording_start_marker.json")
+            self._recording_marker = marker
+        if marker is None:
+            return
+        for session in self._sessions.values():
+            session["recording"] = marker
+            self._write_session(session)
 
     def _read_json(self, path: Path) -> dict[str, Any] | None:
         if not path.exists():
@@ -67,13 +92,15 @@ class FileIpcBridge:
             session_dir.mkdir(parents=True, exist_ok=True)
             session = {
                 "run_id": run_id,
-                "schema_version": "record/1.0.0",
+                "schema_version": "producer/1.0.0",
                 "started_at": datetime.now(timezone.utc).isoformat(),
                 "ended_at": None,
                 "outcome": None,
                 "n_steps": 0,
                 "session_dir": session_dir,
             }
+            if self._recording_marker is not None:
+                session["recording"] = self._recording_marker
             self._sessions[run_id] = session
             self._write_session(session)
         return session
@@ -146,6 +173,7 @@ class FileIpcBridge:
 
     def step_once(self) -> bool:
         did_work = self._handle_run_end()
+        self._attach_recording_marker()
         return self._handle_snapshot() or did_work
 
     def serve(self, timeout: float | None = None) -> None:

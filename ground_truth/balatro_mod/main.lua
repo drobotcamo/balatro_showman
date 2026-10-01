@@ -39,6 +39,8 @@ end
 
 local IO_DIR = io_dir()
 local SNAPSHOT_PATH = IO_DIR .. "\\snapshot.json"
+local RECORDING_START_PATH = IO_DIR .. "\\recording_start.json"
+local RECORDING_MARKER_PATH = IO_DIR .. "\\recording_start_marker.json"
 local RUN_END_PATH = IO_DIR .. "\\run_end.json"
 
 local request_counter = 0
@@ -46,6 +48,20 @@ local run_id = nil
 local run_finalized = false
 local hooks_installed = false
 local last_emit_clock = -math.huge
+local last_emit_seconds = -math.huge
+local recording_poll_diagnosed = false
+
+-- Monotonic producer timestamp with sub-second precision.  Recording-start
+-- capture must use this same clock (see planning/align_oracle_video.py); it
+-- must not be compared directly with a wall-clock video timestamp.
+local function capture_timestamp_ns()
+  local timestamp_ns = math.floor(love.timer.getTime() * 1e9)
+  if timestamp_ns <= last_emit_clock then
+    timestamp_ns = last_emit_clock + 1
+  end
+  last_emit_clock = timestamp_ns
+  return timestamp_ns
+end
 
 -- ---------------------------------------------------------------------------
 -- JSON helpers (dependency-free; fixed shapes are built explicitly)
@@ -62,7 +78,9 @@ local function j_num(value)
   local n = tonumber(value)
   if not n then return "0" end
   if n == math.floor(n) and math.abs(n) < 1e15 then
-    return string.format("%d", n)
+    -- LuaJIT's Windows `%d` path can truncate large nanosecond values to
+    -- signed 32-bit integers; fixed-point formatting preserves the integer.
+    return string.format("%.0f", n)
   end
   return string.format("%.6f", n)
 end
@@ -904,7 +922,44 @@ local function write_atomic(path, text)
   return false
 end
 
+local function poll_recording_start()
+  local handle = io.open(RECORDING_START_PATH, "r")
+  if not handle then
+    if not recording_poll_diagnosed then
+      recording_poll_diagnosed = true
+      print("[balatro_showman_bridge] recording start poll path=" .. RECORDING_START_PATH .. " (request not visible)")
+    end
+    return
+  end
+  local text = handle:read("*a")
+  handle:close()
+  if not text then
+    print("[balatro_showman_bridge] could not read recording start request; leaving it in place")
+    return
+  end
+  print("[balatro_showman_bridge] recording start request found")
+  local schema_version = text:match('"schema_version"%s*:%s*"([^"]+)"')
+  local recording_id = text:match('"recording_id"%s*:%s*"([^"]+)"')
+  local fps = text:match('"fps"%s*:%s*([%d%.]+)')
+  if schema_version ~= "producer/1.0.0" or not recording_id or not fps then
+    print("[balatro_showman_bridge] invalid recording start request; leaving it in place")
+    return
+  end
+  local timestamp_ns = capture_timestamp_ns()
+  local wrote = write_atomic(RECORDING_MARKER_PATH, "{\"schema_version\":\"producer/1.0.0\",\"recording_id\":"
+    .. j_str(recording_id) .. ",\"fps\":" .. fps .. ",\"capture_timestamp_ns\":"
+    .. j_num(timestamp_ns) .. "}\n")
+  if wrote then
+    os.remove(RECORDING_START_PATH)
+    print("[balatro_showman_bridge] recording start marker written: " .. recording_id)
+  else
+    print("[balatro_showman_bridge] could not write recording start marker; leaving request in place")
+  end
+end
+
 local function build_snapshot(rid, page, action_label)
+  poll_recording_start()
+  local timestamp_ns = capture_timestamp_ns()
   local objects, pending_cards = build_objects()
   local action, source_kind, source_action, source_subtype, target_zone, target_position, selected =
     action_details(action_label, page)
@@ -917,7 +972,9 @@ local function build_snapshot(rid, page, action_label)
     selected_json = encode_offer_object(selected, target_zone, target_position)
   end
   local parts = {
-    '"schema_version":"live/2.0.0"',
+    '"schema_version":"producer/1.0.0"',
+    '"step_id":' .. j_str(run_id .. ":" .. tostring(rid)),
+    '"capture_timestamp_ns":' .. j_num(timestamp_ns),
     '"request_id":' .. tostring(rid),
     '"page_name":' .. j_str(page),
     '"source_kind":' .. j_scalar(source_kind),
@@ -934,23 +991,26 @@ local function build_snapshot(rid, page, action_label)
     '"action":' .. j_scalar(action),
     '"persistent_state":{}',
     '"action_taken":' .. j_str(action_label),
-    '"meta":' .. encode_meta(page),
+    '"meta":' .. encode_meta(page):sub(1, -2)
+      .. ',"capture_timestamp_ns":' .. j_num(timestamp_ns)
+      .. ',"video_timestamp_ns":' .. j_num(timestamp_ns) .. '}',
   }
   return "{" .. table.concat(parts, ",") .. "}"
 end
 
 function Bridge.emit(action_label)
+  poll_recording_start()
   if not (G and G.STAGE == G.STAGES.RUN) then return end
   if not run_id then
-    run_id = tostring(os.time()) .. "-" .. tostring(math.random(1000, 9999))
+    run_id = tostring(math.floor(love.timer.getTime() * 1e9)) .. "-" .. tostring(math.random(1000, 9999))
     run_finalized = false
   end
   -- Coalesce actions that fire back-to-back (e.g. buy_from_shop -> use_card)
   -- so a later write cannot overwrite a snapshot the Python client has not
   -- consumed yet. The first action in the pair is the meaningful one.
   local now = os.clock()
-  if now - last_emit_clock < 0.03 then return end
-  last_emit_clock = now
+  if now - last_emit_seconds < 0.03 then return end
+  last_emit_seconds = now
   request_counter = request_counter + 1
   local page = current_page()
   local wrote = write_atomic(SNAPSHOT_PATH, build_snapshot(request_counter, page, action_label))
@@ -1003,7 +1063,10 @@ local function install_action_hooks()
           emitted = (page == "In_TarotSpectral_Pack"
             or page == "In_JokerStandardPlanet_Pack") and label or nil
         end
-        if emitted then pcall(Bridge.emit, emitted) end
+        if emitted then
+          local ok, err = pcall(Bridge.emit, emitted)
+          if not ok then print("[balatro_showman_bridge] emit failed: " .. tostring(err)) end
+        end
         return original(...)
       end
     end
@@ -1015,7 +1078,8 @@ local function install_action_hooks()
       local page = current_page()
       if page == "In_TarotSpectral_Pack"
           or page == "In_JokerStandardPlanet_Pack" then
-        pcall(Bridge.emit, "SelectPackItem")
+        local ok, err = pcall(Bridge.emit, "SelectPackItem")
+        if not ok then print("[balatro_showman_bridge] emit failed: " .. tostring(err)) end
       end
       return select_card(...)
     end
@@ -1028,6 +1092,7 @@ end
 
 function Bridge.tick()
   install_action_hooks()
+  poll_recording_start()
   if run_id and not run_finalized and G and G.STATE == G.STATES.GAME_OVER then
     finalize((G.GAME and G.GAME.won) and "win" or "loss")
   end
@@ -1047,7 +1112,7 @@ local function install_game_hooks()
   local original_start_run = Game.start_run
   if type(original_start_run) == "function" then
     Game.start_run = function(self, ...)
-      run_id = tostring(os.time()) .. "-" .. tostring(math.random(1000, 9999))
+      run_id = tostring(math.floor(love.timer.getTime() * 1e9)) .. "-" .. tostring(math.random(1000, 9999))
       run_finalized = false
       return original_start_run(self, ...)
     end
@@ -1070,6 +1135,6 @@ pcall(function() love.filesystem.createDirectory("agent_io") end)
 install_game_hooks()
 install_action_hooks()
 
-print("[balatro_showman_bridge] loaded; io_dir=" .. IO_DIR)
+print("[balatro_showman_bridge] loaded; build=issue35-poll-diagnostic-3; io_dir=" .. IO_DIR)
 
 return Bridge
