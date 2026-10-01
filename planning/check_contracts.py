@@ -17,6 +17,8 @@ Checks (mechanical only; it does not judge prose quality or gate thresholds):
   files. Inventory documents that intentionally reference external or vendored
   artifacts (e.g. `planning/PHASE0_INVENTORY.md`) are excluded, because those
   targets are not present in a fresh checkout.
+- The orchestrator agent (`.opencode/agent/orchestrator.md`) and its
+  `/orchestrate` command exist with the required sections and wiring.
 
 Stdlib only; exit code 1 on any failure.
 """
@@ -194,6 +196,32 @@ def check_roadmap() -> None:
             )
 
 
+ORCHESTRATOR_REQUIRED_SECTIONS = (
+    "## Procedure",
+    "## Write Authority",
+    "## Report Format",
+    "## Boundaries",
+)
+
+
+def check_orchestrator() -> None:
+    agent = ROOT / ".opencode" / "agent" / "orchestrator.md"
+    command = ROOT / ".opencode" / "command" / "orchestrate.md"
+    if not agent.is_file():
+        fail("missing .opencode/agent/orchestrator.md")
+    else:
+        text = agent.read_text(encoding="utf-8")
+        for heading in ORCHESTRATOR_REQUIRED_SECTIONS:
+            if heading not in text:
+                fail(f".opencode/agent/orchestrator.md: missing section {heading!r}")
+    if not command.is_file():
+        fail("missing .opencode/command/orchestrate.md")
+    else:
+        text = command.read_text(encoding="utf-8")
+        if "agent: orchestrator" not in text:
+            fail(".opencode/command/orchestrate.md: must wire `agent: orchestrator`")
+
+
 def check_references() -> None:
     docs = (
         ROOT / "AGENTS.md",
@@ -230,6 +258,7 @@ def main() -> int:
     check_open_questions()
     check_components()
     check_roadmap()
+    check_orchestrator()
     check_references()
     for error in errors:
         print(f"FAIL: {error}")

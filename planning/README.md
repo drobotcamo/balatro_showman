@@ -32,8 +32,8 @@ other work. Winning plays are not a special objective at this stage.
 - `TOOLING.md`: verified project and machine-specific command recipes.
 - `agent-state/`: work-thread handoffs.
 - `../.opencode/agents/`: configured subagents.
-- `../.opencode/command/`: workflow commands (`/work`, `/resume`, `/handoff`,
-  `/verify`).
+- `../.opencode/command/`: workflow commands (`/work`, `/orchestrate`,
+  `/resume`, `/handoff`, `/verify`).
 - `../.opencode/skill/`: reusable triggered procedures.
 - `components/ontology.md`: asset, class, page/zone, and typography vocabulary.
 - `components/ground-truth.md`: Lua oracle, evaluation set, annotation/QA tool.

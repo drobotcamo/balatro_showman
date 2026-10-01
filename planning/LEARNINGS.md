@@ -94,3 +94,10 @@ under its Decisions section. This file is a knowledge base, not a task log.
   before use.
 - Verification/source: `planning/audit_oracle_runs.py` output and direct JSON
   inspection, recorded in `planning/ORACLE_DATA_REVIEW.md` §4.2 and §4.4.
+
+## 2026-09-30: File-glob tools can silently skip dot-directories
+
+- Context: Assessing whether `.opencode/command/` existed before proposing an orchestrator work item (Issue #25).
+- Observation: The workspace glob tool returned "No files found" for `.opencode/**/*` even though `.opencode/command/`, `.opencode/agents/`, and `.opencode/skill/` all exist; glob patterns apparently ignore dot-directories in this harness. A shell directory listing corrected the record.
+- Implication: Do not claim a referenced path is missing based on glob output alone; verify dot-directories with a shell listing before opening a remediation issue. A false "missing files" claim was made and retracted this session.
+- Verification/source: `Get-ChildItem .opencode\command, .opencode\agents` listing on 2026-09-30, contrasted with the earlier empty glob result.
