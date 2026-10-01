@@ -34,9 +34,14 @@ def test_upgrade_from_previous_revision(tmp_path):
     url = f"sqlite:///{tmp_path / 'upgrade.db'}"
     cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url)
     command.upgrade(cfg, "0001_run_bundle")
+    with sqlite3.connect(tmp_path / "upgrade.db") as db:
+        db.execute("insert into runs values ('legacy', 'active', 'old', '1.0', CURRENT_TIMESTAMP, NULL, NULL, 'unknown')")
+        db.execute("insert into records values (1, 'legacy', 0, 'state', ?, ?, 'valid')", ('{\"chips\":1}', 'x' * 64))
+        db.commit()
     command.upgrade(cfg, "head")
     with sqlite3.connect(tmp_path / "upgrade.db") as db:
         assert db.execute("select version_num from alembic_version").fetchone()[0] == "0003_binary_evidence"
+        assert db.execute("select payload from records where run_id = 'legacy'").fetchone()[0] == b'{"chips":1}'
 
 def test_integrity_failure_is_persisted_and_strict_validation_reports(tmp_path):
     b = bundle(tmp_path); b.append("r1", 0, "state", {"chips": 1})
