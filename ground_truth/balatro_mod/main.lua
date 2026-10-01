@@ -92,7 +92,7 @@ local function try(fn)
 end
 
 -- Sorted JSON object of a game table's scalar entries; non-scalar values are
--- omitted rather than stringified.
+-- emitted as explicit null rather than guessed or silently dropped.
 local function scalar_table_json(source)
   local value = try(source)
   local parts = {}
@@ -105,6 +105,8 @@ local function scalar_table_json(source)
       local entry_type = type(entry)
       if entry_type == "string" or entry_type == "boolean" or entry_type == "number" then
         parts[#parts + 1] = j_str(key) .. ":" .. j_scalar(entry)
+      else
+        parts[#parts + 1] = j_str(key) .. ":null"
       end
     end
   end
@@ -782,19 +784,22 @@ end
 
 -- The stake's numeric level maps to its center via the engine's own
 -- `stake_level` field (game.lua stake centers); the key is scanned, not
--- hardcoded, so Steamodded stake mods resolve the same way.
+-- hardcoded, so Steamodded stake mods resolve the same way. Ties are broken
+-- deterministically by sorting the matching keys.
 local function stake_info()
   local level = try(function() return G.GAME.stake end)
   if type(level) ~= "number" then
     return { level = nil, center_key = nil }
   end
   local key = try(function()
+    local matches = {}
     for center_key, center in pairs(G.P_CENTERS) do
       if type(center) == "table" and center.set == "Stake" and center.stake_level == level then
-        return center_key
+        matches[#matches + 1] = tostring(center_key)
       end
     end
-    return nil
+    table.sort(matches)
+    return matches[1]
   end)
   if type(key) ~= "string" then key = nil end
   return { level = level, center_key = key }
@@ -858,6 +863,8 @@ end
 local function encode_raw_persistent()
   local deck = deck_info()
   local stake = stake_info()
+  local last_planet = try(function() return G.GAME.last_tarot_planet end)
+  if type(last_planet) ~= "string" then last_planet = nil end
   local parts = {
     '"deck":{"center_key":' .. (deck.center_key and j_str(deck.center_key) or "null")
       .. ',"class_id":' .. (deck.class_id and tostring(deck.class_id) or "null") .. "}",
@@ -877,7 +884,7 @@ local function encode_raw_persistent()
     '"hands_played":' .. game_number_json(function() return G.GAME.hands_played end),
     '"unused_discards":' .. game_number_json(function() return G.GAME.unused_discards end),
     '"ecto_minus":' .. game_number_json(function() return G.GAME.ecto_minus end),
-    '"last_tarot_planet":' .. j_scalar(try(function() return G.GAME.last_tarot_planet end)),
+    '"last_tarot_planet":' .. (last_planet and j_str(last_planet) or "null"),
   }
   return "{" .. table.concat(parts, ",") .. "}"
 end
