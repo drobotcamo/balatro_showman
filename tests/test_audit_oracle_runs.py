@@ -3,7 +3,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from planning.audit_oracle_runs import STATE_KEYS, audit, conformance_findings
+from planning.audit_oracle_runs import (
+    OFFERING_ZONES,
+    STATE_KEYS,
+    audit,
+    conformance_findings,
+)
 
 
 def _state() -> dict:
@@ -43,6 +48,21 @@ def _playing_card(class_id, modifier=None, edition=None, seal=None, stickers=Non
             "is_ace": True,
             "is_face": False,
         },
+    }
+
+
+def _offering(zone, position=0, object_type="joker"):
+    return {
+        "class_id": 151,
+        "object_type": object_type,
+        "zone": zone,
+        "position_in_zone": position,
+        "modifier": None,
+        "edition": None,
+        "seal": None,
+        "stickers": [],
+        "card": None,
+        "center_key": "j_joker",
     }
 
 
@@ -114,6 +134,63 @@ class AuditConformanceTests(unittest.TestCase):
         self.assertEqual(summary["inventory_center_key_only"], 1)
         findings = conformance_findings(summary)
         self.assertTrue(any("class_id:null" in finding for finding in findings))
+
+    def test_offering_zone_coverage_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = _write_run(
+                Path(directory),
+                objects=[
+                    _offering("TopShelfShopOfferings", 0),
+                    _offering("TopShelfShopOfferings", 1, "planet"),
+                    _offering("VoucherShopOfferings", 0, "voucher"),
+                    _offering("PackShopOfferings", 0, "pack"),
+                    _offering("PackOfferings", 0),
+                ],
+                pending=[],
+            )
+            summary = audit(run_dir)
+        self.assertEqual(summary["offering_objects_total"], 5)
+        self.assertEqual(
+            summary["offering_zone_counts"],
+            {
+                "TopShelfShopOfferings": 2,
+                "VoucherShopOfferings": 1,
+                "PackShopOfferings": 1,
+                "PackOfferings": 1,
+            },
+        )
+        self.assertEqual(
+            summary["offering_zones_present"], list(OFFERING_ZONES)
+        )
+        self.assertEqual(summary["offering_zones_missing"], [])
+        self.assertEqual(summary["offering_position_missing"], 0)
+        self.assertFalse(
+            any("position_in_zone" in finding for finding in conformance_findings(summary))
+        )
+
+    def test_missing_offering_zone_is_reported_in_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = _write_run(
+                Path(directory),
+                objects=[_offering("PackOfferings", 0)],
+                pending=[],
+            )
+            summary = audit(run_dir)
+        self.assertEqual(summary["offering_objects_total"], 1)
+        self.assertIn("PackOfferings", summary["offering_zones_present"])
+        self.assertIn("VoucherShopOfferings", summary["offering_zones_missing"])
+
+    def test_offering_without_position_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = _write_run(
+                Path(directory),
+                objects=[_offering("PackOfferings", None)],
+                pending=[],
+            )
+            summary = audit(run_dir)
+        self.assertEqual(summary["offering_position_missing"], 1)
+        findings = conformance_findings(summary)
+        self.assertTrue(any("position_in_zone" in finding for finding in findings))
 
     def test_all_null_attribute_column_is_reported(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

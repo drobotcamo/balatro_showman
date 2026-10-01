@@ -21,6 +21,25 @@ class BalatroModManifestTests(unittest.TestCase):
         json_files = sorted(path.name for path in MOD_DIR.glob("*.json"))
         self.assertEqual(json_files, ["manifest.json"])
 
+    def test_producer_emits_canonical_offering_zones(self) -> None:
+        # Issue #16: the live/2.0 zone vocabulary uses the four split offering
+        # zones; bare `ShopOfferings` is a deprecated alias and must not be
+        # emitted.
+        text = (MOD_DIR / "main.lua").read_text(encoding="utf-8")
+        for zone in (
+            "TopShelfShopOfferings",
+            "VoucherShopOfferings",
+            "PackShopOfferings",
+            "PackOfferings",
+        ):
+            self.assertIn(f'"{zone}"', text, zone)
+        self.assertNotIn('"ShopOfferings"', text)
+
+    def test_producer_reads_the_expected_shop_cardareas(self) -> None:
+        text = (MOD_DIR / "main.lua").read_text(encoding="utf-8")
+        for area in ("G.shop_jokers", "G.shop_vouchers", "G.shop_booster", "G.pack_cards"):
+            self.assertIn(area, text, area)
+
 
 if __name__ == "__main__":
     unittest.main()
