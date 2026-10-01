@@ -58,6 +58,29 @@ def test_confirmation_workflows_require_explicit_yes(tmp_path):
     assert result.status == "confirmed"
 
 
+def test_confirmation_eof_and_interrupt_are_not_confirmation():
+    def eof(_):
+        raise EOFError
+
+    def interrupted(_):
+        raise KeyboardInterrupt
+
+    assert not confirm_interactive(eof, lambda _: None)
+    assert not confirm_terminal(interrupted)
+
+
+def test_callback_interrupt_is_explicitly_interrupted(tmp_path):
+    b, _ = bundle(tmp_path)
+
+    def interrupted():
+        raise KeyboardInterrupt
+
+    result = associate_after_confirmation(b, "r1", marker=marker(), confirm=interrupted,
+                                          confirmed_by="terminal")
+    assert result.status == "declined"
+    assert result.code == "confirmation_declined"
+
+
 def test_conflicting_association_is_rejected(tmp_path):
     b, _ = bundle(tmp_path)
     assert associate_recording(b, "r1", confirmed=True, marker=marker()).status == "confirmed"
