@@ -68,11 +68,12 @@ class RunBundle:
             if not run: raise BundleError("unknown run")
             records = s.scalars(select(Record).where(Record.run_id == run_id).order_by(Record.sequence)).all()
             bad = [r.sequence for r in records if hashlib.sha256(r.payload if isinstance(r.payload, bytes) else r.payload.encode()).hexdigest() != r.sha256]
-            result = "invalid" if bad else "valid"
+            bad_status = [r.sequence for r in records if r.integrity_status == "invalid"]
+            result = "invalid" if bad or bad_status else "valid"
             run.integrity_status = result
             self._integrity(s, run_id, result)
             should_raise = strict and bool(bad)
-            report = {"status": result, "record_count": len(records), "bad_sequences": bad}
+            report = {"status": result, "record_count": len(records), "bad_sequences": sorted(set(bad + bad_status))}
         if should_raise: raise BundleError(f"integrity failure: {report['bad_sequences']}")
         return report
 

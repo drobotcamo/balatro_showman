@@ -32,7 +32,7 @@ def test_upgrade_from_previous_revision(tmp_path):
     command.upgrade(cfg, "0001_run_bundle")
     command.upgrade(cfg, "head")
     with sqlite3.connect(tmp_path / "upgrade.db") as db:
-        assert db.execute("select version_num from alembic_version").fetchone()[0] == "0002_record_integrity_index"
+        assert db.execute("select version_num from alembic_version").fetchone()[0] == "0003_binary_evidence"
 
 def test_integrity_failure_is_persisted_and_strict_validation_reports(tmp_path):
     b = bundle(tmp_path); b.append("r1", 0, "state", {"chips": 1})
@@ -47,6 +47,6 @@ def test_integrity_failure_is_persisted_and_strict_validation_reports(tmp_path):
 def test_raw_bytes_are_preserved(tmp_path):
     b = bundle(tmp_path); raw = b"\xff\xfe{partial"
     b.append_raw("r1", 0, "partial", raw)
-    assert b.validate("r1")["status"] == "valid"
+    assert b.validate("r1")["status"] == "invalid"
     with sqlite3.connect(tmp_path / "run.db") as db:
         assert db.execute("select payload from records").fetchone()[0] == raw
