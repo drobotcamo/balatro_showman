@@ -6,7 +6,7 @@ Owner: project lead
 Branch: docs-one-shot-work-completion
 Worktree: C:\Users\camgr\Documents\code_projects\balatro_showman
 Objective: Persist an exact producer-clock marker for each OBS recording and use it for oracle-to-frame alignment.
-Status: ready-for-review
+Status: complete
 Scope: ground_truth/balatro_mod/main.lua, ground_truth/file_ipc_bridge.py, planning/BRIDGE_SPIKE.md, planning/align_oracle_video.py
 Dependencies: Issue #11 live capture; Issue #15 producer identity/alignment
 Completed:
@@ -37,7 +37,7 @@ Completed:
 - Final live capture completed: recording `issue35-20261001T071843Z`, video `F:\\OBS_RECORDINGS\\2026-10-01 00-18-39.mkv`, run `161086442600-9098`, 17 steps, outcome `loss`, and finalized `session.json` with the unique marker. Alignment produced post-marker frames 29, 44, and 28; extracted `artifacts/issue35-live-final/frame-29.png` visually shows the Balatro blind screen.
 - Corrected final capture: recording `issue35-20261001T072540Z`, video `F:\\OBS_RECORDINGS\\2026-10-01 00-25-37.mkv`, run `35151992300-2982`, 15 steps, outcome `loss`, and finalized `session.json` with positive monotonic timestamps. Human verification confirms frame 94 is the exact moment of step `35151992300-2982:2`, action `DiscardHand`.
 Next:
-- Open the PR, attach the live artifact paths and command output, obtain required review/CI, and merge under the work-item policy.
+- Close Issue #35 or record an explicit follow-up if the project owner keeps it open; PR #36 is already merged.
 Decisions: The OBS hook writes a request; Lua samples the producer clock, avoiding cross-process clock conversion. Storage remains the existing JSON run bundle.
 Risks: Alignment correctly reports negative indices for pre-recording steps; post-marker steps are non-negative. The final video is external at `F:\\OBS_RECORDINGS`; the extracted frame is local evidence. Final review should confirm artifact provenance before merge.
-Validation: `py -3 -m unittest tests.test_file_ipc_bridge tests.test_obs_recording_start tests.test_align_oracle_video` passed (11 tests); `py -3 planning\\check_contracts.py` passed; `git diff --check` passed. Independent reviewer returned `holds with gaps` before the final live capture.
+Validation: `py -3 -m unittest tests.test_file_ipc_bridge tests.test_obs_recording_start tests.test_align_oracle_video` passed (11 tests); `py -3 planning\\check_contracts.py` passed; `git diff --check` passed; PR #36 merged with required CI green. Independent reviewer returned `holds with gaps` before the final live capture; the corrected final capture is recorded above.
