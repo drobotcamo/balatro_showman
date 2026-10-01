@@ -1,6 +1,7 @@
 # Oracle Data Integrity and Storage-Contract Conformance (Issue #10)
 
-Status: review complete; proposals unapplied, pending user decision.
+Status: review complete; proposals tracked as follow-up issues (P5 applied by
+Issue #16/PR #28, others pending).
 Parent: Issue #6 (Lua producer, merged in PR #9). Owner: Issue #10.
 Evidence is external and not committed (D016): run directories under
 `F:\OBS_RECORDINGS\oracle_runs\`. This document records findings, not data.
@@ -216,7 +217,7 @@ are by design for a smoke test. The recommendation is to record the oracle as
 gate, and to treat gaps (3)-(6) as the next producer iteration, gated on a
 decision about producer ownership (see §7, P3).
 
-## 7. Proposals (unapplied, for user decision)
+## 7. Proposals (follow-up issues)
 
 Follow-up issues are tracked as sub-issues of #10: P3 = #14 (decision, blocking),
 P1 = #15, P2 = #13, P4 = #12, P5 = #16, P6 = #11.
@@ -267,9 +268,11 @@ video offset.** The two persisted runs miss the reviewed revision. This is a
 manual game-capture task, not a code change. *Recommendation: required before
 any Phase 0 gate closure.*
 
-None of these proposals are applied here. P3 in particular is a durable
-contract decision that needs user input; P1/P2/P4/P5 are producer-scope
-changes that would follow that decision.
+These proposals were unapplied when this review was written. Follow-up work is
+tracked under Issue #10's sub-issues. P5 was applied by Issue #16 (PR #28) with
+the four canonical zones noted above. P3 is a durable contract decision that
+needs user input; the remaining producer-scope changes follow from that
+decision.
 
 ## 8. Residual Uncertainty
 
