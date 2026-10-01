@@ -35,6 +35,7 @@ Completed:
 - After a fresh action, the bridge persisted run `161086442600-9098` with the same marker; alignment produced frame 69. Fresh review verdict: `holds with gaps`; unique marker, completed session, video, and visual frame evidence remain missing.
 - Current checks pass: 11 targeted tests, `planning\\check_contracts.py`, and `git diff --check`.
 - Final live capture completed: recording `issue35-20261001T071843Z`, video `F:\\OBS_RECORDINGS\\2026-10-01 00-18-39.mkv`, run `161086442600-9098`, 17 steps, outcome `loss`, and finalized `session.json` with the unique marker. Alignment produced post-marker frames 29, 44, and 28; extracted `artifacts/issue35-live-final/frame-29.png` visually shows the Balatro blind screen.
+- Corrected final capture: recording `issue35-20261001T072540Z`, video `F:\\OBS_RECORDINGS\\2026-10-01 00-25-37.mkv`, run `35151992300-2982`, 15 steps, outcome `loss`, and finalized `session.json` with positive monotonic timestamps. Human verification confirms frame 94 is the exact moment of step `35151992300-2982:2`, action `DiscardHand`.
 Next:
 - Open the PR, attach the live artifact paths and command output, obtain required review/CI, and merge under the work-item policy.
 Decisions: The OBS hook writes a request; Lua samples the producer clock, avoiding cross-process clock conversion. Storage remains the existing JSON run bundle.
