@@ -142,3 +142,31 @@ under its Decisions section. This file is a knowledge base, not a task log.
 - Verification/source: `git ls-tree HEAD legacy/vendor/`, `git show
   HEAD:.gitmodules` (absent), and `git worktree add` yielding empty vendor dirs
   on 2026-09-30.
+
+## 2026-09-30: Live/2.0 shop and pack offering zones map to four CardAreas
+
+- Context: Issue #16 needed the Lua producer to snapshot the shop and
+  opened-pack offering zones that the adopted action space resolves
+  buy/select targets against.
+- Observation: In the installed Balatro `1.0.1o-FULL` dump
+  (`%APPDATA%\Balatro\Mods\lovely\game-dump`), the shop UI creates exactly
+  `G.shop_jokers` (top shelf, jokers/consumables), `G.shop_vouchers` (one
+  voucher), and `G.shop_booster` (**singular**), and an opened booster fills
+  `G.pack_cards`. `G.shop` is a UIBox, not a CardArea. The canonical live/2.0
+  zones are `TopShelfShopOfferings`, `VoucherShopOfferings`,
+  `PackShopOfferings`, and `PackOfferings`; the vendored `granularize.py`,
+  `mask_builder.py`, `live_encoder.py`, and `live/smoke_test.py` reference only
+  these. Bare `ShopOfferings` appears only in deprecated documents
+  (`data/masking_schema_disorganized.md`, deprecated `action_space_schema.md`
+  §5) and has no distinct live source, so it is an overloaded legacy alias.
+  Booster center keys carry a size suffix (e.g. `p_arcana_normal_1`), so a pack
+  object's `class_id` is null against the vendored map while `center_key` is
+  retained.
+- Implication: Producers must read `G.shop_booster` (not `G.shop_boosters`) and
+  emit the four split zones; emitting bare `ShopOfferings` would duplicate
+  candidates and reintroduce a name the canonical contract does not define.
+- Verification/source: read-only inspection of
+  `%APPDATA%\Balatro\Mods\lovely\game-dump\functions\UI_definitions.lua:637-658`,
+  `SMODS\_\src\game_object.lua:1723`, and
+  `legacy/vendor/balatro-policy-transformer/{granularize.py,mask_builder.py,live/live_encoder.py,live/smoke_test.py}`
+  on 2026-09-30.
