@@ -18,4 +18,4 @@ Next:
 - Obtain required CI and reviewer approval on PR #57, then merge if checks remain green.
 Decisions: D024 read-only compatibility; no in-place migration or unstable-field promotion.
 Risks: Exact downstream compatibility envelope is not separately specified; adapter intentionally returns raw session/step objects and diagnostics.
-Validation: `python -m pytest -q tests/test_run_bundle_compatibility.py tests/test_run_bundle_inspection.py tests/test_run_bundle.py` -> 31 passed; `python planning/check_contracts.py` -> planning contracts OK; `git diff --check` -> clean.
+Validation: `python -m pytest -q tests/test_run_bundle_compatibility.py tests/test_run_bundle_inspection.py tests/test_run_bundle.py` -> 32 passed; `python planning/check_contracts.py` -> planning contracts OK; `git diff --check` -> clean.

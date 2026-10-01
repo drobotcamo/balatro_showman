@@ -20,7 +20,7 @@ def read_oracle_run(path):
         missing = [p.name for p in (session_path, steps_path) if not p.is_file()]
         return _result("malformed", None, [], "unknown", diagnostics + [
             {"code": "missing_file", "field": name, "message": f"missing {name}"}
-            for name in missing])
+            for name in missing], _source(root, session_path, steps_path))
     source = {"directory": str(root), "files": {
         name: {"size": file.stat().st_size, "sha256": _sha256(file)}
         for name, file in (("session.json", session_path), ("steps.ndjson", steps_path))}}
@@ -34,13 +34,13 @@ def read_oracle_run(path):
                 value = json.loads(line)
             except (UnicodeDecodeError, json.JSONDecodeError) as exc:
                 return _result("malformed", session, steps, "unknown", diagnostics +
-                    [{"code": "invalid_step", "field": f"steps.ndjson:{number}", "message": str(exc)}])
+                    [{"code": "invalid_step", "field": f"steps.ndjson:{number}", "message": str(exc)}], source)
             if not isinstance(value, dict):
                 return _result("malformed", session, steps, "unknown", diagnostics +
-                    [{"code": "invalid_step", "field": f"steps.ndjson:{number}", "message": "step must be an object"}])
+                    [{"code": "invalid_step", "field": f"steps.ndjson:{number}", "message": "step must be an object"}], source)
             steps.append(value)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
-        return _result("malformed", None, [], "unknown", [{"code": "invalid_source", "message": str(exc)}])
+        return _result("malformed", None, [], "unknown", [{"code": "invalid_source", "message": str(exc)}], source)
 
     missing = []
     required = REQUIRED_BY_SCHEMA.get(session.get("schema_version"), REQUIRED_TOP_LEVEL)
@@ -69,6 +69,13 @@ def _result(classification, session, steps, video_status, diagnostics, source=No
     if source is not None:
         result["source"] = source
     return result
+
+
+def _source(root, session_path, steps_path):
+    return {"directory": str(root), "files": {
+        name: {"size": file.stat().st_size, "sha256": _sha256(file)}
+        for name, file in (("session.json", session_path), ("steps.ndjson", steps_path))
+        if file.is_file()}}
 
 
 def _sha256(path):

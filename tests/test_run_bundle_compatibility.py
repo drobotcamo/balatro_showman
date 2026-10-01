@@ -45,7 +45,9 @@ def test_malformed_json_and_non_object_steps_are_reported_without_mutation(tmp_p
     session.write_text("{bad", encoding="utf-8")
     steps.write_text("[]\n", encoding="utf-8")
     before = (session.read_bytes(), steps.read_bytes())
-    assert read_oracle_run(tmp_path)["classification"] == "malformed"
+    result = read_oracle_run(tmp_path)
+    assert result["classification"] == "malformed"
+    assert result["source"]["files"]["session.json"]["size"] == len(before[0])
     assert (session.read_bytes(), steps.read_bytes()) == before
 
     session.write_text(json.dumps({"n_steps": 1}), encoding="utf-8")
