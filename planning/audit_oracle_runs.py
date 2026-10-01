@@ -20,6 +20,7 @@ Stdlib only.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -251,7 +252,8 @@ def audit(run_dir: Path) -> dict:
         "canonical_action_present": sum(1 for r in records if r.get("action") is not None),
         "canonical_action_unresolved": sum(
             1 for r in records if r.get("action_taken") in {
-                "UseConsumable", "SellItem", "BuyShopItem", "SelectPackItem"
+                "UseConsumable", "SellItem", "BuyShopItem",
+                "BuyAndUseShopConsumable", "SelectPackItem"
             } and r.get("action") is None
         ),
         "page_name_missing": sum(1 for r in records if not r.get("page_name")),
@@ -318,9 +320,40 @@ def audit(run_dir: Path) -> dict:
         action = record.get("action")
         zone = record.get("target_zone")
         position = record.get("target_position")
-        if action is not None and action.startswith(("UseConsumable_", "SellItem_", "BuyShopItem_")):
+        subtype = record.get("action_subtype")
+        selected = record.get("selected_object") or {}
+        selected_object = selected.get("object") if isinstance(selected, dict) else None
+        if action is not None and action.startswith((
+            "UseConsumable_", "SellItem_", "BuyShopItem_",
+            "BuyAndUseShopConsumable_", "SelectPackItem_"
+        )):
             if zone is None or position is None or record.get("selected_object") is None:
                 fail(f"{label}: step {index} has targeted canonical action without resolved target")
+            match = re.match(r"^(.+)_([0-9]+)$", action)
+            if match:
+                prefix, encoded_position = match.groups()
+                encoded_zone = next(
+                    (candidate for candidate in OFFERING_ZONES + (
+                        "CurrentConsumables", "CurrentJokers", "PackOfferings"
+                    ) if prefix.endswith("_" + candidate)),
+                    None,
+                )
+                if encoded_zone is None:
+                    encoded_zone = prefix.rsplit("_", 1)[-1]
+                if encoded_zone != zone or int(encoded_position) != position:
+                    fail(f"{label}: step {index} canonical action disagrees with target fields")
+        subtype_zones = {
+            "selljoker": "CurrentJokers",
+            "sellconsumable": "CurrentConsumables",
+            "buytopshelfconsumable": "TopShelfShopOfferings",
+        }
+        expected_zone = subtype_zones.get(subtype)
+        if expected_zone and zone != expected_zone:
+            fail(f"{label}: step {index} subtype {subtype!r} has target_zone {zone!r}")
+        if subtype == "buytopshelfconsumable":
+            object_type = selected_object.get("object_type") if isinstance(selected_object, dict) else None
+            if object_type not in {"tarot", "planet", "spectral"}:
+                fail(f"{label}: step {index} buy/use target is not a consumable object")
 
     # --- conformance gaps (non-fatal, reported) ---
     summary["source_kind_distinct"] = sorted(

@@ -757,6 +757,7 @@ end
 -- offering families. Falls back to the generic consumable type used by the
 -- existing consumables zone.
 local function inventory_type(card)
+  if not card or not card.ability then return nil end
   local set = card.ability and card.ability.set
   if set == "Joker" then return "joker" end
   if set == "Voucher" then return "voucher" end
@@ -764,7 +765,12 @@ local function inventory_type(card)
   if set == "Tarot" then return "tarot" end
   if set == "Planet" then return "planet" end
   if set == "Spectral" then return "spectral" end
-  return "consumable"
+  return nil
+end
+
+local function is_consumable_type(object_type)
+  return object_type == "consumable" or object_type == "tarot"
+    or object_type == "planet" or object_type == "spectral"
 end
 
 -- Offering objects can be playing cards (e.g. Standard pack contents) or
@@ -862,9 +868,22 @@ local function action_details(action_label, page)
     selected, target_position = selected_card_in(G and G.jokers)
     if selected then
       target_zone = "CurrentJokers"
+      source_subtype = "selljoker"
     else
       selected, target_position = selected_card_in(G and G.consumeables)
-      target_zone = selected and "CurrentConsumables" or nil
+      if selected then
+        target_zone = "CurrentConsumables"
+        source_subtype = "sellconsumable"
+      end
+    end
+  elseif action_label == "BuyAndUseShopConsumable" then
+    local selected_card, selected_position = selected_card_in(G and G.shop_jokers)
+    local selected_type = selected_card and inventory_type(selected_card)
+    if selected_card and (selected_type == "tarot" or selected_type == "planet"
+        or selected_type == "spectral") then
+      selected, target_position = selected_card, selected_position
+      target_zone = "TopShelfShopOfferings"
+      source_subtype = "buytopshelfconsumable"
     end
   elseif action_label == "BuyShopItem" then
     local areas = {
@@ -879,7 +898,7 @@ local function action_details(action_label, page)
         if candidate[2] == "PackShopOfferings" then
           source_subtype = "buyandopen" .. tostring(pack_kind() or "pack"):lower()
         elseif candidate[2] == "TopShelfShopOfferings" then
-          source_subtype = inventory_type(selected) == "consumable"
+          source_subtype = is_consumable_type(inventory_type(selected))
             and "buytopshelfconsumable" or "buytopshelfjoker"
         end
         break
@@ -888,7 +907,9 @@ local function action_details(action_label, page)
   elseif action_label == "SelectPackItem" then
     selected, target_position = selected_card_in(G and G.pack_cards)
     target_zone = selected and "PackOfferings" or nil
-    source_subtype = selected and ("selectpackitem" .. inventory_type(selected)) or nil
+    local selected_type = selected and inventory_type(selected)
+    source_subtype = selected and selected_type
+      and ("selectpackitem" .. selected_type) or nil
   elseif action_label == "SkipPack" then
     source_kind = "commit"
   end
@@ -899,8 +920,9 @@ local function action_details(action_label, page)
   local canonical = action_label
   if target_zone and target_position ~= nil then
     canonical = action_label .. "_" .. target_zone .. "_" .. tostring(target_position)
-  elseif action_label == "UseConsumable" or action_label == "SellItem"
-      or action_label == "BuyShopItem" or action_label == "SelectPackItem" then
+    elseif action_label == "UseConsumable" or action_label == "SellItem"
+      or action_label == "BuyShopItem" or action_label == "BuyAndUseShopConsumable"
+      or action_label == "SelectPackItem" then
     canonical = nil
     source_kind = "unresolved"
   end
@@ -1333,6 +1355,7 @@ local ACTION_HOOKS = {
   cash_out = "CashOut",
   reroll_shop = "RerollShop",
   buy_from_shop = "BuyShopItem",
+  buy_and_use = "BuyAndUseShopConsumable",
   sell_card = "SellItem",
   use_card = "UseConsumable",
   skip_booster = "SkipPack",
@@ -1361,7 +1384,9 @@ local function install_action_hooks()
           if not ok then print("[balatro_showman_bridge] emit failed: " .. tostring(err)) end
         end
         return original(...)
-      end
+        end
+    elseif name == "buy_and_use" then
+      print("[balatro_showman_bridge] buy/use callback unavailable; coverage unresolved")
     end
   end
   local select_card = G.FUNCS.select_card

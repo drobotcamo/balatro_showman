@@ -187,6 +187,51 @@ def _make_step(
     }
 
 
+def _coalesce_buy_use(raw_steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Derive BuyAndUse from the engine's adjacent buy/use callbacks.
+
+    The producer records the raw callbacks faithfully.  A top-shelf
+    consumable purchase immediately followed by UseConsumable is the only
+    supported derived pattern; a full consumable area is useful evidence but
+    is not required because the two actions are otherwise indistinguishable.
+    """
+    result: list[dict[str, Any]] = []
+    index = 0
+    while index < len(raw_steps):
+        current = raw_steps[index]
+        action = current.get("action") or current.get("_recorded_action") or ""
+        next_step = raw_steps[index + 1] if index + 1 < len(raw_steps) else None
+        next_action = (next_step or {}).get("action") or (next_step or {}).get("_recorded_action") or ""
+        selected = current.get("selected_object") or {}
+        selected_object = selected.get("object") if isinstance(selected, dict) else None
+        object_type = selected_object.get("object_type") if isinstance(selected_object, dict) else None
+        consumable_slots_full = (
+            (current.get("state") or {}).get("consumables_current")
+            == (current.get("state") or {}).get("consumables_total")
+        )
+        if (
+            action.startswith("BuyShopItem_TopShelfShopOfferings_")
+            and object_type in {"tarot", "planet", "spectral"}
+            and next_action == "UseConsumable"
+        ):
+            derived = dict(current)
+            position = current.get("target_position")
+            derived["action"] = f"BuyAndUseShopConsumable_TopShelfShopOfferings_{position}"
+            derived["_recorded_action"] = derived["action"]
+            derived["source_kind"] = "derived_buy_use"
+            derived["source_action"] = "BuyShopItem"
+            derived["source_action_subtype"] = "buytopshelfconsumable"
+            derived["action_subtype"] = "buytopshelfconsumable"
+            derived["derived_from"] = ["BuyShopItem", "UseConsumable"]
+            derived["buy_use_consumable_slots_full"] = consumable_slots_full
+            result.append(derived)
+            index += 2
+            continue
+        result.append(current)
+        index += 1
+    return result
+
+
 # ---------------------------------------------------------------------------
 # Session converter
 # ---------------------------------------------------------------------------
@@ -232,6 +277,8 @@ def convert_session(
     if not raw_steps:
         print(f"  [skip] {run_id}: no steps")
         return False
+
+    raw_steps = _coalesce_buy_use(raw_steps)
 
     # Build granularized steps with SWAP synthesis
     gran_steps: list[dict[str, Any]] = []

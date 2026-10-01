@@ -40,6 +40,12 @@ class BalatroModManifestTests(unittest.TestCase):
         for area in ("G.shop_jokers", "G.shop_vouchers", "G.shop_booster", "G.pack_cards"):
             self.assertIn(area, text, area)
 
+    def test_producer_declares_direct_action_subtypes(self) -> None:
+        text = (MOD_DIR / "main.lua").read_text(encoding="utf-8")
+        for subtype in ("selljoker", "sellconsumable", "buytopshelfconsumable"):
+            self.assertIn(subtype, text, subtype)
+        self.assertIn('"BuyAndUseShopConsumable"', text)
+
 
 if __name__ == "__main__":
     unittest.main()
