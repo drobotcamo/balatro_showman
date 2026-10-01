@@ -4,8 +4,10 @@ Status: `planned`
 
 ## Purpose
 
-Produce large, reproducible, quality-aware datasets from video and intermediate
-pipeline artifacts, with a declared storage format and schema versions.
+Produce large, reproducible, quality-aware datasets from versioned run bundles,
+video, and intermediate pipeline artifacts, with a declared storage format and
+schema versions. Operational run-bundle storage and inspection are established
+earlier by Issue #34; this component owns scale-out dataset production.
 
 ## Inputs
 
@@ -14,6 +16,7 @@ pipeline artifacts, with a declared storage format and schema versions.
   artifacts.
 - Pipeline and schema versions.
 - Ground-truth oracle records (for validation splits and outcome labels).
+- Versioned run bundles produced by the ground-truth storage boundary.
 
 ## Outputs
 
@@ -25,6 +28,7 @@ pipeline artifacts, with a declared storage format and schema versions.
 ## Invariants
 
 - Every row is traceable to source video and frame.
+- Dataset production does not mutate the source run bundle.
 - Reprocessing a video is idempotent for the same versions and configuration.
 - Partial failures are resumable and visible.
 - Dataset splits avoid neighboring-frame, source-video, and synthetic/eval
