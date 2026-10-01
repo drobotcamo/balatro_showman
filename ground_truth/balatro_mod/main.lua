@@ -12,8 +12,12 @@
 --   * Snapshot is written BEFORE the hooked action runs, so the captured state
 --     is the decision state and action_taken is the player's real action.
 --   * objects cover the hand / pending selection / jokers / consumables only.
---     persistent_state and legal_actions are intentionally sparse for the
---     smoke test; this is not a canonical live/2.0.0 model-input snapshot.
+--     Inventory objects carry the canonical `class_id` from the vendored class
+--     map (unmapped keys stay null with `center_key` retained); every object
+--     carries modifier/edition/seal (null when absent) and list-valued
+--     stickers. persistent_state and legal_actions remain intentionally sparse
+--     for the smoke test; this is not a canonical live/2.0.0 model-input
+--     snapshot.
 --   * No game assets, saves, or logs are copied anywhere; only JSON state is
 --     written to the shared agent_io directory.
 
@@ -80,6 +84,385 @@ local RANK_INDEX = {
   ["7"] = 6, ["8"] = 7, ["9"] = 8, ["10"] = 9, Jack = 10, Queen = 11, King = 12,
 }
 local RANK_NAME = { "A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K" }
+
+-- ---------------------------------------------------------------------------
+-- Canonical ontology class IDs (D003: extend, never renumber)
+--
+-- The class names are exactly the game's `center_key` values for inventory
+-- objects, so the table below maps `center_key` -> canonical `class_id` from
+-- the vendored class map. Standard playing cards (class_id 0..51) are not in
+-- this table: their class_id is computed from suit/rank. An unmapped
+-- `center_key` yields a null `class_id` and is retained verbatim, never
+-- guessed. Regenerate with `ground_truth/generate_class_ids.py`.
+-- ---------------------------------------------------------------------------
+
+-- BEGIN GENERATED CLASS ID TABLE
+local CLASS_ID_BY_CENTER_KEY = {
+  b_abandoned = 52,
+  b_anaglyph = 53,
+  b_black = 54,
+  b_blue = 55,
+  b_challenge = 56,
+  b_checkered = 57,
+  b_erratic = 58,
+  b_ghost = 59,
+  b_green = 60,
+  b_magic = 61,
+  b_nebula = 62,
+  b_painted = 63,
+  b_plasma = 64,
+  b_red = 65,
+  b_yellow = 66,
+  b_zodiac = 67,
+  e_foil = 68,
+  e_holo = 69,
+  e_negative = 70,
+  e_polychrome = 71,
+  m_bonus = 72,
+  m_glass = 73,
+  m_gold = 74,
+  m_lucky = 75,
+  m_mult = 76,
+  m_steel = 77,
+  m_stone = 78,
+  m_wild = 79,
+  j_8_ball = 80,
+  j_abstract = 81,
+  j_acrobat = 82,
+  j_ancient = 83,
+  j_arrowhead = 84,
+  j_astronomer = 85,
+  j_banner = 86,
+  j_baron = 87,
+  j_baseball = 88,
+  j_blackboard = 89,
+  j_bloodstone = 90,
+  j_blue_joker = 91,
+  j_blueprint = 92,
+  j_bootstraps = 93,
+  j_brainstorm = 94,
+  j_bull = 95,
+  j_burglar = 96,
+  j_burnt = 97,
+  j_business = 98,
+  j_caino = 99,
+  j_campfire = 100,
+  j_card_sharp = 101,
+  j_cartomancer = 102,
+  j_castle = 103,
+  j_cavendish = 104,
+  j_ceremonial = 105,
+  j_certificate = 106,
+  j_chaos = 107,
+  j_chicot = 108,
+  j_clever = 109,
+  j_cloud_9 = 110,
+  j_constellation = 111,
+  j_crafty = 112,
+  j_crazy = 113,
+  j_credit_card = 114,
+  j_delayed_grat = 115,
+  j_devious = 116,
+  j_diet_cola = 117,
+  j_dna = 118,
+  j_drivers_license = 119,
+  j_droll = 120,
+  j_drunkard = 121,
+  j_duo = 122,
+  j_dusk = 123,
+  j_egg = 124,
+  j_erosion = 125,
+  j_even_steven = 126,
+  j_faceless = 127,
+  j_family = 128,
+  j_fibonacci = 129,
+  j_flash = 130,
+  j_flower_pot = 131,
+  j_fortune_teller = 132,
+  j_four_fingers = 133,
+  j_gift = 134,
+  j_glass = 135,
+  j_gluttenous_joker = 136,
+  j_golden = 137,
+  j_greedy_joker = 138,
+  j_green_joker = 139,
+  j_gros_michel = 140,
+  j_hack = 141,
+  j_half = 142,
+  j_hallucination = 143,
+  j_hanging_chad = 144,
+  j_hiker = 145,
+  j_hit_the_road = 146,
+  j_hologram = 147,
+  j_ice_cream = 148,
+  j_idol = 149,
+  j_invisible = 150,
+  j_joker = 151,
+  j_jolly = 152,
+  j_juggler = 153,
+  j_loyalty_card = 154,
+  j_luchador = 155,
+  j_lucky_cat = 156,
+  j_lusty_joker = 157,
+  j_mad = 158,
+  j_madness = 159,
+  j_mail = 160,
+  j_marble = 161,
+  j_matador = 162,
+  j_merry_andy = 163,
+  j_midas_mask = 164,
+  j_mime = 165,
+  j_misprint = 166,
+  j_mr_bones = 167,
+  j_mystic_summit = 168,
+  j_obelisk = 169,
+  j_odd_todd = 170,
+  j_onyx_agate = 171,
+  j_oops = 172,
+  j_order = 173,
+  j_pareidolia = 174,
+  j_perkeo = 175,
+  j_photograph = 176,
+  j_popcorn = 177,
+  j_raised_fist = 178,
+  j_ramen = 179,
+  j_red_card = 180,
+  j_reserved_parking = 181,
+  j_ride_the_bus = 182,
+  j_riff_raff = 183,
+  j_ring_master = 184,
+  j_rocket = 185,
+  j_rough_gem = 186,
+  j_runner = 187,
+  j_satellite = 188,
+  j_scary_face = 189,
+  j_scholar = 190,
+  j_seance = 191,
+  j_seeing_double = 192,
+  j_selzer = 193,
+  j_shoot_the_moon = 194,
+  j_shortcut = 195,
+  j_sixth_sense = 196,
+  j_sly = 197,
+  j_smeared = 198,
+  j_smiley = 199,
+  j_sock_and_buskin = 200,
+  j_space = 201,
+  j_splash = 202,
+  j_square = 203,
+  j_steel_joker = 204,
+  j_stencil = 205,
+  j_stone = 206,
+  j_stuntman = 207,
+  j_supernova = 208,
+  j_superposition = 209,
+  j_swashbuckler = 210,
+  j_throwback = 211,
+  j_ticket = 212,
+  j_to_the_moon = 213,
+  j_todo_list = 214,
+  j_trading = 215,
+  j_tribe = 216,
+  j_triboulet = 217,
+  j_trio = 218,
+  j_troubadour = 219,
+  j_trousers = 220,
+  j_turtle_bean = 221,
+  j_vagabond = 222,
+  j_vampire = 223,
+  j_walkie_talkie = 224,
+  j_wee = 225,
+  j_wily = 226,
+  j_wrathful_joker = 227,
+  j_yorick = 228,
+  j_zany = 229,
+  debuffed = 230,
+  facedown = 231,
+  blue_seal = 232,
+  gold_seal = 233,
+  purple_seal = 234,
+  red_seal = 235,
+  c_ceres = 236,
+  c_earth = 237,
+  c_eris = 238,
+  c_jupiter = 239,
+  c_mars = 240,
+  c_mercury = 241,
+  c_neptune = 242,
+  c_planet_x = 243,
+  c_pluto = 244,
+  c_saturn = 245,
+  c_uranus = 246,
+  c_venus = 247,
+  c_ankh = 248,
+  c_aura = 249,
+  c_black_hole = 250,
+  c_cryptid = 251,
+  c_deja_vu = 252,
+  c_ectoplasm = 253,
+  c_familiar = 254,
+  c_grim = 255,
+  c_hex = 256,
+  c_immolate = 257,
+  c_incantation = 258,
+  c_medium = 259,
+  c_ouija = 260,
+  c_sigil = 261,
+  c_soul = 262,
+  c_talisman = 263,
+  c_trance = 264,
+  c_wraith = 265,
+  stake_black = 266,
+  stake_blue = 267,
+  stake_gold = 268,
+  stake_green = 269,
+  stake_orange = 270,
+  stake_purple = 271,
+  stake_red = 272,
+  stake_white = 273,
+  tag_boss = 274,
+  tag_buffoon = 275,
+  tag_charm = 276,
+  tag_coupon = 277,
+  tag_d_six = 278,
+  tag_double = 279,
+  tag_economy = 280,
+  tag_ethereal = 281,
+  tag_foil = 282,
+  tag_garbage = 283,
+  tag_handy = 284,
+  tag_holo = 285,
+  tag_investment = 286,
+  tag_juggle = 287,
+  tag_meteor = 288,
+  tag_negative = 289,
+  tag_orbital = 290,
+  tag_polychrome = 291,
+  tag_rare = 292,
+  tag_skip = 293,
+  tag_standard = 294,
+  tag_top_up = 295,
+  tag_uncommon = 296,
+  tag_voucher = 297,
+  c_chariot = 298,
+  c_death = 299,
+  c_devil = 300,
+  c_emperor = 301,
+  c_empress = 302,
+  c_fool = 303,
+  c_hanged_man = 304,
+  c_heirophant = 305,
+  c_hermit = 306,
+  c_high_priestess = 307,
+  c_judgement = 308,
+  c_justice = 309,
+  c_lovers = 310,
+  c_magician = 311,
+  c_moon = 312,
+  c_star = 313,
+  c_strength = 314,
+  c_sun = 315,
+  c_temperance = 316,
+  c_tower = 317,
+  c_wheel_of_fortune = 318,
+  c_world = 319,
+  v_antimatter = 320,
+  v_blank = 321,
+  v_clearance_sale = 322,
+  v_crystal_ball = 323,
+  v_directors_cut = 324,
+  v_glow_up = 325,
+  v_grabber = 326,
+  v_hieroglyph = 327,
+  v_hone = 328,
+  v_illusion = 329,
+  v_liquidation = 330,
+  v_magic_trick = 331,
+  v_money_tree = 332,
+  v_nacho_tong = 333,
+  v_observatory = 334,
+  v_omen_globe = 335,
+  v_overstock_norm = 336,
+  v_overstock_plus = 337,
+  v_paint_brush = 338,
+  v_palette = 339,
+  v_petroglyph = 340,
+  v_planet_merchant = 341,
+  v_planet_tycoon = 342,
+  v_recyclomancy = 343,
+  v_reroll_glut = 344,
+  v_reroll_surplus = 345,
+  v_retcon = 346,
+  v_seed_money = 347,
+  v_tarot_merchant = 348,
+  v_tarot_tycoon = 349,
+  v_telescope = 350,
+  v_wasteful = 351,
+  p_arcana_jumbo = 352,
+  p_arcana_mega = 353,
+  p_arcana_normal = 354,
+  p_buffoon_jumbo = 355,
+  p_buffoon_mega = 356,
+  p_buffoon_normal = 357,
+  p_celestial_jumbo = 358,
+  p_celestial_mega = 359,
+  p_celestial_normal = 360,
+  p_spectral_jumbo = 361,
+  p_spectral_mega = 362,
+  p_spectral_normal = 363,
+  p_standard_jumbo = 364,
+  p_standard_mega = 365,
+  p_standard_normal = 366,
+  rental = 367,
+  perishable = 368,
+  eternal = 369,
+  bl_arm = 370,
+  bl_big = 371,
+  bl_club = 372,
+  bl_eye = 373,
+  bl_final_acorn = 374,
+  bl_final_bell = 375,
+  bl_final_heart = 376,
+  bl_final_leaf = 377,
+  bl_final_vessel = 378,
+  bl_fish = 379,
+  bl_flint = 380,
+  bl_goad = 381,
+  bl_head = 382,
+  bl_hook = 383,
+  bl_house = 384,
+  bl_manacle = 385,
+  bl_mark = 386,
+  bl_mouth = 387,
+  bl_needle = 388,
+  bl_ox = 389,
+  bl_pillar = 390,
+  bl_plant = 391,
+  bl_psychic = 392,
+  bl_serpent = 393,
+  bl_small = 394,
+  bl_tooth = 395,
+  bl_wall = 396,
+  bl_water = 397,
+  bl_wheel = 398,
+  bl_window = 399,
+}
+-- END GENERATED CLASS ID TABLE
+
+-- Composition labels are attached to their parent object (D004), not folded
+-- into the base `class_id`. Values are the vendored class names.
+local EDITION_BY_TYPE = {
+  foil = "e_foil",
+  holo = "e_holo",
+  polychrome = "e_polychrome",
+  negative = "e_negative",
+}
+local SEAL_BY_NAME = {
+  Red = "red_seal",
+  Blue = "blue_seal",
+  Gold = "gold_seal",
+  Purple = "purple_seal",
+}
 
 local PAGE_BY_STATE = {
   [7] = "Blind_Select",
@@ -182,6 +565,70 @@ local function card_fields(card)
   }
 end
 
+local function j_str_array(values)
+  local parts = {}
+  for _, value in ipairs(values) do parts[#parts + 1] = j_str(value) end
+  return "[" .. table.concat(parts, ",") .. "]"
+end
+
+local function center_key(card)
+  local center = card.config and card.config.center
+  return center and center.key or nil
+end
+
+local function class_id_for_center_key(key)
+  if type(key) ~= "string" then return nil end
+  return CLASS_ID_BY_CENTER_KEY[key]
+end
+
+-- Enhancement (m_*) is the playing card's active center; a normal card's center
+-- is `c_base`. Only m_* centers are enhancement modifiers.
+local function card_modifier(card)
+  local key = center_key(card)
+  if type(key) == "string" and key:sub(1, 2) == "m_" then return key end
+  return nil
+end
+
+-- `card.edition.type` is the canonical key; fall back to the boolean flags.
+local function card_edition(card)
+  local edition = card.edition
+  if type(edition) ~= "table" then return nil end
+  local by_type = EDITION_BY_TYPE[edition.type]
+  if by_type then return by_type end
+  if edition.negative then return EDITION_BY_TYPE.negative end
+  if edition.polychrome then return EDITION_BY_TYPE.polychrome end
+  if edition.holo then return EDITION_BY_TYPE.holo end
+  if edition.foil then return EDITION_BY_TYPE.foil end
+  return nil
+end
+
+-- `card.seal` is the raw game name (Red/Blue/Gold/Purple).
+local function card_seal(card)
+  return SEAL_BY_NAME[card.seal]
+end
+
+-- Stickers are list-valued in the adopted contract (empty list when none).
+local function card_stickers(card)
+  local ability = card.ability
+  if type(ability) ~= "table" then return {} end
+  local stickers = {}
+  if ability.rental then stickers[#stickers + 1] = "rental" end
+  if ability.perishable then stickers[#stickers + 1] = "perishable" end
+  if ability.eternal then stickers[#stickers + 1] = "eternal" end
+  return stickers
+end
+
+-- modifier/edition/seal are null when absent (str | None in the contract).
+local function card_attributes_json(card)
+  local modifier = card_modifier(card)
+  local edition = card_edition(card)
+  local seal = card_seal(card)
+  return '"modifier":' .. (modifier and j_str(modifier) or "null")
+    .. ',"edition":' .. (edition and j_str(edition) or "null")
+    .. ',"seal":' .. (seal and j_str(seal) or "null")
+    .. ',"stickers":' .. j_str_array(card_stickers(card))
+end
+
 local function encode_card_body(card, fields)
   return '{"rank":' .. j_str(RANK_NAME[fields.rank_index + 1])
     .. ',"rank_index":' .. tostring(fields.rank_index)
@@ -197,7 +644,7 @@ local function encode_playing_object(card, zone, position)
   return '{"class_id":' .. tostring(fields.class_id)
     .. ',"object_type":"card","zone":' .. j_str(zone)
     .. ',"position_in_zone":' .. tostring(position)
-    .. ',"modifier":null,"edition":null,"seal":null'
+    .. ',' .. card_attributes_json(card)
     .. ',"card":' .. encode_card_body(card, fields) .. "}"
 end
 
@@ -205,25 +652,21 @@ local function encode_pending_card(card)
   local fields = card_fields(card)
   if not fields then return nil end
   return '{"class_id":' .. tostring(fields.class_id)
-    .. ',"object_type":"card","modifier":null,"edition":null,"seal":null'
+    .. ',"object_type":"card",' .. card_attributes_json(card)
     .. ',"card":' .. encode_card_body(card, fields) .. "}"
 end
 
-local function center_key(card)
-  local center = card.config and card.config.center
-  return center and center.key or nil
-end
-
 local function encode_inventory_object(card, object_type, zone, position)
+  local key = center_key(card)
+  local class_id = class_id_for_center_key(key)
   local parts = {
-    '"class_id":null',
+    '"class_id":' .. (class_id and tostring(class_id) or "null"),
     '"object_type":' .. j_str(object_type),
     '"zone":' .. j_str(zone),
     '"position_in_zone":' .. tostring(position),
-    '"modifier":null,"edition":null,"seal":null',
+    card_attributes_json(card),
     '"card":null',
   }
-  local key = center_key(card)
   if key then parts[#parts + 1] = '"center_key":' .. j_str(key) end
   return "{" .. table.concat(parts, ",") .. "}"
 end

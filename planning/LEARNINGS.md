@@ -101,3 +101,44 @@ under its Decisions section. This file is a knowledge base, not a task log.
 - Observation: The workspace glob tool returned "No files found" for `.opencode/**/*` even though `.opencode/command/`, `.opencode/agents/`, and `.opencode/skill/` all exist; glob patterns apparently ignore dot-directories in this harness. A shell directory listing corrected the record.
 - Implication: Do not claim a referenced path is missing based on glob output alone; verify dot-directories with a shell listing before opening a remediation issue. A false "missing files" claim was made and retracted this session.
 - Verification/source: `Get-ChildItem .opencode\command, .opencode\agents` listing on 2026-09-30, contrasted with the earlier empty glob result.
+
+## 2026-09-30: Balatro card attribute fields for the producer
+
+- Context: Issue #12 needed the oracle to emit modifier/edition/seal/stickers
+  for card and inventory objects matching the adopted object schema.
+- Observation: In the installed Balatro `1.0.1o-FULL` game dump, a playing
+  card's enhancement is `card.config.center.key` (normal cards use `c_base`;
+  enhancements are `m_*`); the edition is `card.edition.type` in
+  `{foil,holo,polychrome,negative}` (boolean flags `card.edition.<type>` also
+  exist); the seal is `card.seal` in `{Red,Blue,Gold,Purple}`; and
+  rental/perishable/eternal are booleans at `card.ability.rental`,
+  `.perishable`, `.eternal`. Inventory `class_id` comes from `center_key`
+  (`card.config.center.key`), which for base-game jokers/consumables/vouchers
+  equals the vendored class-map `class_name`.
+- Implication: The adopted contract defines `modifier`/`edition`/`seal` as
+  `str | None` but `stickers` as `list[str]` (empty when none). Playing cards
+  never carry the three stickers, so `pending_cards.stickers` is structurally
+  empty; the audit's pending all-null check excludes it.
+- Verification/source: read-only inspection of
+  `%APPDATA%\Balatro\Mods\lovely\game-dump\card.lua`
+  (`Card:set_edition`, `Card:set_seal`, sticker badges) on 2026-09-30, plus
+  `legacy/vendor/balatro-policy-transformer/state_schema.md` §3.
+
+## 2026-09-30: Vendored `legacy/vendor/*` trees are gitlinks without `.gitmodules`
+
+- Context: Issue #12 added a test that reads the vendored class map and a
+  generator that embeds it in the Lua producer; a fresh linked worktree was
+  created to do the work.
+- Observation: `git ls-files -s legacy/vendor/` shows mode `160000` gitlinks for
+  `balatro-cv-pipeline` and `balatro-policy-transformer`, but `HEAD` has no
+  `.gitmodules` and each directory contains its own `.git`. Contents are not
+  tracked by this repository, so a linked worktree or fresh clone has empty
+  `legacy/vendor/` directories.
+- Implication: Do not rely on vendored files being present in a linked worktree
+  or CI checkout. The class-ID test and generator require the vendored map
+  locally; `check_contracts.py` does not reference vendored paths, so CI is
+  unaffected. Work needing vendored content should use the main worktree (as
+  Issue #18 did) and record the dependency.
+- Verification/source: `git ls-tree HEAD legacy/vendor/`, `git show
+  HEAD:.gitmodules` (absent), and `git worktree add` yielding empty vendor dirs
+  on 2026-09-30.
