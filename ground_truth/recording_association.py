@@ -92,7 +92,7 @@ def associate_after_confirmation(bundle: RunBundle, run_id: str, *, marker: dict
                                  confirm, confirmed_by: str, **kwargs) -> AssociationResult:
     """Connect an operator confirmation callback to the association boundary."""
     try:
-        confirmed = bool(confirm())
+        confirmed = confirm() is True
     except (EOFError, KeyboardInterrupt):
         confirmed = False
     return associate_recording(bundle, run_id, confirmed=confirmed, marker=marker,
