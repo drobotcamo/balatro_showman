@@ -256,6 +256,12 @@ classes.*
 `PackShopOfferings` to `objects`. *Recommendation: adopt; required for shop and
 pack event/mask validation.*
 
+*Applied by Issue #16 (2026-09-30): the producer now emits the four canonical
+live/2.0 zones — `TopShelfShopOfferings`, `VoucherShopOfferings`,
+`PackShopOfferings`, `PackOfferings`. Bare `ShopOfferings` is a deprecated
+offline-extractor alias with no distinct live CardArea and is intentionally not
+emitted; the user approved this substitution (Issue #16 comment).*
+
 **P6 — Capture at least one run pinned to the merged revision and record the
 video offset.** The two persisted runs miss the reviewed revision. This is a
 manual game-capture task, not a code change. *Recommendation: required before

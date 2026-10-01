@@ -156,9 +156,12 @@ under its Decisions section. This file is a knowledge base, not a task log.
   zones are `TopShelfShopOfferings`, `VoucherShopOfferings`,
   `PackShopOfferings`, and `PackOfferings`; the vendored `granularize.py`,
   `mask_builder.py`, `live_encoder.py`, and `live/smoke_test.py` reference only
-  these. Bare `ShopOfferings` appears only in deprecated documents
+  these. Bare `ShopOfferings` is absent from the canonical live action map and
+  zone vocabulary; it survives only in deprecated/compat paths
   (`data/masking_schema_disorganized.md`, deprecated `action_space_schema.md`
-  §5) and has no distinct live source, so it is an overloaded legacy alias.
+  §5, `compute_action_space_config.py`, `training_data_pipeline.md`) and in the
+  review document that proposed it (`ORACLE_DATA_REVIEW.md` §4.5, §7 P5). It
+  has no distinct live source, so it is an overloaded legacy alias.
   Booster center keys carry a size suffix (e.g. `p_arcana_normal_1`), so a pack
   object's `class_id` is null against the vendored map while `center_key` is
   retained.
@@ -167,6 +170,6 @@ under its Decisions section. This file is a knowledge base, not a task log.
   candidates and reintroduce a name the canonical contract does not define.
 - Verification/source: read-only inspection of
   `%APPDATA%\Balatro\Mods\lovely\game-dump\functions\UI_definitions.lua:637-658`,
-  `SMODS\_\src\game_object.lua:1723`, and
-  `legacy/vendor/balatro-policy-transformer/{granularize.py,mask_builder.py,live/live_encoder.py,live/smoke_test.py}`
+  `%APPDATA%\Balatro\Mods\smods-main\src\game_object.lua:1723`, and
+  `legacy/vendor/balatro-policy-transformer/{granularize.py,mask_builder.py,live/live_encoder.py,live/smoke_test.py,action_map.py}`
   on 2026-09-30.

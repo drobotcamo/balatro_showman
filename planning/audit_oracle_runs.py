@@ -241,7 +241,15 @@ def audit(run_dir: Path) -> dict:
     summary["object_stickers_not_list"] = sum(
         1 for o in obj if o.get("stickers") is not None and not isinstance(o.get("stickers"), list)
     )
-    inv_types = {"joker", "tarot", "planet", "spectral", "consumable", "voucher"}
+    inv_types = {
+        "joker",
+        "tarot",
+        "planet",
+        "spectral",
+        "consumable",
+        "voucher",
+        "pack",
+    }
     inv = [o for o in obj if o.get("object_type") in inv_types]
     summary["inventory_objects"] = len(inv)
     summary["inventory_class_id_present"] = sum(
