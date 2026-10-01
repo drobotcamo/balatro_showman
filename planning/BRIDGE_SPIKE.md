@@ -27,13 +27,26 @@ callbacks and writes a snapshot *before* the action runs, so the captured state
 is the decision state and `action_taken` is the player's real action. On game
 over it writes `run_end.json` with the real outcome.
 
-Scope is deliberately small (Issue #6 smoke test):
+Transport revisions (the `live/X.Y.Z` label is the producer snapshot
+contract only; it is never the granularized step schema `3.0.0`):
 
-- Snapshots carry real `state`, `page_name`, hand/pending/joker/consumable
-  `objects`, `request_id`, and runtime metadata.
-- `persistent_state` and `legal_actions` are sparse; action labels are coarse
-  (`PlayHand`, `SelectBlind`, ...), not the canonical zoned action space. This
-  is a transport/liveness proof, not a model-input snapshot.
+- `live/2.0.0` (Issue #6 smoke test): real `state`, `page_name`,
+  hand/pending/joker/consumable `objects`, `request_id`, runtime metadata;
+  `persistent_state` empty and no legality, action labels coarse. Two runs
+  persisted at this revision (see Status).
+- `live/3.0.0` (Issue #21, D021): adds `raw_persistent` (engine-truth raw
+  persistent fields: deck center/class id, stake level/center key,
+  `starting_params.no_faces`, raw `G.GAME.modifiers`, the run's full
+  playing-card deck with modifier/edition/seal/stickers, per-hand
+  level/played/played_this_round, redeemed voucher keys, `bosses_used`
+  counts, `round_resets.blind_states/blind_choices/blind_tags`,
+  `boss_rerolled`, and the `skips`/`hands_played`/`unused_discards`/
+  `ecto_minus`/`last_tarot_planet` counters), `legal_actions` (coarse base
+  labels legal per `mask_schema.md` §2-3 gating, always including the action
+  about to run), and `mask_basis` (`reroll_cost`, `free_rerolls`, selection
+  counts). `persistent_state` stays `{}` — the canonical shape is owned by
+  the pipeline reducer (D021). Unavailable engine reads are emitted as
+  explicit nulls, never guessed.
 
 ## Repository check
 
@@ -79,10 +92,13 @@ py -3 -m unittest tests.test_file_ipc_bridge tests.test_balatro_mod
 ## Status
 
 The producer is verified against the installed runtime (Balatro `1.0.1o-FULL`,
-Steamodded `26.926.0~dev-a`, Lovely `0.10.0`) with two real runs, and the
-current revision is exercised by an external, not-checked-in lupa/luaparser
-harness (blind/select, Arcana and Buffoon packs, an unknown kind, voucher 998,
-win/loss finalize). Provenance of the persisted runs:
+Steamodded `26.926.0~dev-a`, Lovely `0.10.0`) with two real runs, and by an
+external, not-checked-in lupa (Lua 5.1) harness that executes `main.lua`
+against a stub `G` and validates the emitted snapshot JSON (raw fields,
+legality across blind/shop/pack/unknown pages, client acceptance). The
+persisted runs below are `live/2.0.0` revisions; `planning/audit_oracle_runs.py`
+reports their raw-field/legality coverage as findings. Provenance of the
+persisted runs:
 
 - `win`, 433 steps: `F:\OBS_RECORDINGS\oracle_runs\2026-09-30_14-50-37_1790805058-5327\`
   with video `F:\OBS_RECORDINGS\2026-09-30 14-50-37.mkv`. Captured before the
@@ -99,9 +115,7 @@ and real per-step runtime metadata. Steamodded patches `G.STATES` with
 are emitted as an explicit `Unknown_PackKind_*`, never guessed) and 998 to
 `In_Shop`.
 
-A capture pinned to this exact revision is still pending, as are the
-`persistent_state`/action-space and field/storage conformance questions tracked
-in Issue #10. Issue #10's integrity and conformance findings are in
-`planning/ORACLE_DATA_REVIEW.md`; both persisted runs above are pre- or
-intermediate-revision, so no persisted run yet reflects this exact file.
-Steamodded's debug socket is not used as a transport.
+A capture pinned to the `live/3.0.0` revision is still pending (manual game
+capture, owned by #16/#11); the raw-field/legality emission itself is the
+Issue #21 deliverable and is exercised by the lupa harness and the audit
+tool. Steamodded's debug socket is not used as a transport.

@@ -9,9 +9,10 @@ Usage (from the repository root):
     py -3 planning\\audit_oracle_runs.py RUN_DIR [RUN_DIR ...]
 
 Exit code 0 means every integrity invariant held for every run. Coverage and
-conformance gaps (coarse actions, empty persistent_state, missing fields) are
-printed as findings but do not fail the audit: they are contract questions
-tracked in `planning/ORACLE_DATA_REVIEW.md`, not data corruption.
+conformance gaps (coarse actions, empty persistent_state, missing fields, raw
+persistent-field and legal-action coverage per schema revision) are printed as
+findings but do not fail the audit: they are contract questions tracked in
+`planning/ORACLE_DATA_REVIEW.md`, not data corruption.
 
 Stdlib only.
 """
@@ -50,6 +51,48 @@ REQUIRED_TOP_LEVEL = (
     "persistent_state",
     "action_taken",
     "meta",
+)
+
+# Fields the producer transport adds per schema revision. `live/3.0.0`
+# (Issue #21, D021) adds the raw persistent fields and the engine
+# legal-action basis; `live/2.0.0` is the pre-#21 legacy snapshot shape.
+# Unknown schema versions are audited against the base set and reported.
+RAW_FIELD_SCHEMA_VERSIONS = {"live/3.0.0"}
+REQUIRED_BY_SCHEMA = {
+    "live/3.0.0": REQUIRED_TOP_LEVEL + ("raw_persistent", "legal_actions", "mask_basis"),
+}
+# Producer schema revisions known to predate the raw-field transport; they are
+# audited against the base field set and reported as findings, not as unknown.
+KNOWN_LEGACY_SCHEMA_VERSIONS = {"live/2.0.0"}
+
+RAW_LEAF_FIELDS = (
+    ("deck", "center_key"),
+    ("deck", "class_id"),
+    ("stake", "level"),
+    ("stake", "center_key"),
+    ("starting_params_no_faces", None),
+    ("modifiers", None),
+    ("tracked_deck_cards", None),
+    ("hand_levels", None),
+    ("vouchers_redeemed", None),
+    ("bosses_used", None),
+    ("blind_states", None),
+    ("blind_choices", None),
+    ("blind_tags", None),
+    ("boss_rerolled", None),
+    ("skips", None),
+    ("hands_played", None),
+    ("unused_discards", None),
+    ("ecto_minus", None),
+    ("last_tarot_planet", None),
+)
+
+MASK_BASIS_FIELDS = (
+    "reroll_cost",
+    "free_rerolls",
+    "selected_hand_count",
+    "selected_consumable_count",
+    "selected_sellable_count",
 )
 
 INTEGRITY_FAILURES: list[str] = []
@@ -118,6 +161,44 @@ def conformance_findings(summary: dict) -> list[str]:
             f"{summary['run']}: pending_cards.{column} is null/empty on all "
             f"{summary.get('pending_cards_total', 0)} pending card(s)"
         )
+    if not summary.get("raw_field_schema"):
+        findings.append(
+            f"{summary['run']}: no raw persistent fields "
+            f"(schema {summary.get('schema_versions', {}) or 'unknown'} predates "
+            f"{sorted(RAW_FIELD_SCHEMA_VERSIONS)})"
+        )
+    else:
+        for key in ("skips", "hands_played", "unused_discards", "ecto_minus"):
+            if summary.get(f"raw_{key}_present", 0) == 0 and summary.get("step_lines"):
+                findings.append(
+                    f"{summary['run']}: raw_persistent.{key} is null on all steps"
+                )
+        for column in ("center_key", "level"):
+            field = "deck" if column == "center_key" else "stake"
+            if summary.get(f"raw_{field}_{column}_present", 0) == 0 and summary.get("step_lines"):
+                findings.append(
+                    f"{summary['run']}: raw_persistent.{field}.{column} is null on all steps"
+                )
+    if summary.get("step_lines"):
+        if summary.get("legal_actions_nonempty", 0) < summary["step_lines"]:
+            findings.append(
+                f"{summary['run']}: legal_actions missing/empty on "
+                f"{summary['step_lines'] - summary.get('legal_actions_nonempty', 0)}/"
+                f"{summary['step_lines']} steps"
+            )
+        if summary.get("mask_basis_present", 0) < summary["step_lines"]:
+            findings.append(
+                f"{summary['run']}: mask_basis missing on "
+                f"{summary['step_lines'] - summary.get('mask_basis_present', 0)}/"
+                f"{summary['step_lines']} steps"
+            )
+    client_violations = summary.get("step_lines", 0) - summary.get("action_in_legal_actions", 0)
+    if client_violations:
+        findings.append(
+            f"{summary['run']}: action_taken not in legal_actions on "
+            f"{client_violations}/{summary.get('step_lines', 0)} steps "
+            "(client would reject these snapshots)"
+        )
     return findings
 
 
@@ -171,7 +252,20 @@ def audit(run_dir: Path) -> dict:
         fail(f"{label}: step run_id does not match session run_id ({dict(run_ids)})")
     if session.get("outcome") not in {"win", "loss"}:
         fail(f"{label}: session.outcome is not win/loss ({session.get('outcome')!r})")
-    for field in REQUIRED_TOP_LEVEL:
+    schema_versions = {r.get("schema_version") for r in records}
+    if len(schema_versions) != 1:
+        fail(f"{label}: mixed schema_version values across steps ({sorted(schema_versions, key=str)})")
+        schema_version = None
+    else:
+        schema_version = next(iter(schema_versions))
+    required_fields = REQUIRED_BY_SCHEMA.get(schema_version, REQUIRED_TOP_LEVEL)
+    if (
+        schema_version not in REQUIRED_BY_SCHEMA
+        and schema_version not in KNOWN_LEGACY_SCHEMA_VERSIONS
+        and schema_version is not None
+    ):
+        summary["schema_version_unknown"] = schema_version
+    for field in required_fields:
         missing = sum(1 for r in records if field not in r)
         if missing:
             fail(f"{label}: {field!r} absent on {missing}/{n} steps")
@@ -236,6 +330,54 @@ def audit(run_dir: Path) -> dict:
     )
     summary["pending_attribute_all_null"] = _all_null_columns(
         pending, PENDING_ATTRIBUTE_COLUMNS
+    )
+
+    # --- raw persistent-field and legality coverage (D021, Issue #21) ---
+    summary["raw_field_schema"] = bool(schema_version) and schema_version in RAW_FIELD_SCHEMA_VERSIONS
+    raw_rows = [r.get("raw_persistent") or {} for r in records]
+    for field, subfield in RAW_LEAF_FIELDS:
+        if subfield is None:
+            key = f"raw_{field}_present"
+            summary[key] = sum(
+                1 for row in raw_rows if _present(row.get(field))
+            )
+        else:
+            key = f"raw_{field}_{subfield}_present"
+            summary[key] = sum(
+                1
+                for row in raw_rows
+                if isinstance(row.get(field), dict) and _present(row[field].get(subfield))
+            )
+    summary["raw_tracked_deck_cards_total"] = sum(
+        len(row.get("tracked_deck_cards") or []) for row in raw_rows
+    )
+    summary["mask_basis_present"] = sum(
+        1 for r in records if isinstance(r.get("mask_basis"), dict)
+    )
+    for field in MASK_BASIS_FIELDS:
+        summary[f"mask_basis_{field}_present"] = sum(
+            1
+            for r in records
+            if isinstance(r.get("mask_basis"), dict)
+            and r["mask_basis"].get(field) is not None
+        )
+    summary["legal_actions_nonempty"] = sum(
+        1 for r in records if isinstance(r.get("legal_actions"), list) and r["legal_actions"]
+    )
+    summary["action_in_legal_actions"] = sum(
+        1
+        for r in records
+        if isinstance(r.get("legal_actions"), list)
+        and r.get("action_taken") in r["legal_actions"]
+    )
+    summary["legal_action_labels"] = sorted(
+        {
+            label
+            for r in records
+            if isinstance(r.get("legal_actions"), list)
+            for label in r["legal_actions"]
+            if isinstance(label, str)
+        }
     )
     return summary
 
