@@ -15,6 +15,17 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-01: PR bodies must use real multiline input
+
+- Context: Recent PR history included bodies with literal `\\n` sequences where
+  section breaks were intended.
+- Observation: Passing an escaped string directly to `gh pr create --body` can
+  preserve the escape text instead of creating line breaks.
+- Implication: Construct substantial issue and PR bodies as multiline files or
+  heredocs, then search the final body for unintended `\\n` before submission.
+- Verification/source: PR history reviewed while implementing Issue #37; the
+  rule is encoded in `.opencode/skill/deslop/SKILL.md` and `AGENTS.md`.
+
 ## 2026-09-30: Bounded autonomy is safer than an unconstrained swarm
 
 - Context: The repository needed agents that could make independent progress on
