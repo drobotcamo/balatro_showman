@@ -94,6 +94,7 @@ def associate_after_confirmation(bundle: RunBundle, run_id: str, *, marker: dict
     try:
         confirmed = confirm() is True
     except (EOFError, KeyboardInterrupt):
-        confirmed = False
+        return associate_recording(bundle, run_id, confirmed=False, marker=marker,
+                                   confirmed_by=confirmed_by, interrupted=True, **kwargs)
     return associate_recording(bundle, run_id, confirmed=confirmed, marker=marker,
                                confirmed_by=confirmed_by, **kwargs)

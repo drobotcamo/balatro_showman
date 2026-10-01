@@ -77,8 +77,8 @@ def test_callback_interrupt_is_explicitly_interrupted(tmp_path):
 
     result = associate_after_confirmation(b, "r1", marker=marker(), confirm=interrupted,
                                           confirmed_by="terminal")
-    assert result.status == "declined"
-    assert result.code == "confirmation_declined"
+    assert result.status == "interrupted"
+    assert result.code == "coordination_interrupted"
 
 
 def test_conflicting_association_is_rejected(tmp_path):
