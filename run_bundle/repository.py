@@ -6,7 +6,7 @@ from .models import Base, Run, Record, Provenance, Integrity
 
 STATUSES = {"active", "interrupted", "completed", "won", "lost", "aborted", "endless"}
 FINAL = STATUSES - {"active", "interrupted"}
-ALLOWED = {"active": STATUSES - {"active"}, "interrupted": {"active", "interrupted", "completed", "won", "lost", "aborted", "endless"}}
+ALLOWED = {"active": STATUSES - {"active"}, "interrupted": {"active", "completed", "won", "lost", "aborted", "endless"}}
 
 class BundleError(Exception): pass
 class InvalidTransition(BundleError): pass
@@ -72,7 +72,7 @@ class RunBundle:
             result = "invalid" if bad or bad_status else "valid"
             run.integrity_status = result
             self._integrity(s, run_id, result)
-            should_raise = strict and bool(bad)
+            should_raise = strict and bool(bad or bad_status)
             report = {"status": result, "record_count": len(records), "bad_sequences": sorted(set(bad + bad_status))}
         if should_raise: raise BundleError(f"integrity failure: {report['bad_sequences']}")
         return report

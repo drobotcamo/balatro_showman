@@ -13,11 +13,10 @@ Completed:
 - Added SQLAlchemy 2.x models for runs, records, provenance, integrity, and schema versions.
 - Added repository API for creation, append/append_raw, lifecycle transitions, immutable finalized evidence, and SHA-256 validation.
 - Added explicit Alembic initial migration and storage/concurrency documentation.
-- Focused lifecycle and migration-backed fixture tests pass: 9 passed.
+- Focused lifecycle and migration-backed fixture tests pass: 14 passed.
 - planning/check_contracts.py and git diff --check pass.
-Next:
-- Obtain final reviewer verdict after adding the binary-evidence migration and explicit invalid-source status handling.
-- Wait for required CI, obtain fresh-context reviewer verdict recorded on PR, and merge if all gates pass.
+- Next:
+- Record fresh-context reviewer verdict on PR #53, then merge once required CI is green.
 Decisions: D024; malformed source bytes are preserved through append_raw without repair.
 Risks: required CI and final reviewer verdict remain pending.
-Validation: `python -m pytest tests/test_run_bundle.py -q` => 12 passed; `python planning/check_contracts.py` => planning contracts OK; `git diff --check` => clean.
+Validation: `python -m pytest tests/test_run_bundle.py -q` => 14 passed; `python planning/check_contracts.py` => planning contracts OK; `git diff --check` => clean.
