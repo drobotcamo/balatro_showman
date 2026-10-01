@@ -21,7 +21,7 @@ class Record(Base):
     run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), nullable=False)
     sequence: Mapped[int] = mapped_column(Integer, nullable=False)
     kind: Mapped[str] = mapped_column(String(32), nullable=False)
-    payload: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     integrity_status: Mapped[str] = mapped_column(String(16), nullable=False, default="valid")
     __table_args__ = (UniqueConstraint("run_id", "sequence", name="uq_record_sequence"),)

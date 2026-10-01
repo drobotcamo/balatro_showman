@@ -27,27 +27,30 @@ class RunBundle:
             for key, value in (provenance or {}).items(): s.add(Provenance(run_id=run_id, key=key, value=str(value)))
 
     def append(self, run_id, sequence, kind, payload):
-        try: encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        try: encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         except (TypeError, ValueError) as exc:
             raise BundleError("payload is not JSON-serializable; preserve raw input via append_raw") from exc
-        digest = hashlib.sha256(encoded.encode()).hexdigest()
+        digest = hashlib.sha256(encoded).hexdigest()
         with Session(self._engine) as s, s.begin():
             run = s.get(Run, run_id)
             if not run: raise BundleError("unknown run")
             if run.status in FINAL: raise FinalizedEvidenceError("finalized evidence is immutable")
             if s.scalar(select(Record).where(Record.run_id == run_id, Record.sequence == sequence)): raise BundleError("duplicate record")
             s.add(Record(run_id=run_id, sequence=sequence, kind=kind, payload=encoded, sha256=digest))
+            run.integrity_status = "unknown"
+            self._integrity(s, run_id, "unknown")
 
     def append_raw(self, run_id, sequence, kind, raw_payload: bytes, *, integrity_status="invalid"):
         """Preserve malformed/partial source bytes without repairing them."""
         digest = hashlib.sha256(raw_payload).hexdigest()
-        encoded = raw_payload.decode("utf-8", errors="replace")
         with Session(self._engine) as s, s.begin():
             run = s.get(Run, run_id)
             if not run: raise BundleError("unknown run")
             if run.status in FINAL: raise FinalizedEvidenceError("finalized evidence is immutable")
             if s.scalar(select(Record).where(Record.run_id == run_id, Record.sequence == sequence)): raise BundleError("duplicate record")
-            s.add(Record(run_id=run_id, sequence=sequence, kind=kind, payload=encoded, sha256=digest, integrity_status=integrity_status))
+            s.add(Record(run_id=run_id, sequence=sequence, kind=kind, payload=raw_payload, sha256=digest, integrity_status=integrity_status))
+            run.integrity_status = "unknown"
+            self._integrity(s, run_id, "unknown")
 
     def transition(self, run_id, status):
         if status not in STATUSES: raise InvalidTransition(status)
@@ -64,7 +67,7 @@ class RunBundle:
             run = s.get(Run, run_id)
             if not run: raise BundleError("unknown run")
             records = s.scalars(select(Record).where(Record.run_id == run_id).order_by(Record.sequence)).all()
-            bad = [r.sequence for r in records if hashlib.sha256(r.payload.encode()).hexdigest() != r.sha256]
+            bad = [r.sequence for r in records if hashlib.sha256(r.payload if isinstance(r.payload, bytes) else r.payload.encode()).hexdigest() != r.sha256]
             result = "invalid" if bad else "valid"
             run.integrity_status = result
             self._integrity(s, run_id, result)

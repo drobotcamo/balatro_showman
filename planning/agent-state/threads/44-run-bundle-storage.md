@@ -16,8 +16,8 @@ Completed:
 - Focused lifecycle and migration-backed fixture tests pass: 9 passed.
 - planning/check_contracts.py and git diff --check pass.
 Next:
-- Address reviewer-identified gaps: explicit upgrade-from-previous migration test and persisted integrity-failure assertions.
+- Obtain final reviewer verdict after preserving raw bytes, documenting lifecycle transitions, and maintaining integrity metadata on append.
 - Wait for required CI, obtain fresh-context reviewer verdict recorded on PR, and merge if all gates pass.
 Decisions: D024; malformed source bytes are preserved through append_raw without repair.
-Risks: migration upgrade-from-previous revision is not yet covered; full acceptance suite still needs integrity persistence assertions.
-Validation: `python -m pytest tests/test_run_bundle.py -q` => 9 passed; `python planning/check_contracts.py` => planning contracts OK; `git diff --check` => clean; PR #53 planning-check one pass and one queued.
+Risks: required CI and final reviewer verdict remain pending.
+Validation: `python -m pytest tests/test_run_bundle.py -q` => 12 passed; `python planning/check_contracts.py` => planning contracts OK; `git diff --check` => clean.

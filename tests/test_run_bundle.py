@@ -43,3 +43,10 @@ def test_integrity_failure_is_persisted_and_strict_validation_reports(tmp_path):
     assert b.validate("r1")["status"] == "invalid"
     with sqlite3.connect(tmp_path / "run.db") as db:
         assert db.execute("select result from integrity where run_id = 'r1'").fetchone()[0] == "invalid"
+
+def test_raw_bytes_are_preserved(tmp_path):
+    b = bundle(tmp_path); raw = b"\xff\xfe{partial"
+    b.append_raw("r1", 0, "partial", raw)
+    assert b.validate("r1")["status"] == "valid"
+    with sqlite3.connect(tmp_path / "run.db") as db:
+        assert db.execute("select payload from records").fetchone()[0] == raw
