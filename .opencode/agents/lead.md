@@ -40,6 +40,15 @@ Follow this loop:
    that boundary and record the blocker instead of guessing.
 8. Before compaction or stopping, update the work-thread baton with verified
    completed work, exact validation output, next actions, risks, and decisions.
+9. End with one of two outcomes: a verified handoff for another agent when the
+   session has run long enough to benefit from fresh context, or a completed
+   thread whose PR has been opened, checks are green, required review/approval
+   evidence is present, and PR/work item are merged and settled. Do not present a draft,
+   local diff, or ready-to-review state as completion.
+10. Promote verified findings that can save future agents time or frustration to
+    `planning/LEARNINGS.md`, using its required context/observation/implication/
+    verification format. Keep unfinished work and next actions in the thread
+    baton.
 
 Use `/resume`, `/handoff`, and `/verify` when their documented workflow fits.
 Do not create ceremony, speculative sub-issues, or a swarm for work that one

@@ -93,6 +93,18 @@ The orchestrator (`../.opencode/agents/orchestrator.md`, invoked via
   settled/closed work-item state whenever repository and GitHub permissions
   allow it. Report any permission or external blocker explicitly rather than
   treating it as completion.
+- Conclude every `/work` invocation with exactly one of two explicit outcomes:
+  (1) a verified handoff intended for another agent because the session has
+  continued long enough to warrant a fresh context, or (2) a completed thread,
+  meaning the PR has been opened, required checks are green, the required review
+  or approval evidence is present, and the PR and work item are merged and
+  settled.
+  A local diff, draft PR, or "ready" status is not a third outcome.
+- Record verified findings that are likely to save a future agent time,
+  repeated investigation, or avoidable frustration in `planning/LEARNINGS.md`.
+  Include the context, observation, implication, and verification/source; do
+  not record generic advice or unverified speculation. Keep session-specific
+  next actions in the thread baton instead.
 
 ## Subagent Policy
 
