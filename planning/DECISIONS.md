@@ -215,6 +215,12 @@ SHA-256 over canonical records and database-level integrity metadata without
 repairing evidence. Query results retain the stable status/provenance envelope
 (`observed`, `derived`, `missing`, `unknown`, or `unsupported`).
 
+Compatibility is read-only in the initial implementation: adapters may inspect
+currently available oracle artifacts but must not silently upgrade unstable
+fields. No in-place migration is supported. If conversion is later needed, it
+must write a new SQLite bundle that records the source identity and hash,
+adapter/version, source references, and field-level diagnostics.
+
 Alternatives considered: a directory of immutable JSONL files was rejected for
 query latency and indexing across many runs; a future Phase 9 database was
 rejected because operational capture and scale-out dataset concerns have
