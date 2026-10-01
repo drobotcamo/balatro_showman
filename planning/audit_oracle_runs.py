@@ -246,6 +246,12 @@ def audit(run_dir: Path) -> dict:
         "request_id_unique": len(set(rid)),
         "request_id_none": sum(1 for x in rid if x is None),
         "action_taken_missing": sum(1 for r in records if not r.get("action_taken")),
+        "canonical_action_present": sum(1 for r in records if r.get("action") is not None),
+        "canonical_action_unresolved": sum(
+            1 for r in records if r.get("action_taken") in {
+                "UseConsumable", "SellItem", "BuyShopItem", "SelectPackItem"
+            } and r.get("action") is None
+        ),
         "page_name_missing": sum(1 for r in records if not r.get("page_name")),
         "persistent_state_empty": sum(
             1 for r in records if r.get("persistent_state") in ({}, None)
@@ -289,6 +295,14 @@ def audit(run_dir: Path) -> dict:
         summary[f"state_missing_{key}"] = missing
         if missing:
             fail(f"{label}: state.{key} absent on {missing}/{n} steps")
+
+    for index, record in enumerate(records):
+        action = record.get("action")
+        zone = record.get("target_zone")
+        position = record.get("target_position")
+        if action is not None and action.startswith(("UseConsumable_", "SellItem_", "BuyShopItem_")):
+            if zone is None or position is None or record.get("selected_object") is None:
+                fail(f"{label}: step {index} has targeted canonical action without resolved target")
 
     # --- conformance gaps (non-fatal, reported) ---
     summary["source_kind_distinct"] = sorted(

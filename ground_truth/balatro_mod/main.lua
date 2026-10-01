@@ -820,6 +820,76 @@ local function build_objects()
   return objects, pending_cards
 end
 
+-- Resolve only targets that the game exposes as selected cards.  A missing
+-- selection is deliberately left unresolved; downstream code must not turn a
+-- plausible position into a training label.
+local function selected_card_in(cards)
+  if not (cards and cards.cards) then return nil, nil end
+  for i, card in ipairs(cards.cards) do
+    if card.highlighted then return card, i - 1 end
+  end
+  return nil, nil
+end
+
+local function action_details(action_label, page)
+  local target_zone, target_position, selected = nil, nil, nil
+  local source_kind = "commit"
+  local source_action = action_label
+  local source_subtype = nil
+
+  if action_label == "UseConsumable" then
+    selected, target_position = selected_card_in(G and G.consumeables)
+    target_zone = selected and "CurrentConsumables" or nil
+  elseif action_label == "SellItem" then
+    selected, target_position = selected_card_in(G and G.jokers)
+    if selected then
+      target_zone = "CurrentJokers"
+    else
+      selected, target_position = selected_card_in(G and G.consumeables)
+      target_zone = selected and "CurrentConsumables" or nil
+    end
+  elseif action_label == "BuyShopItem" then
+    local areas = {
+      { G and G.shop_vouchers, "VoucherShopOfferings", "buyvoucher" },
+      { G and G.shop_booster, "PackShopOfferings", nil },
+      { G and G.shop_jokers, "TopShelfShopOfferings", nil },
+    }
+    for _, candidate in ipairs(areas) do
+      selected, target_position = selected_card_in(candidate[1])
+      if selected then
+        target_zone, source_subtype = candidate[2], candidate[3]
+        if candidate[2] == "PackShopOfferings" then
+          source_subtype = "buyandopen" .. tostring(pack_kind() or "pack"):lower()
+        elseif candidate[2] == "TopShelfShopOfferings" then
+          source_subtype = inventory_type(selected) == "consumable"
+            and "buytopshelfconsumable" or "buytopshelfjoker"
+        end
+        break
+      end
+    end
+  elseif action_label == "SelectPackItem" then
+    selected, target_position = selected_card_in(G and G.pack_cards)
+    target_zone = selected and "PackOfferings" or nil
+    source_subtype = selected and ("selectpackitem" .. inventory_type(selected)) or nil
+  elseif action_label == "SkipPack" then
+    source_kind = "commit"
+  end
+
+  -- A canonical indexed label is emitted only when both zone and position
+  -- came from an observed selected object.  The coarse hook label remains the
+  -- provenance for unresolved cases.
+  local canonical = action_label
+  if target_zone and target_position ~= nil then
+    canonical = action_label .. "_" .. target_zone .. "_" .. tostring(target_position)
+  elseif action_label == "UseConsumable" or action_label == "SellItem"
+      or action_label == "BuyShopItem" or action_label == "SelectPackItem" then
+    canonical = nil
+    source_kind = "unresolved"
+  end
+  return canonical, source_kind, source_action, source_subtype,
+    target_zone, target_position, selected
+end
+
 -- ---------------------------------------------------------------------------
 -- Raw persistent fields (D021, Issue #21) — engine truth for the reducer
 -- ---------------------------------------------------------------------------
@@ -1119,6 +1189,16 @@ end
 
 local function build_snapshot(rid, page, action_label)
   local objects, pending_cards = build_objects()
+  local action, source_kind, source_action, source_subtype, target_zone, target_position, selected =
+    action_details(action_label, page)
+  local selected_json = nil
+  if selected and target_zone == "CurrentJokers" then
+    selected_json = encode_inventory_object(selected, "joker", target_zone, target_position)
+  elseif selected and target_zone == "CurrentConsumables" then
+    selected_json = encode_inventory_object(selected, consumable_type(selected), target_zone, target_position)
+  elseif selected then
+    selected_json = encode_offer_object(selected, target_zone, target_position)
+  end
   local values = state_values()
   local basis = {
     selected_hand = highlighted_count(G.hand),
@@ -1130,13 +1210,18 @@ local function build_snapshot(rid, page, action_label)
     '"schema_version":"live/3.0.0"',
     '"request_id":' .. tostring(rid),
     '"page_name":' .. j_str(page),
-    '"source_kind":null',
-    '"action_subtype":null',
+    '"source_kind":' .. j_scalar(source_kind),
+    '"source_action":' .. j_scalar(source_action),
+    '"action_subtype":' .. j_scalar(source_subtype),
+    '"source_action_subtype":' .. j_scalar(source_subtype),
     '"state":' .. encode_state(values),
     '"objects":[' .. table.concat(objects, ",") .. "]",
     '"pending_cards":[' .. table.concat(pending_cards, ",") .. "]",
-    '"target_zone":null',
-    '"target_position":null',
+    '"target_zone":' .. j_scalar(target_zone),
+    '"target_position":' .. j_scalar(target_position),
+    '"swap_pair":null',
+    '"selected_object":' .. (selected_json and ('{"object":' .. selected_json .. '}') or "null"),
+    '"action":' .. j_scalar(action),
     '"persistent_state":{}',
     '"raw_persistent":' .. encode_raw_persistent(),
     '"legal_actions":' .. j_str_array(legal_actions),
@@ -1202,9 +1287,30 @@ local function install_action_hooks()
     if type(original) == "function" then
       wrapped = true
       G.FUNCS[name] = function(...)
-        pcall(Bridge.emit, label)
+        -- The same UI callback selects hand cards and pack contents. Only
+        -- pack selections are oracle actions; hand-card decomposition remains
+        -- downstream granularization.
+        local emitted = label
+        if name == "select_card" then
+          local page = current_page()
+          emitted = (page == "In_TarotSpectral_Pack"
+            or page == "In_JokerStandardPlanet_Pack") and label or nil
+        end
+        if emitted then pcall(Bridge.emit, emitted) end
         return original(...)
       end
+    end
+  end
+  local select_card = G.FUNCS.select_card
+  if type(select_card) == "function" then
+    wrapped = true
+    G.FUNCS.select_card = function(...)
+      local page = current_page()
+      if page == "In_TarotSpectral_Pack"
+          or page == "In_JokerStandardPlanet_Pack" then
+        pcall(Bridge.emit, "SelectPackItem")
+      end
+      return select_card(...)
     end
   end
   if wrapped then

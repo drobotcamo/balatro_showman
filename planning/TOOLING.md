@@ -79,6 +79,55 @@ Conformance gaps (coarse actions, empty `persistent_state`, missing
 `frame_idx`) are reported as findings but do not fail the audit. Verified
 2026-09-30 against the two `F:\OBS_RECORDINGS\oracle_runs\` runs from Issue #6.
 
+### Record a live oracle run
+
+The Lua producer writes snapshots to `%APPDATA%\Balatro\agent_io`; the
+repository bridge consumes them, acknowledges each action, and writes one run
+directory containing `session.json` and `steps.ndjson`.
+
+1. Install the producer revision to
+   `%APPDATA%\Balatro\Mods\balatro_showman_bridge\main.lua`. Back up the
+   existing file first. Restart Balatro completely after changing the file so
+   Steamodded/Lovely reloads the mod.
+2. From the repository root, start the recorder before starting a run:
+
+   ```powershell
+   py -3 ground_truth\file_ipc_bridge.py `
+     --out-dir "F:\OBS_RECORDINGS\oracle_runs"
+   ```
+
+   The default IPC directory is `%APPDATA%\Balatro\agent_io`. Use
+   `--io-dir` only when the game uses a different directory. Leave this
+   process running while playing; stop it with Ctrl+C after the run ends.
+3. Start a new Balatro run and play through the states being evaluated. For
+   shop/pack offering coverage, enter the shop and open at least one booster
+   pack. A clean audit requires the run to end in a win or loss so
+   `run_end.json` finalizes `session.json`.
+4. Find the new child directory under the `--out-dir` path. Its name is the
+   producer `run_id`, for example `1790821374-5833`.
+5. Audit it from the repository root:
+
+   ```powershell
+   py -3 planning\audit_oracle_runs.py `
+     "F:\OBS_RECORDINGS\oracle_runs\<run_id>"
+   ```
+
+   For offering coverage, confirm `oracle run integrity OK`,
+   `offering_objects_total > 0`, all expected names in
+   `offering_zones_present`, an empty `offering_zones_missing`, and
+   `offering_position_missing: 0`.
+
+The bridge records the producer's `action_taken`; it does not choose actions.
+If the run is stopped before win/loss, inspect `steps.ndjson` directly for
+partial evidence, but expect the integrity audit to reject a null session
+outcome. External run directories are evidence only and must not be committed.
+When finished testing, restore the backed-up mod file if the staged producer
+was not intended to remain installed.
+
+Known machine-specific evidence: the verified capture used Balatro
+`1.0.1o-FULL`, Steamodded `26.926.0~dev-a`, Lovely `0.10.0`, and output under
+`F:\OBS_RECORDINGS\oracle_runs` on 2026-09-30/2026-10-01.
+
 Add commands here only after they have been run successfully in this repository.
 Each recipe must state its working directory, inputs, expected result, and known
 failure modes.
