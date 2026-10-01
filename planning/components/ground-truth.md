@@ -18,6 +18,8 @@ minimal annotation/QA tooling the other phase gates depend on.
 ## Outputs
 
 - Ground-truth run records: per-step state, action label, and run outcome.
+- Raw engine persistent fields and the game's own legal actions/mask basis, as
+  the reducer validation reference (D021).
 - Aligned video frames for benchmarked steps.
 - Evaluation-set manifests with an annotation protocol.
 - A minimal annotation/QA tool for real-frame boxes and text fields.
@@ -26,6 +28,8 @@ minimal annotation/QA tooling the other phase gates depend on.
 
 - Ground truth is never synthesized into observed state; it is a separate
   channel used only for validation and outcome labeling.
+- The oracle emits raw engine fields and engine legality; it does not compute
+  canonical `persistent_state` — the pipeline reducer owns that shape (D021).
 - Video-to-engine alignment is explicit and auditable (timestamps, offsets).
 - Evaluation clips are disjoint from synthetic backgrounds and from training
   video.
