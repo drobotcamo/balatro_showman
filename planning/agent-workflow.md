@@ -12,7 +12,7 @@ other document restates these rules — they link to this one.
 - `planning/DECISIONS.md`: durable decisions and open questions.
 - `planning/LEARNINGS.md`: reusable findings, failure modes, and techniques.
 - `planning/TOOLING.md`: verified project and machine-specific command recipes.
-- `planning/agent-state/threads/<issue-number>-<short-name>.md`: a work-thread
+- `planning/agent-state/threads/<issue-number-or-tag>-<short-name>.md`: a work-thread
   baton that can be continued by multiple sessions on the same branch/worktree.
 - `.opencode/agents/`: configured agents, including the orchestrator and the
   per-work-item lead; `.opencode/command/`: workflow commands; `.opencode/skill/`:
@@ -28,6 +28,9 @@ GitHub is the coordination authority for parallel work:
   deliverables are merged or explicitly deferred, its acceptance criteria are
   addressed, and remaining uncertainty is recorded. Abandoned or superseded
   work is closed with a reason.
+- New issues receive a unique immutable four-letter tag recorded in
+  `planning/issue-tags.json`. Use `TAG (#N)` in new references; numeric issue
+  references and historical numeric thread filenames remain valid.
 - A dedicated branch and worktree implement the Issue; one or more agent
   sessions may continue the same branch and worktree.
 - A Pull Request is the review, validation, and merge boundary for all work:

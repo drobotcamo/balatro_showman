@@ -81,8 +81,8 @@ def check_threads() -> None:
         rel = path.relative_to(ROOT)
         if path.name == "README.md":
             continue
-        if not re.fullmatch(r"\d+-[a-z0-9-]+\.md", path.name):
-            fail(f"{rel}: name must be <issue-number>-<short-name>.md")
+        if not re.fullmatch(r"(?:\d+|[A-Z]{4})-[a-z0-9-]+\.md", path.name):
+            fail(f"{rel}: name must be <issue-number-or-tag>-<short-name>.md")
         text = path.read_text(encoding="utf-8")
         for field in THREAD_REQUIRED_FIELDS:
             if field not in text:
@@ -146,6 +146,27 @@ def check_open_questions() -> None:
                 f"ROADMAP.md: open question {question} has no row in the "
                 "Open Questions And Gates table"
             )
+
+
+def check_issue_tags() -> None:
+    import json
+
+    path = PLANNING / "issue-tags.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        fail(f"issue-tags.json: invalid JSON: {exc}")
+        return
+    if not isinstance(data, dict):
+        fail("issue-tags.json: expected an object")
+        return
+    for tag, issue in data.items():
+        if not isinstance(tag, str) or not re.fullmatch(r"[A-Z]{4}", tag):
+            fail(f"issue-tags.json: invalid tag {tag!r}")
+        if not isinstance(issue, int) or issue < 1:
+            fail(f"issue-tags.json: invalid issue number for {tag!r}")
+    if len(data) != len(set(data.values())):
+        fail("issue-tags.json: duplicate issue number")
 
 
 def check_components() -> None:
@@ -256,6 +277,7 @@ def main() -> int:
     check_decisions()
     check_learnings()
     check_open_questions()
+    check_issue_tags()
     check_components()
     check_roadmap()
     check_orchestrator()
