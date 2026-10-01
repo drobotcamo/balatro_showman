@@ -16,7 +16,7 @@ Completed:
 - Focused lifecycle and migration-backed fixture tests pass: 9 passed.
 - planning/check_contracts.py and git diff --check pass.
 Next:
-- Obtain final reviewer verdict after preserving raw bytes, documenting lifecycle transitions, and maintaining integrity metadata on append.
+- Obtain final reviewer verdict after adding the binary-evidence migration and explicit invalid-source status handling.
 - Wait for required CI, obtain fresh-context reviewer verdict recorded on PR, and merge if all gates pass.
 Decisions: D024; malformed source bytes are preserved through append_raw without repair.
 Risks: required CI and final reviewer verdict remain pending.
