@@ -26,6 +26,14 @@ class RunBundle:
                       schema_version=self.schema_version, created_at=now))
             for key, value in (provenance or {}).items(): s.add(Provenance(run_id=run_id, key=key, value=str(value)))
 
+    def add_provenance(self, run_id, values):
+        """Add audit metadata without changing evidence or its integrity hash."""
+        with Session(self._engine) as s, s.begin():
+            if not s.get(Run, run_id):
+                raise BundleError("unknown run")
+            for key, value in values.items():
+                s.add(Provenance(run_id=run_id, key=key, value=str(value)))
+
     def append(self, run_id, sequence, kind, payload):
         try: encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
         except (TypeError, ValueError) as exc:
