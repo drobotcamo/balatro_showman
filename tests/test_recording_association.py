@@ -1,6 +1,7 @@
 import sqlite3
 
-from ground_truth.recording_association import associate_recording
+from ground_truth.recording_association import (associate_after_confirmation, associate_recording,
+                                                confirm_interactive, confirm_terminal)
 from run_bundle import RunBundle
 
 
@@ -46,3 +47,19 @@ def test_boolean_and_negative_marker_values_are_invalid(tmp_path):
     b, _ = bundle(tmp_path); bad = marker(); bad["fps"] = True
     assert associate_recording(b, "r1", confirmed=True, marker=bad).status == "invalid"
     assert associate_recording(b, "r1", confirmed=True, marker=marker(-1)).status == "invalid"
+
+
+def test_confirmation_workflows_require_explicit_yes(tmp_path):
+    b, _ = bundle(tmp_path); notices = []
+    assert confirm_interactive(lambda _: "yes", notices.append)
+    assert notices
+    assert not confirm_terminal(lambda _: "no")
+    result = associate_after_confirmation(b, "r1", marker=marker(), confirm=lambda: True, confirmed_by="terminal")
+    assert result.status == "confirmed"
+
+
+def test_conflicting_association_is_rejected(tmp_path):
+    b, _ = bundle(tmp_path)
+    assert associate_recording(b, "r1", confirmed=True, marker=marker()).status == "confirmed"
+    other = marker(); other["recording_id"] = "obs-2"
+    assert associate_recording(b, "r1", confirmed=True, marker=other).status == "interrupted"

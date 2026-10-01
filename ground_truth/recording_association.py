@@ -86,3 +86,14 @@ def confirm_terminal(prompt=input) -> bool:
         return prompt("OBS recording is required/optional. Confirm start? [y/N] ").strip().lower() in {"y", "yes"}
     except (EOFError, KeyboardInterrupt):
         return False
+
+
+def associate_after_confirmation(bundle: RunBundle, run_id: str, *, marker: dict[str, Any] | None,
+                                 confirm, confirmed_by: str, **kwargs) -> AssociationResult:
+    """Connect an operator confirmation callback to the association boundary."""
+    try:
+        confirmed = bool(confirm())
+    except (EOFError, KeyboardInterrupt):
+        confirmed = False
+    return associate_recording(bundle, run_id, confirmed=confirmed, marker=marker,
+                               confirmed_by=confirmed_by, **kwargs)
