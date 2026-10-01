@@ -35,11 +35,14 @@ contract only; it is never the granularized step schema `3.0.0`):
   `persistent_state` empty and no legality, action labels coarse. Two runs
   persisted at this revision (see Status).
 - `live/3.0.0` (Issue #21, D021): adds `raw_persistent` (engine-truth raw
-  persistent fields: deck center/class id, stake level/center key,
+  persistent fields: deck center/class id (via
+  `G.GAME.selected_back.effect.center.key` on this Steamodded runtime),
+  stake level/center key (via `G.P_CENTER_POOLS.Stake[level].key`),
   `starting_params.no_faces`, raw `G.GAME.modifiers`, the run's full
   playing-card deck with modifier/edition/seal/stickers, per-hand
   level/played/played_this_round, redeemed voucher keys, `bosses_used`
-  counts, `round_resets.blind_states/blind_choices/blind_tags`,
+  counts (nested `{boss/small/big: {blind_key: count}}` on this runtime),
+  `round_resets.blind_states/blind_choices/blind_tags`,
   `boss_rerolled`, and the `skips`/`hands_played`/`unused_discards`/
   `ecto_minus`/`last_tarot_planet` counters), `legal_actions` (coarse base
   labels legal per `mask_schema.md` §2-3 gating, always including the action
@@ -92,10 +95,14 @@ py -3 -m unittest tests.test_file_ipc_bridge tests.test_balatro_mod
 ## Status
 
 The producer is verified against the installed runtime (Balatro `1.0.1o-FULL`,
-Steamodded `26.926.0~dev-a`, Lovely `0.10.0`) with two real runs, and by an
-external, not-checked-in lupa (Lua 5.1) harness that executes `main.lua`
-against a stub `G` and validates the emitted snapshot JSON (raw fields,
-legality across blind/shop/pack/unknown pages, client acceptance). The
+Steamodded `26.926.0~dev-a`, Lovely `0.10.0`) by a real capture (50 steps
+across two sessions; legality, mask basis, counters, hand levels, and blind
+statuses present on every step) and by an external, not-checked-in lupa
+(Lua 5.1) harness that executes `main.lua` against a stub `G` and validates
+the emitted snapshot JSON (raw fields, legality across blind/shop/pack/unknown
+pages, client acceptance). The client stops cleanly on Ctrl+C and reports
+unfinalized sessions. Known runtime divergences from the vanilla game dump
+(deck/stake/bosses_used reads) are recorded in `planning/LEARNINGS.md`. The
 persisted runs below are `live/2.0.0` revisions; `planning/audit_oracle_runs.py`
 reports their raw-field/legality coverage as findings. Provenance of the
 persisted runs:
@@ -115,7 +122,10 @@ and real per-step runtime metadata. Steamodded patches `G.STATES` with
 are emitted as an explicit `Unknown_PackKind_*`, never guessed) and 998 to
 `In_Shop`.
 
-A capture pinned to the `live/3.0.0` revision is still pending (manual game
-capture, owned by #16/#11); the raw-field/legality emission itself is the
-Issue #21 deliverable and is exercised by the lupa harness and the audit
-tool. Steamodded's debug socket is not used as a transport.
+A capture from the installed `live/3.0.0` producer exists
+(`F:\OBS_RECORDINGS\oracle_runs_live3\`, 50 steps, one session unfinalized
+after a mid-run exit to the main menu — the producer only finalizes on game
+over); it validated legality/mask-basis/counter emission but pre-dates the
+deck/stake/bosses_used runtime fixes, so a fresh capture with the re-copied
+mod is the remaining validation. Steamodded's debug socket is not used as a
+transport.

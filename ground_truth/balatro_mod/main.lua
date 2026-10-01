@@ -91,26 +91,27 @@ local function try(fn)
   return nil
 end
 
--- Sorted JSON object of a game table's scalar entries; non-scalar values are
--- emitted as explicit null rather than guessed or silently dropped.
-local function scalar_table_json(source)
-  local value = try(source)
+-- Sorted JSON object of a game table, recursing into nested tables up to
+-- max_depth; every leaf is a scalar, an explicit null, or a nested object, so
+-- engine values are never guessed or silently dropped. Depth-capped against
+-- cyclic game tables.
+local function table_json_value(value, max_depth, depth)
+  if depth > max_depth then return "null" end
+  local t = type(value)
+  if t ~= "table" then return j_scalar(value) end
   local parts = {}
-  if type(value) == "table" then
-    local keys = {}
-    for key in pairs(value) do keys[#keys + 1] = tostring(key) end
-    table.sort(keys)
-    for _, key in ipairs(keys) do
-      local entry = try(function() return value[key] end)
-      local entry_type = type(entry)
-      if entry_type == "string" or entry_type == "boolean" or entry_type == "number" then
-        parts[#parts + 1] = j_str(key) .. ":" .. j_scalar(entry)
-      else
-        parts[#parts + 1] = j_str(key) .. ":null"
-      end
-    end
+  local keys = {}
+  for key in pairs(value) do keys[#keys + 1] = tostring(key) end
+  table.sort(keys)
+  for _, key in ipairs(keys) do
+    local entry = try(function() return value[key] end)
+    parts[#parts + 1] = j_str(key) .. ":" .. table_json_value(entry, max_depth, depth + 1)
   end
   return "{" .. table.concat(parts, ",") .. "}"
+end
+
+local function table_json(source, max_depth)
+  return table_json_value(try(source), max_depth or 3, 0)
 end
 
 local function game_number_json(fn)
@@ -775,32 +776,43 @@ end
 -- ---------------------------------------------------------------------------
 
 local function deck_info()
-  local key = try(function() return G.GAME.selected_back_key end)
+  -- Steamodded reads the deck center at G.GAME.selected_back.effect.center.key
+  -- (overrides.lua:2401); `selected_back_key` is the vanilla fallback.
+  local key = try(function() return G.GAME.selected_back.effect.center.key end)
+  if type(key) ~= "string" then
+    key = try(function() return G.GAME.selected_back_key end)
+  end
   if type(key) ~= "string" then
     return { center_key = nil, class_id = nil }
   end
   return { center_key = key, class_id = class_id_for_center_key(key) }
 end
 
--- The stake's numeric level maps to its center via the engine's own
--- `stake_level` field (game.lua stake centers); the key is scanned, not
--- hardcoded, so Steamodded stake mods resolve the same way. Ties are broken
--- deterministically by sorting the matching keys.
+-- The stake's numeric level resolves through the engine's own stake pool
+-- (SMODS.stake_from_index maps G.GAME.stake to G.P_CENTER_POOLS.Stake[level].
+-- key); the stake_level scan over G.P_CENTERS is the fallback. Ties are
+-- broken deterministically by sorting the matching keys.
 local function stake_info()
   local level = try(function() return G.GAME.stake end)
   if type(level) ~= "number" then
     return { level = nil, center_key = nil }
   end
   local key = try(function()
-    local matches = {}
-    for center_key, center in pairs(G.P_CENTERS) do
-      if type(center) == "table" and center.set == "Stake" and center.stake_level == level then
-        matches[#matches + 1] = tostring(center_key)
-      end
-    end
-    table.sort(matches)
-    return matches[1]
+    local center = G.P_CENTER_POOLS and G.P_CENTER_POOLS.Stake and G.P_CENTER_POOLS.Stake[level]
+    return center and center.key or nil
   end)
+  if type(key) ~= "string" then
+    key = try(function()
+      local matches = {}
+      for center_key, center in pairs(G.P_CENTERS) do
+        if type(center) == "table" and center.set == "Stake" and center.stake_level == level then
+          matches[#matches + 1] = tostring(center_key)
+        end
+      end
+      table.sort(matches)
+      return matches[1]
+    end)
+  end
   if type(key) ~= "string" then key = nil end
   return { level = level, center_key = key }
 end
@@ -854,10 +866,11 @@ local function voucher_keys()
   return keys
 end
 
--- bosses_used is emitted verbatim as the engine's {boss_key: count} dict;
--- the reducer derives the canonical class-id list.
+-- bosses_used is emitted verbatim; this runtime nests it as
+-- {boss/small/big: {blind_key: count}} (SMODS.normalize_bosses_used_table),
+-- and the reducer derives the canonical class-id list.
 local function bosses_used_json()
-  return scalar_table_json(function() return G.GAME.bosses_used end)
+  return table_json(function() return G.GAME.bosses_used end, 2)
 end
 
 local function encode_raw_persistent()
@@ -871,14 +884,14 @@ local function encode_raw_persistent()
     '"stake":{"level":' .. (stake.level and j_num(stake.level) or "null")
       .. ',"center_key":' .. (stake.center_key and j_str(stake.center_key) or "null") .. "}",
     '"starting_params_no_faces":' .. game_boolean_json(function() return G.GAME.starting_params.no_faces end),
-    '"modifiers":' .. scalar_table_json(function() return G.GAME.modifiers end),
+    '"modifiers":' .. table_json(function() return G.GAME.modifiers end),
     '"tracked_deck_cards":[' .. table.concat(tracked_deck_cards(), ",") .. "]",
     '"hand_levels":' .. hand_levels_json(),
     '"vouchers_redeemed":' .. j_str_array(voucher_keys()),
     '"bosses_used":' .. bosses_used_json(),
-    '"blind_states":' .. scalar_table_json(function() return G.GAME.round_resets.blind_states end),
-    '"blind_choices":' .. scalar_table_json(function() return G.GAME.round_resets.blind_choices end),
-    '"blind_tags":' .. scalar_table_json(function() return G.GAME.round_resets.blind_tags end),
+    '"blind_states":' .. table_json(function() return G.GAME.round_resets.blind_states end),
+    '"blind_choices":' .. table_json(function() return G.GAME.round_resets.blind_choices end),
+    '"blind_tags":' .. table_json(function() return G.GAME.round_resets.blind_tags end),
     '"boss_rerolled":' .. game_boolean_json(function() return G.GAME.round_resets.boss_rerolled end),
     '"skips":' .. game_number_json(function() return G.GAME.skips end),
     '"hands_played":' .. game_number_json(function() return G.GAME.hands_played end),
