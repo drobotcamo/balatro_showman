@@ -95,6 +95,16 @@ MASK_BASIS_FIELDS = (
     "selected_sellable_count",
 )
 
+# Canonical live/2.0 shop and opened-pack offering zones (D009). Bare
+# `ShopOfferings` is a deprecated offline-extractor alias with no distinct live
+# area, so it is not part of this set (Issue #16).
+OFFERING_ZONES = (
+    "TopShelfShopOfferings",
+    "VoucherShopOfferings",
+    "PackShopOfferings",
+    "PackOfferings",
+)
+
 INTEGRITY_FAILURES: list[str] = []
 
 
@@ -140,6 +150,11 @@ def _all_null_columns(
 def conformance_findings(summary: dict) -> list[str]:
     """Non-fatal conformance notes for one run summary."""
     findings: list[str] = []
+    if summary.get("offering_position_missing"):
+        findings.append(
+            f"{summary['run']}: {summary['offering_position_missing']} "
+            "shop/pack offering object(s) missing an integer position_in_zone"
+        )
     inventory = summary.get("inventory_objects", 0)
     if inventory and summary.get("inventory_class_id_null"):
         findings.append(
@@ -297,6 +312,20 @@ def audit(run_dir: Path) -> dict:
     ]
     summary["object_types"] = dict(Counter(o.get("object_type") for o in obj))
     summary["object_zones"] = dict(Counter(o.get("zone") for o in obj))
+    offering = [o for o in obj if o.get("zone") in OFFERING_ZONES]
+    summary["offering_objects_total"] = len(offering)
+    summary["offering_zone_counts"] = {
+        zone: summary["object_zones"].get(zone, 0) for zone in OFFERING_ZONES
+    }
+    summary["offering_zones_present"] = [
+        zone for zone in OFFERING_ZONES if summary["object_zones"].get(zone)
+    ]
+    summary["offering_zones_missing"] = [
+        zone for zone in OFFERING_ZONES if not summary["object_zones"].get(zone)
+    ]
+    summary["offering_position_missing"] = sum(
+        1 for o in offering if not isinstance(o.get("position_in_zone"), int)
+    )
     summary["object_modifier_null"] = sum(1 for o in obj if o.get("modifier") is None)
     summary["object_edition_null"] = sum(1 for o in obj if o.get("edition") is None)
     summary["object_seal_null"] = sum(1 for o in obj if o.get("seal") is None)
@@ -306,7 +335,15 @@ def audit(run_dir: Path) -> dict:
     summary["object_stickers_not_list"] = sum(
         1 for o in obj if o.get("stickers") is not None and not isinstance(o.get("stickers"), list)
     )
-    inv_types = {"joker", "tarot", "planet", "spectral", "consumable", "voucher"}
+    inv_types = {
+        "joker",
+        "tarot",
+        "planet",
+        "spectral",
+        "consumable",
+        "voucher",
+        "pack",
+    }
     inv = [o for o in obj if o.get("object_type") in inv_types]
     summary["inventory_objects"] = len(inv)
     summary["inventory_class_id_present"] = sum(

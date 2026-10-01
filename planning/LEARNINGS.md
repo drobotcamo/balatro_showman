@@ -156,3 +156,33 @@ under its Decisions section. This file is a knowledge base, not a task log.
 - Observation: (1) `G.GAME.selected_back_key` is null on every step; Steamodded reads the deck center at `G.GAME.selected_back.effect.center.key` (`smods-main/src/overrides.lua:2401-2402`). (2) Stake centers do not match `stake_level == G.GAME.stake` (SMODS renumbers `stake_level` by applied-chain length, `game_object.lua:863-866`); the engine mapping is `G.P_CENTER_POOLS.Stake[G.GAME.stake].key` (= `SMODS.stake_from_index`, `overrides.lua:2407`, `ui.lua:3421`). (3) `G.GAME.bosses_used` is nested `{boss/small/big: {blind_key: count}}` via `SMODS.normalize_bosses_used_table` (`blind.lua`), not the flat `{blind_key: count}` the vanilla dump shows; the real capture also shows `blind_states` uses a fifth value `'Current'`.
 - Implication: The producer now reads deck/stake through the Steamodded paths with the vanilla-dump reads as fallbacks, and serializes nested game tables recursively (depth-capped, sorted keys, explicit nulls). Raw emission of nested engine structures must never flatten or drop sub-tables; verify dump-derived field claims against a real capture before relying on them.
 - Verification/source: `planning/audit_oracle_runs.py` output on the real capture (50/50 steps legal + mask_basis + counters, deck/stake center keys null), read-only grep of `smods-main/src/`, and the two persisted run directories.
+## 2026-09-30: Live/2.0 shop and pack offering zones map to four CardAreas
+
+- Context: Issue #16 needed the Lua producer to snapshot the shop and
+  opened-pack offering zones that the adopted action space resolves
+  buy/select targets against.
+- Observation: In the installed Balatro `1.0.1o-FULL` dump
+  (`%APPDATA%\Balatro\Mods\lovely\game-dump`), the shop UI creates exactly
+  `G.shop_jokers` (top shelf, jokers/consumables), `G.shop_vouchers` (one
+  voucher), and `G.shop_booster` (**singular**), and an opened booster fills
+  `G.pack_cards`. `G.shop` is a UIBox, not a CardArea. The canonical live/2.0
+  zones are `TopShelfShopOfferings`, `VoucherShopOfferings`,
+  `PackShopOfferings`, and `PackOfferings`; the vendored `granularize.py`,
+  `mask_builder.py`, `live_encoder.py`, and `live/smoke_test.py` reference only
+  these. Bare `ShopOfferings` is absent from the canonical live action map and
+  zone vocabulary; it survives only in deprecated/compat paths
+  (`data/masking_schema_disorganized.md`, deprecated `action_space_schema.md`
+  §5, `compute_action_space_config.py`, `training_data_pipeline.md`) and in the
+  review document that proposed it (`ORACLE_DATA_REVIEW.md` §4.5, §7 P5). It
+  has no distinct live source, so it is an overloaded legacy alias.
+  Booster center keys carry a size suffix (e.g. `p_arcana_normal_1`), so a pack
+  object's `class_id` is null against the vendored map while `center_key` is
+  retained.
+- Implication: Producers must read `G.shop_booster` (not `G.shop_boosters`) and
+  emit the four split zones; emitting bare `ShopOfferings` would duplicate
+  candidates and reintroduce a name the canonical contract does not define.
+- Verification/source: read-only inspection of
+  `%APPDATA%\Balatro\Mods\lovely\game-dump\functions\UI_definitions.lua:637-658`,
+  `%APPDATA%\Balatro\Mods\smods-main\src\game_object.lua:1723`, and
+  `legacy/vendor/balatro-policy-transformer/{granularize.py,mask_builder.py,live/live_encoder.py,live/smoke_test.py,action_map.py}`
+  on 2026-09-30.

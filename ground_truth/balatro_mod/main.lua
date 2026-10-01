@@ -11,7 +11,9 @@
 -- Scope (deliberately small, see Issue #6):
 --   * Snapshot is written BEFORE the hooked action runs, so the captured state
 --     is the decision state and action_taken is the player's real action.
---   * objects cover the hand / pending selection / jokers / consumables only.
+--   * objects cover the hand / pending selection / jokers / consumables and
+--     the shop and opened-pack offering zones (TopShelfShopOfferings,
+--     VoucherShopOfferings, PackShopOfferings, PackOfferings).
 --     Inventory objects carry the canonical `class_id` from the vendored class
 --     map (unmapped keys stay null with `center_key` retained); every object
 --     carries modifier/edition/seal (null when absent) and list-valued
@@ -731,6 +733,39 @@ local function consumable_type(card)
   return "consumable"
 end
 
+-- Inventory type from the card's ability set, covering the shop and pack
+-- offering families. Falls back to the generic consumable type used by the
+-- existing consumables zone.
+local function inventory_type(card)
+  local set = card.ability and card.ability.set
+  if set == "Joker" then return "joker" end
+  if set == "Voucher" then return "voucher" end
+  if set == "Booster" then return "pack" end
+  if set == "Tarot" then return "tarot" end
+  if set == "Planet" then return "planet" end
+  if set == "Spectral" then return "spectral" end
+  return "consumable"
+end
+
+-- Offering objects can be playing cards (e.g. Standard pack contents) or
+-- inventory objects (jokers / consumables / vouchers / packs). Unmapped
+-- `center_key`s keep `class_id:null`, per the adopted object schema.
+local function encode_offer_object(card, zone, position)
+  local fields = card_fields(card)
+  if fields then return encode_playing_object(card, zone, position) end
+  return encode_inventory_object(card, inventory_type(card), zone, position)
+end
+
+-- Append every card of a shop/pack CardArea to `objects`, ordered by
+-- `position_in_zone`. An absent or empty area emits nothing.
+local function append_offerings(objects, area, zone)
+  if not (area and area.cards) then return end
+  for i, card in ipairs(area.cards) do
+    local object = encode_offer_object(card, zone, i - 1)
+    if object then objects[#objects + 1] = object end
+  end
+end
+
 local function build_objects()
   local objects = {}
   local pending_cards = {}
@@ -767,6 +802,18 @@ local function build_objects()
       objects[#objects + 1] = encode_inventory_object(card, consumable_type(card), "CurrentConsumables", i - 1)
     end
   end
+
+  -- Shop and opened-pack offering zones (D009 live/2.0 zone vocabulary):
+  --   G.shop_jokers   -> TopShelfShopOfferings (jokers/consumables for sale)
+  --   G.shop_vouchers -> VoucherShopOfferings
+  --   G.shop_booster  -> PackShopOfferings (booster packs for sale)
+  --   G.pack_cards    -> PackOfferings (contents of an opened booster)
+  -- Bare `ShopOfferings` is a deprecated offline-extractor alias with no
+  -- distinct live area, so it is intentionally not emitted (Issue #16).
+  append_offerings(objects, G and G.shop_jokers, "TopShelfShopOfferings")
+  append_offerings(objects, G and G.shop_vouchers, "VoucherShopOfferings")
+  append_offerings(objects, G and G.shop_booster, "PackShopOfferings")
+  append_offerings(objects, G and G.pack_cards, "PackOfferings")
 
   return objects, pending_cards
 end
