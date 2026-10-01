@@ -89,3 +89,15 @@ def test_conflicting_association_is_rejected(tmp_path):
     assert associate_recording(b, "r1", confirmed=True, marker=marker()).status == "confirmed"
     other = marker(); other["recording_id"] = "obs-2"
     assert associate_recording(b, "r1", confirmed=True, marker=other).status == "interrupted"
+
+
+def test_interactive_policy_and_direct_confirmation_validation(tmp_path):
+    messages = []
+    assert confirm_interactive(lambda _: "y", messages.append, required=True)
+    assert "recording is required" in messages[0]
+    assert not confirm_interactive(lambda _: "n", messages.append)
+    assert "recording is optional" in messages[1]
+
+    b, _ = bundle(tmp_path)
+    assert associate_recording(b, "r1", confirmed=1, marker=marker()).code == "confirmation_invalid"
+    assert associate_recording(b, "r1", confirmed=True, marker=marker(), observed_at_ns="now").code == "observation_time_invalid"

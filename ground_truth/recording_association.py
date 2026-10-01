@@ -27,6 +27,8 @@ def associate_recording(bundle: RunBundle, run_id: str, *, confirmed: bool,
                         max_age_ns: int | None = None, video_ref: str | None = None,
                         confirmed_by: str = "human", interrupted: bool = False) -> AssociationResult:
     """Persist a recording marker only after explicit human confirmation."""
+    if not isinstance(confirmed, bool):
+        return AssociationResult("invalid", "confirmation_invalid", "confirmation must be boolean")
     if interrupted:
         return AssociationResult("interrupted", "coordination_interrupted", "coordination was interrupted")
     if not confirmed:
@@ -43,8 +45,10 @@ def associate_recording(bundle: RunBundle, run_id: str, *, confirmed: bool,
             or not math.isfinite(fps) or not isinstance(timestamp, int)
             or isinstance(timestamp, bool) or timestamp < 0):
         return AssociationResult("invalid", "marker_malformed", "recording marker is malformed")
-    if max_age_ns is not None and (not isinstance(max_age_ns, int) or max_age_ns < 0):
+    if max_age_ns is not None and (not isinstance(max_age_ns, int) or isinstance(max_age_ns, bool) or max_age_ns < 0):
         return AssociationResult("invalid", "max_age_invalid", "maximum marker age is invalid", marker["recording_id"])
+    if observed_at_ns is not None and (not isinstance(observed_at_ns, int) or isinstance(observed_at_ns, bool) or observed_at_ns < 0):
+        return AssociationResult("invalid", "observation_time_invalid", "observation time is invalid", marker["recording_id"])
     if not isinstance(confirmed_by, str) or not confirmed_by.strip():
         return AssociationResult("invalid", "confirmer_invalid", "confirmation identity is invalid", marker["recording_id"])
     if video_ref is not None and (not isinstance(video_ref, str) or not video_ref.strip()):
@@ -71,9 +75,10 @@ def associate_recording(bundle: RunBundle, run_id: str, *, confirmed: bool,
     return AssociationResult("confirmed", "association_confirmed", "recording marker associated", marker["recording_id"])
 
 
-def confirm_interactive(prompt, notify) -> bool:
-    """Notify a present operator, then accept only an explicit yes."""
-    notify("OBS recording marker found. Confirm association? [y/N]")
+def confirm_interactive(prompt, notify, *, required: bool = False) -> bool:
+    """Notify an operator of recording policy, then accept only an explicit yes."""
+    policy = "required" if required else "optional"
+    notify(f"OBS recording is {policy}. OBS recording marker found. Confirm association? [y/N]")
     return prompt("y/N: ").strip().lower() in {"y", "yes"}
 
 
