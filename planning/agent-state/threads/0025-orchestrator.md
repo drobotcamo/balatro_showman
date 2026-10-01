@@ -6,7 +6,7 @@ Owner: opencode orchestrator bootstrap session (issue-25)
 Branch: issue-25-orchestrator
 Worktree: `C:\Users\camgr\Documents\code_projects\balatro_showman-orchestrator`
 Objective: Add the orchestrator agent and `/orchestrate` command with T0 write authority, primary issue-creation role, codified worktree policy, and mechanical contract validation.
-Status: ready-for-review
+Status: complete
 Scope: `.opencode/agents/orchestrator.md`, `.opencode/command/orchestrate.md`, `planning/agent-workflow.md`, `planning/README.md`, `planning/DECISIONS.md`, `planning/check_contracts.py`, `planning/LEARNINGS.md`, `planning/agent-state/threads/0025-orchestrator.md`. Explicitly out of scope: `.opencode/agents/lead.md` and `.opencode/skill/project-memory/SKILL.md` edits (agent-workflow.md's Orchestrator section satisfies Issue #25's intent; recorded on Issue #25).
 Dependencies: None blocking; builds on Issue #18 reconciliation and D019-D021. Independent of open producer issues #11-#16 and #21.
 Completed:
@@ -21,7 +21,7 @@ Completed:
 - Moved the agent to `.opencode/agents/orchestrator.md` (plural) to match the existing working primary-agent location (lead/reviewer/explorer) and fix the reviewer-flagged directory inconsistency; `.opencode/agent/` removed. Checker path updated to match.
 - Fresh-context `@reviewer` (task `ses_f0b02ad42ffeu5Wx9AoafDxaNm`): round 1 `holds with gaps` (agent/ vs agents/ directory, stale baton PR field, named-scope files untouched, edit-permission gap). Directory, baton, and scope findings fixed or dispositioned in round 2; the write-authority-is-prose-only gap is explicitly accepted (same convention as `agents/lead.md`; the orchestrator legitimately needs edit and shell access for T0 baton writes). Verdict evidence recorded on PR #26 and Issue #25.
 Next:
-- Merge PR #26 once `planning-check` is green on HEAD (T0 auto-PR policy; T1 content user-approved); close Issue #25 with the disposition comment.
+- None. Merged via PR #26 once the final `planning-check` run is green; Issue #25 closed by the merge. First live `/orchestrate` run is the follow-up acceptance test (see Risks).
 Decisions: D022 added this branch. No other durable changes.
 Risks: Whether OpenCode resolves `/orchestrate` to `.opencode/agents/orchestrator.md` at runtime is unverified (cannot launch opencode inside this session); the first live `/orchestrate` run is the acceptance test — record results in LEARNINGS or a follow-up issue rather than editing D022 silently. Write authority is enforced by prose plus conventions, not by tool permissions (accepted, see Completed). CI status must be confirmed before merge.
 Validation: `py -3 planning/check_contracts.py` -> `planning contracts OK`; `git diff --check` -> clean (CRLF warnings only); reviewer verdict recorded on PR #26.
