@@ -14,8 +14,9 @@ other document restates these rules — they link to this one.
 - `planning/TOOLING.md`: verified project and machine-specific command recipes.
 - `planning/agent-state/threads/<issue-number>-<short-name>.md`: a work-thread
   baton that can be continued by multiple sessions on the same branch/worktree.
-- `.opencode/agents/`: configured subagents; `.opencode/command/`: workflow
-  commands; `.opencode/skill/`: triggered procedures.
+- `.opencode/agents/`: configured agents, including the orchestrator and the
+  per-work-item lead; `.opencode/command/`: workflow commands; `.opencode/skill/`:
+  triggered procedures.
 - Chat: temporary interaction, never the only place a conclusion exists.
 
 ## Work Item Model
@@ -47,6 +48,29 @@ GitHub is the coordination authority for parallel work:
 - Major design decisions require user input before implementation. Surface
   alternatives, tradeoffs, and a recommendation rather than silently choosing
   a new architecture or contract.
+
+## Orchestrator
+
+The orchestrator (`../.opencode/agents/orchestrator.md`, invoked via
+`/orchestrate`) owns portfolio state, not a single work item:
+
+- Its procedure is fixed: state assessment (issues, PRs, CI, git, worktrees),
+  handoff audit (verify thread-baton claims against repository evidence),
+  readiness table (derived from issue dependencies and the ROADMAP open
+  questions and gates), and a recommendation ending in continue/open Issue
+  #N, a worktree decision, and the exact command to run.
+- Its write authority is T0 only: thread batons, closing stale threads, issue
+  and PR comments, and creating issues or sub-issues. It is the primary issue
+  creator; workers may still propose sub-issues per the Work Item Model. It
+  never edits pipeline code, never merges PRs, and is never the sole approver
+  of its own changes.
+- Worktree selection is codified, not judged: T0/planning issues may run
+  in-place when the main checkout is free (precedent: Issue #18); T2 pipeline
+  issues get a dedicated worktree branched from the integration branch. The
+  orchestrator reports which rule applies and flags stale merged worktrees
+  without deleting them.
+- Its agent file and command are mechanically validated by
+  `planning/check_contracts.py`.
 
 ## Session Start
 

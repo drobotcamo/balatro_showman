@@ -154,6 +154,29 @@ become unscorable. This concretizes D009 and D020; source: Issue #14 design
 note `planning/PERSISTENT_STATE_OWNERSHIP.md` and
 `planning/ORACLE_DATA_REVIEW.md` §7 (P3).
 
+### D022 — accepted — The orchestrator assesses portfolio state with T0 write authority and is the primary issue creator
+
+Portfolio-level assessment, handoff auditing, and next-issue selection belong
+to a dedicated orchestrator agent (`.opencode/agent/orchestrator.md`, invoked
+via `/orchestrate`) with a fixed procedure: state assessment, handoff audit
+against repository evidence, readiness derivation from issue dependencies and
+the ROADMAP open questions and gates, and a recommendation ending in the next
+issue and worktree decision. Its write authority is T0 only (thread batons,
+stale-thread closure, issue/PR comments, issue creation); it never edits
+pipeline code, never merges PRs, and is never the sole approver of its own
+changes. It is the primary issue creator; workers may still propose
+sub-issues per `planning/agent-workflow.md`. Worktree selection is codified:
+T0/planning issues may run in-place when the main checkout is free; T2
+pipeline issues get a dedicated worktree.
+Alternatives considered: (a) the per-item lead agent also orchestrates —
+rejected because a session owning one work item cannot audit its own handoffs
+impartially and portfolio state assessment went unowned; (b) an external
+dependency-aware issue tracker (e.g. beads) as the source of truth — rejected
+for now because GitHub Issues plus structured planning tables already carry
+dependencies and gates, and adopting a new coordination authority is a larger
+architecture change than this phase needs. Source: Issue #25 and user-approved
+design conversation of 2026-09-30.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the
