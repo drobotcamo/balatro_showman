@@ -74,18 +74,12 @@ def associate_recording(bundle: RunBundle, run_id: str, *, confirmed: bool,
 def confirm_interactive(prompt, notify) -> bool:
     """Notify a present operator, then accept only an explicit yes."""
     notify("OBS recording marker found. Confirm association? [y/N]")
-    try:
-        return prompt("y/N: ").strip().lower() in {"y", "yes"}
-    except (EOFError, KeyboardInterrupt):
-        return False
+    return prompt("y/N: ").strip().lower() in {"y", "yes"}
 
 
 def confirm_terminal(prompt=input) -> bool:
     """Terminal confirmation helper; EOF/interruption is never confirmation."""
-    try:
-        return prompt("OBS recording is required/optional. Confirm start? [y/N] ").strip().lower() in {"y", "yes"}
-    except (EOFError, KeyboardInterrupt):
-        return False
+    return prompt("OBS recording is required/optional. Confirm start? [y/N] ").strip().lower() in {"y", "yes"}
 
 
 def associate_after_confirmation(bundle: RunBundle, run_id: str, *, marker: dict[str, Any] | None,

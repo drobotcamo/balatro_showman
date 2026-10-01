@@ -1,4 +1,5 @@
 import sqlite3
+import pytest
 
 from ground_truth.recording_association import (associate_after_confirmation, associate_recording,
                                                 confirm_interactive, confirm_terminal)
@@ -65,8 +66,10 @@ def test_confirmation_eof_and_interrupt_are_not_confirmation():
     def interrupted(_):
         raise KeyboardInterrupt
 
-    assert not confirm_interactive(eof, lambda _: None)
-    assert not confirm_terminal(interrupted)
+    with pytest.raises(EOFError):
+        confirm_interactive(eof, lambda _: None)
+    with pytest.raises(KeyboardInterrupt):
+        confirm_terminal(interrupted)
 
 
 def test_callback_interrupt_is_explicitly_interrupted(tmp_path):
