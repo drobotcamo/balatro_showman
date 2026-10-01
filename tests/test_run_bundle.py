@@ -1,4 +1,5 @@
 import pytest
+import sqlite3
 from alembic import command
 from alembic.config import Config
 from run_bundle import RunBundle, InvalidTransition, FinalizedEvidenceError
@@ -24,3 +25,21 @@ def test_invalid_transition(tmp_path):
 def test_raw_malformed_and_duplicate(tmp_path):
     b = bundle(tmp_path); b.append_raw("r1", 0, "partial", b"{not-json")
     with pytest.raises(Exception): b.append("r1", 0, "state", {})
+
+def test_upgrade_from_previous_revision(tmp_path):
+    url = f"sqlite:///{tmp_path / 'upgrade.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url)
+    command.upgrade(cfg, "0001_run_bundle")
+    command.upgrade(cfg, "head")
+    with sqlite3.connect(tmp_path / "upgrade.db") as db:
+        assert db.execute("select version_num from alembic_version").fetchone()[0] == "0002_record_integrity_index"
+
+def test_integrity_failure_is_persisted_and_strict_validation_reports(tmp_path):
+    b = bundle(tmp_path); b.append("r1", 0, "state", {"chips": 1})
+    with sqlite3.connect(tmp_path / "run.db") as db:
+        db.execute("update records set payload = '{\"chips\":2}' where run_id = 'r1'"); db.commit()
+    with pytest.raises(Exception, match="integrity failure"):
+        b.validate("r1", strict=True)
+    assert b.validate("r1")["status"] == "invalid"
+    with sqlite3.connect(tmp_path / "run.db") as db:
+        assert db.execute("select result from integrity where run_id = 'r1'").fetchone()[0] == "invalid"
