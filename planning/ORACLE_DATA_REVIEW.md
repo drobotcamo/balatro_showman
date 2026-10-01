@@ -22,17 +22,30 @@ producer's action space, and event extraction.
 | --- | --- | --- | --- | --- |
 | win | 433 | win | `F:\OBS_RECORDINGS\oracle_runs\2026-09-30_14-50-37_1790805058-5327\` | `F:\OBS_RECORDINGS\2026-09-30 14-50-37.mkv` |
 | loss (verify) | 43 | loss | `F:\OBS_RECORDINGS\oracle_runs\2026-09-30_15-31_verify_1790807319-8546\` | none recorded |
+| loss (superseded candidate) | 39 | loss | `F:\OBS_RECORDINGS\oracle_runs\1790821374-5833\` | none recorded |
+| loss (merged revision) | 29 | loss | `F:\OBS_RECORDINGS\oracle_runs\184013382700-5967\` | `F:\OBS_RECORDINGS\2026-10-01 00-58-04.mkv` |
 
 Each directory holds `session.json` (client contract `record/1.0.0`),
 `steps.ndjson` (client-added `_recorded_action`, snapshot contract
 `live/2.0.0`), and `NOTE.txt`. Runtime is identical in both runs: Balatro
 `1.0.1o-FULL`, Steamodded `26.926.0~dev-a`, Lovely `0.10.0`.
 
-**Provenance caveat.** Neither persisted run was captured from the merged
-revision (`main.lua` at HEAD). The win run predates the Steamodded page-map fix
-and the `game_state`/`pack_kind` diagnostics; the loss run is an intermediate
-revision where the pack diagnostics were not yet gated to `G.STATE == 999`
-(see §4.4). A capture pinned to the current revision is still outstanding.
+**Provenance caveat.** The win and verify runs predate the merged producer
+revision. The loss run is an intermediate revision where pack diagnostics were
+not yet gated to `G.STATE == 999` (see §4.4). The new run was captured after
+reinstalling the checked-in producer and restarting Balatro; source and
+installed `main.lua` SHA-256 matched
+`2BDC1B14C2BC27D37861168AAA58E7D634CD0D3567403BA84A570560A791C031`.
+
+The superseded candidate loss run `1790821374-5833` covers blind select, in-blind play,
+cash-out, shop, and both pack page families, and emits the newer offering zones
+and canonical object IDs. It is not sufficient evidence: its directory has no
+video or provenance note, its records have no frame index/offset or
+merged-revision identifier, and the audit fails on a null
+`capture_timestamp_ns` value before reporting integrity (`TypeError` in
+`planning/audit_oracle_runs.py`). The merged-revision run
+`184013382700-5967` covers blind select, in-blind play, cash-out, shop, and a
+booster pack; its session contains the recording marker and its audit passes.
 
 ## 3. Method / Reproduction
 
@@ -186,30 +199,26 @@ Roadmap Phase 0 gate bullet: "The Lua oracle emits aligned `(state, action,
 outcome)` for at least one run." Ground-truth contract invariant: "Video-to-
 engine alignment is explicit and auditable (timestamps, offsets)."
 
-**Finding: the runs prove transport liveness and internal
-state/action/outcome alignment, but the gate should not be claimed as passed.**
+**Finding: the merged-revision run proves transport liveness and auditable
+video-to-engine alignment, but the full Phase 0 gate remains open.**
 Reasoning, stated so the user can override:
 
-- Met: two full runs (one win, one loss) persist one aligned record per
+- Met: the merged-revision loss run persists one aligned record per
   decision step, with a single `run_id`, unique `request_id`s, `action_taken`
-  on every step, and a real `win`/`loss` outcome. This satisfies the "at least
-  one run" existence claim.
-- Not met: the word "aligned" is defined by the ground-truth contract as
-  *video-to-engine* alignment (timestamps, offsets), and neither run carries a
-  `frame_idx`, a video offset, or a frame mapping. `sent_at_real_time` is
-  second-resolution wall-clock, not an alignment artifact.
+  on every step, a real `loss` outcome, a persisted recording marker, and
+  positive frame mappings from `planning/align_oracle_video.py`. This satisfies
+  the aligned-run existence claim.
+- Met: the run covers blind select, in-blind play, cash-out, shop, and a
+  booster pack. All four canonical offering zones are present and positioned.
 - Not sufficient for downstream metric acceptance: the coarse base-only action
-  labels, empty `persistent_state`, missing masks, and missing shop/pack
-  offering zones cannot support the Phase 7 (persistent reduction, mask
-  agreement) or Phase 8 (event inference) metrics the oracle is meant to score.
+  labels, empty `persistent_state`, and incomplete object attributes cannot
+  support the Phase 7 (persistent reduction, mask agreement) or Phase 8 (event
+  inference) metrics the oracle is meant to score.
 
-**Exact gaps blocking the gate as written:** (1) no video-to-engine alignment
-metadata (the ground-truth contract invariant above); (2) no frame index or
-traceability to source video/frame (also a dataset-contract invariant for any
-later persisted rows); (3) no canonical zoned action label or
-`target_action_id`; (4) `persistent_state` empty and no legality masks; (5) no
-canonical `class_id` for jokers/consumables and no modifier/edition/seal data;
-(6) no shop/pack offering zones.
+**Exact gaps blocking the full gate as written:** (1) no canonical zoned action
+label or `target_action_id`; (2) `persistent_state` remains empty despite raw
+fields; (3) object modifiers/editions/stickers remain incomplete; (4) the
+evaluation set, annotation protocol, and numeric thresholds remain open.
 
 The coarse action labels and empty `persistent_state` were known at handoff and
 are by design for a smoke test. The recommendation is to record the oracle as
