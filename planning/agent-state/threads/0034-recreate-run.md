@@ -21,9 +21,8 @@ Completed:
   D024 records the complete compatibility, integrity, query, and ownership
   decisions. PR #50 carries the design update.
 Next:
-1. Merge PR #50 after `planning-check` passes and the fresh review holds.
-2. Unblock the smallest implementation issue, beginning with #44.
-3. Keep #48 as the integration and validation boundary for Issue #34.
+1. Unblock the smallest implementation issue, beginning with #44.
+2. Keep #48 as the integration and validation boundary for Issue #34.
 Decisions: D021, D023, and D024 govern the ownership and implementation boundary.
 Risks: SQLite schema and migration details remain to be specified by #44; Phase 9 export format remains intentionally separate.
 Validation: `py -3 planning\\check_contracts.py` and `git diff --check` passed before PR #50; rerun after this update.
