@@ -1,7 +1,7 @@
 # Work Thread
 Updated: 2026-10-01
 Issue: #34
-PR: pending
+PR: #49
 Owner: lead
 Branch: issue-34-run-bundle-boundary
 Worktree: C:\Users\camgr\Documents\code_projects\balatro_showman
