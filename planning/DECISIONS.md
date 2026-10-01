@@ -177,6 +177,24 @@ dependencies and gates, and adopting a new coordination authority is a larger
 architecture change than this phase needs. Source: Issue #25 and user-approved
 design conversation of 2026-09-30.
 
+### D023 — accepted — Python granularization synthesizes SWAP actions
+
+The Lua oracle does not emit a direct `SWAP_i_j` event. It emits the engine-truth action and object/zone evidence needed to observe state changes; Python granularization compares relevant joker ordering across steps and creates `SWAP_i_j` with `source_kind: "swap_synth"` when the adopted schema requires it. This keeps synthetic event inference in the Phase 8 event/granularization layer and prevents competing SWAP definitions. Source: user decision on 2026-10-01; `legacy/vendor/balatro-policy-transformer/granularization_schema.md` §6 and D020.
+
+### D024 — accepted — Python granularization synthesizes Buy & Use actions
+
+Balatro records the UI's Buy & Use gesture as adjacent `BuyShopItem` and
+`UseConsumable` callbacks; the Lua producer preserves those raw observations.
+The downstream live granularizer collapses an adjacent top-shelf Tarot, Planet,
+or Spectral purchase followed by `UseConsumable` into
+`BuyAndUseShopConsumable_TopShelfShopOfferings_i`, retaining `derived_from` and
+the consumable-slot-full indicator. A full consumable area is supporting
+evidence, not a required discriminator, because the raw sequence is otherwise
+functionally equivalent. This avoids depending on a nonexistent
+`G.FUNCS.buy_and_use` callback and keeps raw oracle provenance intact. Source:
+Issue #13 runtime bundle `53440456500-3281`, audited 2026-10-01; current
+`legacy/policy/granularize_live.py`.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the

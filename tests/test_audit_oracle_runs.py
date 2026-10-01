@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import planning.audit_oracle_runs as audit_module
 from planning.audit_oracle_runs import (
     MASK_BASIS_FIELDS,
     RAW_LEAF_FIELDS,
@@ -153,6 +154,65 @@ def _write_run(
 
 
 class AuditConformanceTests(unittest.TestCase):
+    def test_target_subtypes_match_zones_and_objects(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            selected = _offering("TopShelfShopOfferings", 0, "tarot")
+            run_dir = _write_run(
+                Path(directory),
+                objects=[selected],
+                pending=[],
+                extra={
+                    "action": "BuyAndUseShopConsumable_TopShelfShopOfferings_0",
+                    "action_subtype": "buytopshelfconsumable",
+                    "target_zone": "TopShelfShopOfferings",
+                    "target_position": 0,
+                    "selected_object": {"object": selected},
+                },
+            )
+            summary = audit(run_dir)
+        self.assertEqual(summary["canonical_action_present"], 1)
+
+    def test_sell_subtype_zone_is_checked(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            selected = _joker(151, "j_joker")
+            run_dir = _write_run(
+                Path(directory),
+                objects=[selected],
+                pending=[],
+                extra={
+                    "action": "SellItem_CurrentJokers_0",
+                    "action_subtype": "selljoker",
+                    "target_zone": "CurrentJokers",
+                    "target_position": 0,
+                    "selected_object": {"object": selected},
+                },
+            )
+            summary = audit(run_dir)
+        self.assertEqual(summary["canonical_action_present"], 1)
+
+    def test_invalid_buy_use_object_fails_audit(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            selected = _offering("TopShelfShopOfferings", 0, "joker")
+            run_dir = _write_run(
+                Path(directory),
+                objects=[selected],
+                pending=[],
+                extra={
+                    "action": "BuyAndUseShopConsumable_TopShelfShopOfferings_0",
+                    "action_subtype": "buytopshelfconsumable",
+                    "target_zone": "TopShelfShopOfferings",
+                    "target_position": 0,
+                    "selected_object": {"object": selected},
+                },
+            )
+            audit_module.INTEGRITY_FAILURES.clear()
+            audit(run_dir)
+            self.assertTrue(
+                any("buy/use target is not a consumable object" in finding
+                    for finding in audit_module.INTEGRITY_FAILURES)
+            )
+            audit_module.INTEGRITY_FAILURES.clear()
+
     def test_populated_run_has_no_attribute_findings(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             run_dir = _write_run(
