@@ -54,6 +54,10 @@ against a Lua ground-truth oracle. `planning/README.md` is the planning index.
   AI phrasing, and repetitive summaries.
 - Submit PR and issue bodies with actual line breaks. Before submission, check
   that literal `\\n` does not appear unless it is intentional code content.
+- On PowerShell, avoid nested quoting for substantial multiline GitHub or CLI
+  bodies; create a real temporary body file or use a supported heredoc pattern,
+  inspect it, and pass it with the command's file option. This prevents shell
+  parsing failures and preserves the intended line breaks.
 
 ## Safety
 

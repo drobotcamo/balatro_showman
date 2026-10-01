@@ -15,6 +15,27 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-01: Long-running work needs a clean session boundary
+
+- Context: The repository uses multiple agent sessions on shared work-item
+  branches and relies on thread batons to transfer execution state.
+- Observation: Published agent-harness guidance recommends incremental progress,
+  clean end states, and structured progress artifacts for the next session;
+  GitHub's cloud-agent workflow likewise makes branch, commit, test, and PR
+  state inspectable; OpenAI's harness-engineering report treats repository-local
+  knowledge, validation, review, and merge as the agent's end-to-end loop.
+- Implication: `/work` should end only with either a verified baton for a fresh
+  agent context or a fully completed thread with green checks, required review
+  evidence, and merge/settlement. Findings that prevent repeated investigation
+  should be promoted to this file rather than left in chat.
+- Verification/source: `planning/agent-workflow.md` §`/work` Execution Rule and
+  Handoff Protocol; Anthropic, “Effective harnesses for long-running agents,”
+  2025-11-26, https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents;
+  GitHub, “About GitHub Copilot cloud agent,” accessed 2026-10-01,
+  https://docs.github.com/en/copilot/concepts/agents/coding-agent/about-coding-agent;
+  OpenAI, “Harness engineering: leveraging Codex in an agent-first world,”
+  2026-02-11, https://openai.com/index/harness-engineering/.
+
 ## 2026-10-01: PR bodies must use real multiline input
 
 - Context: Recent PR history included bodies with literal `\\n` sequences where
