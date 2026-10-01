@@ -51,7 +51,7 @@ GitHub is the coordination authority for parallel work:
 
 ## Orchestrator
 
-The orchestrator (`../.opencode/agent/orchestrator.md`, invoked via
+The orchestrator (`../.opencode/agents/orchestrator.md`, invoked via
 `/orchestrate`) owns portfolio state, not a single work item:
 
 - Its procedure is fixed: state assessment (issues, PRs, CI, git, worktrees),

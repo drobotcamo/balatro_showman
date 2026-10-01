@@ -17,7 +17,7 @@ Checks (mechanical only; it does not judge prose quality or gate thresholds):
   files. Inventory documents that intentionally reference external or vendored
   artifacts (e.g. `planning/PHASE0_INVENTORY.md`) are excluded, because those
   targets are not present in a fresh checkout.
-- The orchestrator agent (`.opencode/agent/orchestrator.md`) and its
+- The orchestrator agent (`.opencode/agents/orchestrator.md`) and its
   `/orchestrate` command exist with the required sections and wiring.
 
 Stdlib only; exit code 1 on any failure.
@@ -205,10 +205,10 @@ ORCHESTRATOR_REQUIRED_SECTIONS = (
 
 
 def check_orchestrator() -> None:
-    agent = ROOT / ".opencode" / "agent" / "orchestrator.md"
+    agent = ROOT / ".opencode" / "agents" / "orchestrator.md"
     command = ROOT / ".opencode" / "command" / "orchestrate.md"
     if not agent.is_file():
-        fail("missing .opencode/agent/orchestrator.md")
+        fail("missing .opencode/agents/orchestrator.md")
     else:
         text = agent.read_text(encoding="utf-8")
         for heading in ORCHESTRATOR_REQUIRED_SECTIONS:
