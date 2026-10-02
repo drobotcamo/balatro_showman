@@ -1,14 +1,13 @@
 # Issue Tags
 
-New work items use a unique, immutable four-letter uppercase tag. GitHub issue
-numbers remain the backing identifier and are included where GitHub needs a
-numeric reference.
+Numeric GitHub issues and checkpoint filenames are normal for new work. The
+eight historical four-letter aliases remain valid, immutable references; no
+allocation or registry change is needed to start an issue.
 
-The registry is `planning/issue-tags.json`. Atomically allocate and register a
+The registry is `planning/issue-tags.json`. The optional compatibility utility can register a
 tag with `python tools/issue_tags.py register <issue-number>`. The command
 serializes concurrent allocation attempts and updates the registry itself.
-Numeric references and numeric thread filenames remain valid for historical
-work.
+The `check` subcommand remains in CI and validates registry integrity.
 
-New references use `TAG (#N)` in prose, `Issue: TAG (#N)` in thread files, and
-both the tag and `Closes #N` in pull requests.
+Tagged checkpoints use `Issue: TAG (#N)` matching the registry. Numeric references
+use `#N`; PRs can use `Closes #N` without a tag.

@@ -13,9 +13,17 @@ other work. Winning plays are not a special objective at this stage.
 - Read the relevant component contract before changing that component; its
   inputs, outputs, invariants, and acceptance criteria are the interface
   between agents and development phases.
-- Do not skip a phase gate because a later component can be prototyped early.
+- Start an agreed ready issue through `agent-workflow.md`; portfolio assessment
+  is for unresolved selection. D028 permits cross-component slices, not claims
+  that unmeasured broad gates passed.
 
 ## Document Map
+
+- `WORKFLOW_MIGRATION_IMPLEMENTATION_PLAN.md`: D028 implementation handoff,
+  scoped subagent assignments, migration acceptance, and production follow-through.
+- `LEAD_WORKFLOW_MIGRATION_PROMPT.md`: direct lead launch prompt for that migration.
+- `PRODUCTION_RETROSPECTIVE_2026-10-02.md`: production/workflow review and evidence.
+- `WORKFLOW_MIGRATION_VERIFICATION.md`: scenario evidence and reserved CI/input requests.
 
 - `ROADMAP.md`: phased development plan, phase gates, and component ownership.
 - `ARCHITECTURE.md`: system boundaries and data flow.
@@ -55,13 +63,17 @@ learning formats and append-only ordering, open-question linkage, component
 sections and status, roadmap ownership and gates, and resolvable backtick file
 references in the core agent/planning documents. It does not judge prose
 quality or validate gate thresholds; the
-numeric thresholds are a Phase 0 evaluation-protocol deliverable (Q03).
+criteria and numeric thresholds require the applicable approved versioned
+protocol before held-out evaluation (Q03).
 
 ## Status Vocabulary
 
 Use one of: `planned`, `designing`, `building`, `validated`, `blocked`, or
 `retired`.
 
-Current status: `building`. Phase 0 is the active phase; the Lua-oracle
-transport is validated, but contract conformance, video-to-engine alignment,
-and the evaluation set are pending (see `PHASE0_INVENTORY.md`).
+Current status: `building`. Capture/storage/inspection components exist and a
+historical pinned run has alignment metadata. Recorder reliability, current
+rendered correspondence, semantic suitability and evaluation acceptance remain
+open. Next delivery is reliable recorded-run inspection (#81), then reviewed
+evaluation slice (#79/#82), then measured video-only reconstruction. See
+`PHASE0_INVENTORY.md`; live ownership/blockers belong on GitHub, not this index.

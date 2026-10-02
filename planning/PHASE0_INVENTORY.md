@@ -32,11 +32,11 @@ store. It must not be used to promote a candidate without external evidence.
 
 | Phase 0 output | Owning component | Repository evidence | Status |
 | --- | --- | --- | --- |
-| Public-artifact inventory and provenance records | Ground truth / dataset | `legacy/vendor/balatro-cv-pipeline/`, `legacy/vendor/balatro-policy-transformer/` contain reference code/data; no active provenance records were found | inventory only |
-| Aligned `(state, action, outcome)` oracle run | Ground truth | `ground_truth/balatro_mod/` Lua producer merged via PR #9; two real runs persisted and audited in `planning/ORACLE_DATA_REVIEW.md`, but neither is pinned to the merged revision and neither carries video-to-engine alignment | transport validated; contract conformance and video alignment pending |
+| Public-artifact inventory and provenance records | Ground truth / dataset | Schema and read-only inventory shipped in PR #77; candidate evidence is not eligibility | inventory delivered; adoption unresolved |
+| Aligned `(state, action, outcome)` oracle run | Ground truth | `planning/ORACLE_DATA_REVIEW.md` reports older unpinned runs and a 29-step pinned loss run with marker/positive frame mappings | historical transport/alignment metadata exists; current reliability, semantic suitability and measured rendered correspondence unaccepted |
 | Real-frame eval set, annotation protocol, and QA export | Ground truth | Legacy labeling code exists (`legacy/label_store.py`, `legacy/tools/`), but no active tool, real clips, eval manifest, or protocol was found | blocked on real footage and format decision |
 | Required assets/weights versioned and provenance-backed | Ontology / synthetic data / detection | A legacy YOLO checkpoint and OCR geometry exist; no active-store provenance, license, compatibility, or checksum records were found | not ready to adopt |
-| Phase 1–10 thresholds | Owning phase components; protocol owned by ground truth | No Phase 0 evaluation protocol or numeric thresholds exist yet; Q03 tracks this gap | blocked on eval design and pilot data |
+| Applicable evaluation criteria | Owning phase/slice components; protocol owned by ground truth | No approved first-slice protocol established here; Q03 remains staged under D028 | development protocol/pilot next; freeze criteria before held-out evaluation |
 
 ## Verified reusable references
 
@@ -53,12 +53,11 @@ store. It must not be used to promote a candidate without external evidence.
 
 ## Boundary and next gate
 
-The smallest safe next implementation is a provenance manifest schema plus a
-read-only inventory of candidate artifacts. Do not copy weights, sprites, or
-sample data into an active store until source identity, license, checksum, and
-compatibility are verified. The oracle and eval-set work cannot be declared
-complete from repository inspection: the bridge source is merged and transport
-is validated (PR #9, `planning/ORACLE_DATA_REVIEW.md`), but Phase 0 still
-requires a capture pinned to the merged revision with video-to-engine alignment,
-timestamped real footage, and an agreed annotation/export format. The oracle
-producer/reducer ownership decision (#14) gates the next producer iteration.
+The inventory is shipped, not the next implementation. #81 owns reliable
+recorded-run inspection, starting with recorder fault regressions before live
+capture. #79 supplies a development protocol; #82's minimal tool/pilot informs
+its final approved evaluation protocol. #80 gates only required artifact use.
+Do not promote candidates without source, license, checksum and compatibility.
+Historical reports are preserved; external video was not replayed for this
+reconciliation. Alignment arithmetic alone is not measured frame correspondence.
+No current live acceptance or broad Phase 0 completion is claimed.

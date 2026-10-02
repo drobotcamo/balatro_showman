@@ -1,40 +1,28 @@
-## Issue
-
-Tag:
+## Issue and delivered outcome
 
 Closes #
+Historical tag (optional):
+Tier and approval authority:
 
-Tier: T0 planning/process | T1 contract (user approval required) | T2 code (agent merges when green)
+Observable behavior/artifact, scope and exclusions.
 
-## What changed
+## Validation and limits
 
-Scope, files, and components touched.
+Commands, exact results, revision and unverified claims. Inspection/structural
+checks are not reconstruction-quality or agent-behavior evidence.
 
-## Validation
+## Review evidence
 
-Commands run and their results (paste output; inspection alone is not evidence
-for reconstruction-quality claims).
+Follow `planning/agent-workflow.md` → Review Evidence. Record independent task,
+reviewed SHA, verdict, checks, material findings/disposition and limits once on
+this PR where the tier requires review. Include all artifacts before final review.
 
-## Remaining uncertainty
+## Integration and ownership
 
-What could not be verified, and why it is acceptable.
+- [ ] Required current CI, intended base/diff and dependency order verified
+- [ ] Affected contracts/decisions/learnings updated where needed
+- [ ] Unfinished-work checkpoint included only if needed
+- [ ] `git status` inventoried; all owned changes included, unrelated work excluded
 
-## Planning updates
-
-- [ ] Component contract updated if its interface, invariants, or status changed
-- [ ] Thread file updated (`planning/agent-state/threads/`)
-- [ ] Durable decisions in `DECISIONS.md` / findings in `LEARNINGS.md`
-- [ ] `python planning/check_contracts.py` passes
-
-## Review notes
-
-What a reviewer should check first; what cannot be verified automatically.
-
-## T2 Merge Evidence
-
-- [ ] Fresh-context `@reviewer` verdict is `holds` for the current diff
-- [ ] Reviewer task and evidence are recorded on this PR
-- [ ] CI is green and the PR base, current diff, and dependency order were checked separately
-- [ ] Merge commit and Issue/thread settlement were verified after merge
-- [ ] If already merged without review evidence, this is recorded as a process violation
-- [ ] `git status` was inspected and no worker-owned leftovers remain outside this PR
+After merge, verify and record completion here/on the same issue. No tracked
+completion-mirror update or settlement-only follow-up is required.

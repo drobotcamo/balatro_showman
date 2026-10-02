@@ -13,8 +13,8 @@ decisions, run bundles, issues, or gate status.
 ## Preflight
 
 1. Read `planning/ROADMAP.md`, `planning/PHASE0_INVENTORY.md`, the ground-truth
-   and dataset contracts, the active dependency batons, and the versioned Phase
-   0 protocol.
+   and dataset contracts, applicable unfinished-work checkpoints, and the
+   versioned protocol for the actual gate/slice and evidence revision.
 2. Refuse to conclude `pass` when the protocol is absent, incomplete,
    contradictory, unversioned, or does not identify criteria, thresholds,
    evidence schema, statuses, authority, report location, and sendback rules.
@@ -22,6 +22,9 @@ decisions, run bundles, issues, or gate status.
 3. Pin repository revision, protocol revision, evidence identities, and the
    report destination before collecting rows. Missing identity is a gap, not a
    pass.
+4. Verify the protocol identifies the requested gate/slice, supported scope and
+   applicable evidence revision. A valid protocol for another slice/revision is
+   inapplicable, not a pass. Criteria must be approved before held-out evaluation.
 
 ## Evidence collection
 
@@ -30,14 +33,11 @@ identity, timestamp, verification command and output, owner, status, gaps,
 sendback owner, recheck, and the required human decision. Do not infer labels
 from filenames, repository presence, oracle output, or a prior report.
 
-The matrix must contain separate rows for:
-
-- output ownership and meaning;
-- an aligned oracle run;
-- a disjoint real-frame evaluation set;
-- active asset and weight provenance;
-- Phase 1–10 thresholds; and
-- cross-cutting evidence integrity.
+Derive named required rows from that applicable approved protocol. Record its
+identity and each criterion ID rather than unexplained positional rows. Retain
+applicable ownership, alignment, disjoint evaluation, required-artifact provenance
+and integrity obligations; future Phase 1-10 thresholds are not unconditional
+prerequisites for a bounded slice (D028). Deferred broader criteria remain open.
 
 Allowed row results are `pass`, `sendback`, `blocked`, and `unknown`. Preserve
 `missing`, `unsupported`, `occluded`, and `ambiguous` evidence states where
@@ -70,7 +70,8 @@ human/issue; do not edit the governing document to make a row pass.
 
 Do not capture, annotate, train, promote assets, mutate run bundles, or create,
 close, or update issues. Do not approve this skill or close Phase 0. Repeated
-runs with identical inputs must produce identical conclusions and row content
-apart from explicitly declared report metadata. Use the fixtures in
-`fixtures/` to exercise the refusal and classification paths before using real
-evidence.
+runs with identical inputs should produce identical conclusions and row content
+apart from explicitly declared report metadata. `fixtures/cases.json` and
+`tests/test_gate_fixtures.py` check a declared classification model and fixture
+identities/refusal cases, not actual agent execution or determinism. Independently
+review the tabletop/live report before claiming gate acceptance.

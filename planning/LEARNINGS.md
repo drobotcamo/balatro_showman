@@ -15,6 +15,35 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-02: Passing local tests leave capture lifecycle faults uncovered
+
+- Context: Production retrospective of the active file-IPC recorder.
+- Observation: The local suite passed 91 tests and 15 subtests. Separate isolated
+  fixtures reproduced a restart leaving two persisted records but `n_steps=1`,
+  deletion of malformed input, and a pending snapshot reopening a finalized run
+  with a null outcome. The GitHub workflow runs planning/tag checks, not pytest.
+- Implication: Add capture restart/finalization/failure acceptance tests before
+  relying on recorder output for evaluation. Distinguish planning CI, local
+  component tests, and measured live evidence when reporting quality.
+- Verification/source: `planning/PRODUCTION_RETROSPECTIVE_2026-10-02.md`,
+  Verification record and code references; independent reviewer reproduced the
+  fixture results. Real-game failure frequency was not measured.
+
+## 2026-10-02: Request identity claims must be pinned to producer revision
+
+- Context: Migration research compared old run reports with current Lua source.
+- Observation: Older reports show per-run request sequences, but current Lua
+  initializes `Bridge.request_id` once and `Game.start_run` changes run identity
+  without resetting it. The bridge still keys in-memory deduplication by request
+  ID alone. The lead also reproduced the three capture faults above in isolated
+  fixtures during #92.
+- Implication: Do not infer current counter lifetime from older captures. Test
+  run-scoped identity across restarts and delayed/missing end signals in #81.
+- Verification/source: Explorer C task `ses_f015be329ffeywdOpdk5Y8hoxQ` inspected
+  `ground_truth/balatro_mod/main.lua` initialization, emit and start-run hooks;
+  `ground_truth/file_ipc_bridge.py` maps. Diagnostic output is recorded in
+  `planning/WORKFLOW_MIGRATION_VERIFICATION.md`. No live frequency measured.
+
 ## 2026-10-01: Long-running work needs a clean session boundary
 
 - Context: The repository uses multiple agent sessions on shared work-item

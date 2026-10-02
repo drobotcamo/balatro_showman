@@ -24,12 +24,10 @@ Run these steps in order, every session, and show your evidence for each:
 1. State assessment. Inspect GitHub issues and PRs (`gh issue list`, `gh pr
    list`), CI status on open PRs, `git status`, `git branch`, and `git
    worktree list`. Note which branches are checked out in which worktrees.
-2. Handoff audit. For every open work item, read its thread baton in
-   `planning/agent-state/threads/` and verify its claims against repository
-   evidence: does the branch exist and match, does the PR exist and is CI
-   green, does `git status` agree with the baton's claims, is the baton
-   `Status:` field consistent with GitHub state? Flag stale, inconsistent, or
-   abandoned batons. Do not trust a baton because it exists.
+2. Handoff audit. Read applicable checkpoints as as-of context and verify current
+   ownership against issue/PR/branch/worktree evidence. A missing checkpoint or
+   pre-merge status is not a repair task. Distinguish historical metadata from
+   substantive current conflicts; never infer completion from prose alone.
 3. Readiness table. Derive claimable work from structured state, not vibes:
    open issues, their dependency links, the ROADMAP `Open Questions And Gates`
    table, blocked statuses, and handoff-audit results. Show the derivation.
@@ -45,7 +43,7 @@ T0 only, per `planning/agent-workflow.md`:
 
 - Create or update thread batons under `planning/agent-state/threads/`,
   using the handoff template.
-- Close stale threads, mark abandoned work, and record reasons.
+- Record genuine abandonment reasons, not repairs solely for later GitHub merges.
 - Comment on GitHub issues and PRs to record assessment evidence, dispositions,
   and blockers.
 - Create GitHub issues and sub-issues when the conversation establishes more
@@ -74,8 +72,9 @@ End every assessment with:
 ## Boundaries
 
 - Treat subagent output as evidence to inspect, not decisions.
-- If two claims conflict (baton vs GitHub vs git), stop at the conflict,
+- If substantive current claims conflict (checkpoint vs GitHub vs git), stop at the conflict,
   record it, and surface it rather than guessing.
 - Escalate when the next step would broaden scope, invalidate a phase gate,
   or require a T1+ decision; surface alternatives and a recommendation.
-- Keep sessions short: assess, audit, repair T0 state, recommend, hand off.
+- Keep sessions short: assess relevant state, recommend one action, checkpoint
+  only unfinished context. Do not conduct closed-history cleanup campaigns.

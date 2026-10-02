@@ -46,7 +46,8 @@ against a Lua ground-truth oracle. `planning/README.md` is the planning index.
   linkage, component sections, roadmap ownership and gates, and reference
   resolution), not for prose quality or gate thresholds.
 - Report what changed, what was verified, and what remains uncertain.
-- Update the affected contract and work-thread file; capture reusable findings.
+- Update affected contracts; checkpoint unfinished work when fresh context is
+  needed. Capture reusable findings; record live completion on the PR/issue.
 - A completion claim requires a runnable check's output or an independent
   fresh-context review (`planning/agent-workflow.md` → Approval).
 

@@ -28,7 +28,7 @@ annotation, and generate synthetic OCR glyph crops for UI text.
 - Every annotation is generated from the same transform as its visual asset.
 - Seeds make scenes reproducible.
 - Train/validation/test backgrounds, seeds, and source videos are separated.
-- Background pools used for training are disjoint from the Phase 0 evaluation
+- Background pools used for training are disjoint from the applicable evaluation
   set; eval failure surfaces are never trained on.
 - Synthetic-only metadata never masquerades as observed game state.
 
@@ -39,5 +39,6 @@ annotation, and generate synthetic OCR glyph crops for UI text.
 - The generator can create difficult small, occluded, modified, and overlapping
   objects.
 - Glyph crops match the OCR training format and cover all fields and states.
-- Resolution and aspect-ratio diversity meets the Phase 0 protocol.
+- Resolution and aspect-ratio diversity meets the applicable approved protocol,
+  fixed before held-out evaluation (D028/Q03).
 - A real-frame smoke set shows transfer beyond synthetic imagery.

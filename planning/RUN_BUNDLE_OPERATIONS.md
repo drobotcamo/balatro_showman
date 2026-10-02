@@ -71,7 +71,7 @@ confirmed.
 
 ## Agent Procedure
 
-1. Read the relevant thread baton, Issue, and run-bundle contracts.
+1. Read the Issue, run-bundle contracts and applicable unfinished-work checkpoint.
 2. Inspect with `python -m run_bundle ...`; preserve the JSON envelope and
    diagnostics in any report.
 3. Build the terminal summary from observed data and label unknown or missing
