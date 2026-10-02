@@ -58,6 +58,8 @@ def test_strict_validation_reports_integrity_failure(tmp_path):
 def test_validation_rejects_tampered_aggregate_result(tmp_path):
     b = bundle(tmp_path)
     b.append("r1", 0, "state", {"n": 1})
+    with b._engine.begin() as connection:
+        connection.exec_driver_sql("UPDATE integrity SET result = 'unknown' WHERE run_id = 'r1'")
     inspector = RunBundleInspector(f"sqlite:///{tmp_path / 'run.db'}")
     assert inspector.validate("r1")["data"]["status"] == "valid"
     with b._engine.begin() as connection:
