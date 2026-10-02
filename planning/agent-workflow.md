@@ -52,11 +52,51 @@ Do not delete unfamiliar worktrees or discard changes to resolve uncertainty.
 6. If blocked or context-limited, leave one factual unfinished-work checkpoint
    with exact results, ownership exclusions and the requested next action.
 
+### Acceptance Iteration
+
+Treat the issue's complete `Done When`/acceptance list as the unit of work, not
+the first code slice, focused test, PR, or reviewer verdict. After each useful
+slice, re-read every acceptance item and classify it as verified, pending,
+explicitly deferred, or blocked by a specific external decision/evidence/action.
+Continue on the same issue and implementation branch through the next
+independently verifiable slice. A partial PR is valid when it advances the
+outcome, but is not issue completion and does not by itself justify handoff.
+
+Stop implementation only at a real boundary: a specific user decision/input,
+verified permission/access denial, missing external asset/runtime, evidence that
+cannot proceed without a decision, or genuine context exhaustion. State the exact
+decision/action and why it blocks the remaining acceptance. Continue every other
+in-scope criterion, including independently executable work outside the blocked
+slice. Ask for the narrow missing input only after all such independent acceptance
+work is done. Context exhaustion calls for a factual checkpoint and fresh lead,
+not a user-approval claim; the next lead continues the same issue and does not
+restart settled slices. Do not reframe ordinary remaining implementation as an
+external blocker. If the user must supply live evidence, finish fixture-backed
+and command-level work first, then ask the precise recording/runtime/acceptance
+question and wait only at that checkpoint. Record what remains pending and resume
+the same issue when the input arrives.
+
+At each proposed stop, verify the issue acceptance list against branch diff,
+tests, PR/CI/review and required human evidence. Do not label an item complete
+from a summary alone. Completion means all required criteria are addressed or
+explicitly deferred with the user's acceptance, current review/required checks
+are satisfied, integration is verified, and live completion is recorded on the
+same PR/issue. A passing focused suite proves only the cases it ran.
+
+`/work` must iterate automatically after a bounded implementation/review slice:
+inspect remaining acceptance, continue if any in-scope item has no real external
+dependency, and keep all related slices under the same issue. It must not return
+a success-style “implemented” summary with uncommitted changes or unresolved
+acceptance. For long work, publish/checkpoint factual progress and continue in
+the same lead when possible; context exhaustion is a handoff reason only after a
+compact verified checkpoint and explicit unfinished acceptance inventory.
+
 For `/work`, ask clarifying questions at most once, then use the narrowest
 reasonable assumptions. Do not pause for routine progress or permissions already
 granted. Continue through review/publication/integration when in scope and allowed.
-A draft, local diff or ready-to-review state is not completion. Report external
-blockers instead of inventing success or manufacturing a handoff boundary.
+A draft, local diff, focused test pass or one reviewed code slice is not issue
+completion. Report external blockers instead of inventing success or
+manufacturing a handoff boundary.
 
 ## Orchestrator
 

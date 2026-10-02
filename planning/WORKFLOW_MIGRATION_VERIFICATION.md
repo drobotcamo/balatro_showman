@@ -74,3 +74,32 @@ integrity scope, performance evidence needs and oracle-isolated evaluation path.
 The inspected Lua request counter is process-scoped, not reset on each run;
 run-scoped identity remains required across restarts. No recorder rewrite belongs
 in this PR.
+
+## Follow-up: acceptance iteration gap observed after merge
+
+On 2026-10-02, a `/work #81` session reported recorder edits and 10 passing
+focused tests, then stopped with the changes uncommitted and without publication,
+the remaining issue acceptance inventory, or the human capture request. The
+repository was inspected after the report: `ground_truth/file_ipc_bridge.py` and
+`tests/test_file_ipc_bridge.py` were modified on the migration branch, with no
+open #81 PR. Those local changes belong to that session and are preserved; do not
+stage them as workflow remediation.
+
+This exposed an instruction gap: the migration said continue through integration
+and report real blockers but did not explicitly define full issue acceptance as
+the unit across successive independently useful code/review slices. The outcome
+could be misread as complete after one focused implementation. The canonical
+workflow and `/work` lead adapter now state the iteration rule, require a
+criterion-by-criterion stop check, and distinguish a valid partial PR from issue
+completion. No source-behavior test can prove agent compliance; the #81 run is
+direct behavioral evidence and that next lead must recheck live state before
+continuing.
+
+Recovery: inspect/retain the #81 edits and their ownership, run relevant tests,
+continue acceptance under #81, open its implementation PR when ready, obtain
+current-SHA review and required CI, and proceed through remaining fixture cases.
+After fixture/command work, request the exact human runtime/mod, recording
+destination/window/format, tolerance and explicit association needed for live
+evidence. Do not claim #81 complete until all criteria are addressed or explicitly
+deferred with user acceptance. This observation is not a license to commit the
+other session's changes or combine them with migration edits.
