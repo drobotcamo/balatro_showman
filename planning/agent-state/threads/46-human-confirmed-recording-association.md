@@ -1,12 +1,12 @@
 # Work Thread
-Updated: 2026-10-01
+Updated: 2026-10-02
 Issue: #46
-PR: #56 (https://github.com/drobotcamo/balatro_showman/pull/56)
+PR: #61 (https://github.com/drobotcamo/balatro_showman/pull/61) follow-up to merged #56
 Owner: project lead
 Branch: issue-46-human-confirmed-recording-association
 Worktree: C:\Users\camgr\Documents\code_projects\balatro_showman-issue-46
 Objective: Add human-confirmed, additive recording-marker association for run bundles.
-Status: ready-for-review
+Status: blocked
 Scope: ground_truth/recording_association.py, run_bundle/repository.py, focused tests
 Dependencies: #35 marker contract; #44 run-bundle API; D023-D024
 Completed:
@@ -15,9 +15,14 @@ Completed:
 - Added additive provenance persistence that does not alter evidence hashes or lifecycle.
 - Added focused tests for confirmed, declined, missing, malformed, stale, interrupted,
   finalized, and immutable-evidence paths.
+- Enforced user decision D025: required coordination failures return `blocked` with
+  `recording_required`; optional failures remain explicit non-video outcomes.
+- Normalized ordinary confirmation callback failures to the explicit interrupted
+  result so required coordination cannot escape without a machine-readable outcome.
 Next:
-- Wait for PR #56 checks and required approval, then merge.
-Decisions: No new architecture; use existing Provenance as additive audit metadata.
+- Obtain fresh approval and required CI for PR #61, then merge and settle Issue #46.
+Decisions: D025; no new run-bundle lifecycle status; existing Provenance remains additive audit metadata.
 Risks: No live OBS interaction was added per #35 boundary; video existence remains
-  explicitly unclaimed unless separately verified.
-Validation: 26 focused tests passed; planning/check_contracts.py passed; git diff --check passed.
+ explicitly unclaimed unless separately verified. PR #61 has no reported CI checks
+ or approval, so it cannot be merged under the T2 workflow.
+Validation: 18 focused tests passed; 81 full tests passed; planning/check_contracts.py passed; git diff --check passed.

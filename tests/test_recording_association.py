@@ -2,7 +2,7 @@ import sqlite3
 import pytest
 
 from ground_truth.recording_association import (associate_after_confirmation, associate_recording,
-                                                confirm_interactive, confirm_terminal)
+                                                confirm_interactive, confirm_terminal, coordinate_recording)
 from run_bundle import RunBundle
 
 
@@ -84,8 +84,108 @@ def test_callback_interrupt_is_explicitly_interrupted(tmp_path):
     assert result.code == "coordination_interrupted"
 
 
+def test_callback_failure_is_explicitly_interrupted(tmp_path):
+    b, _ = bundle(tmp_path)
+
+    def failed():
+        raise RuntimeError("prompt failed")
+
+    result = associate_after_confirmation(b, "r1", marker=marker(), confirm=failed,
+                                          confirmed_by="terminal")
+    assert result.status == "interrupted"
+    assert result.code == "coordination_interrupted"
+
+
+def test_required_callback_failure_is_blocked(tmp_path):
+    b, _ = bundle(tmp_path)
+
+    def failed(_):
+        raise RuntimeError("prompt failed")
+
+    result = coordinate_recording(b, "r1", marker=marker(), prompt=failed, required=True)
+    assert result.status == "blocked"
+    assert result.code == "recording_required"
+
+
 def test_conflicting_association_is_rejected(tmp_path):
     b, _ = bundle(tmp_path)
     assert associate_recording(b, "r1", confirmed=True, marker=marker()).status == "confirmed"
     other = marker(); other["recording_id"] = "obs-2"
-    assert associate_recording(b, "r1", confirmed=True, marker=other).status == "interrupted"
+    result = associate_recording(b, "r1", confirmed=True, marker=other)
+    assert result.status == "rejected"
+    assert result.code == "association_conflict"
+
+
+def test_interactive_policy_and_direct_confirmation_validation(tmp_path):
+    messages = []
+    assert confirm_interactive(lambda _: "y", messages.append, required=True)
+    assert "recording is required" in messages[0]
+    assert not confirm_interactive(lambda _: "n", messages.append)
+    assert "recording is optional" in messages[1]
+
+    b, _ = bundle(tmp_path)
+    assert associate_recording(b, "r1", confirmed=1, marker=marker()).code == "confirmation_invalid"
+    assert associate_recording(b, "r1", confirmed=True, marker=marker(), observed_at_ns="now").code == "observation_time_invalid"
+
+
+def test_terminal_confirmation_states_recording_policy():
+    prompts = []
+    assert confirm_terminal(lambda message: prompts.append(message) or "y", required=True)
+    assert "recording is required" in prompts[0]
+    assert not confirm_terminal(lambda message: prompts.append(message) or "n")
+    assert "recording is optional" in prompts[1]
+
+
+def test_terminal_confirmation_is_wired_to_association(tmp_path):
+    b, _ = bundle(tmp_path)
+    result = associate_after_confirmation(
+        b,
+        "r1",
+        marker=marker(),
+        confirm=lambda: confirm_terminal(lambda _: "yes", required=True),
+        confirmed_by="terminal",
+    )
+    assert result.status == "confirmed"
+
+
+def test_coordinate_recording_is_the_user_facing_boundary(tmp_path):
+    b, _ = bundle(tmp_path); notices = []
+    result = coordinate_recording(b, "r1", marker=marker(), prompt=lambda _: "yes",
+                                  notify=notices.append, interactive=True, required=True)
+    assert result.status == "confirmed"
+    assert "recording is required" in notices[0]
+
+
+def test_required_recording_failure_blocks_coordination(tmp_path):
+    b, _ = bundle(tmp_path)
+    result = coordinate_recording(b, "r1", marker=marker(), prompt=lambda _: "no", required=True)
+    assert result.status == "blocked"
+    assert result.code == "recording_required"
+
+    result = coordinate_recording(b, "r1", marker=marker(), prompt=lambda _: "yes",
+                                  interactive=True, required=True)
+    assert result.status == "blocked"
+    assert result.code == "recording_required"
+
+    result = coordinate_recording(b, "r1", marker=None, prompt=lambda _: "yes", required=True)
+    assert result.status == "blocked"
+    assert result.code == "recording_required"
+
+
+def test_optional_recording_failure_remains_explicit(tmp_path):
+    b, _ = bundle(tmp_path)
+    result = coordinate_recording(b, "r1", marker=None, prompt=lambda _: "yes")
+    assert result.status == "missing"
+    assert result.code == "marker_missing"
+
+
+def test_missing_marker_notification_does_not_claim_evidence():
+    notices = []
+    assert not confirm_interactive(lambda _: "n", notices.append, marker_found=False)
+    assert "No OBS recording marker is available" in notices[0]
+
+
+def test_result_serializes_explicit_video_status(tmp_path):
+    b, _ = bundle(tmp_path)
+    result = associate_recording(b, "r1", confirmed=True, marker=None)
+    assert result.as_dict()["video_status"] == "unknown"

@@ -234,6 +234,18 @@ physical representation proposed in Issue #43, but does not change D023's
 ownership boundaries or the contracts owned by Issues #13, #15, #21, and #35.
 Source: user-approved Issue #43 design revision, 2026-10-01.
 
+### D025 — accepted — Required recording policy is a coordination hard gate
+When the runner declares recording required, confirmation and valid marker
+association must succeed before the user-facing coordination boundary returns
+success. Declined, missing, stale, malformed, interrupted, or conflicting
+recording evidence returns `blocked` with code `recording_required`; it does
+not mutate the run bundle. Optional recording retains explicit non-video
+outcomes. This is enforced at the recording-association boundary rather than
+adding a new run-bundle lifecycle status, preserving the existing lifecycle
+contract. Alternative: treat `required` as advisory notification only; rejected
+because it would allow a run to proceed despite the runner's stated policy.
+Source: user decision for Issue #46, 2026-10-02.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the

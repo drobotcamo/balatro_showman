@@ -16,10 +16,11 @@ class AssociationResult:
     code: str
     diagnostic: str
     recording_id: str | None = None
+    video_status: str = "unknown"
 
     def as_dict(self) -> dict[str, Any]:
         return {"status": self.status, "code": self.code, "diagnostic": self.diagnostic,
-                "recording_id": self.recording_id}
+                "recording_id": self.recording_id, "video_status": self.video_status}
 
 
 def associate_recording(bundle: RunBundle, run_id: str, *, confirmed: bool,
@@ -27,6 +28,8 @@ def associate_recording(bundle: RunBundle, run_id: str, *, confirmed: bool,
                         max_age_ns: int | None = None, video_ref: str | None = None,
                         confirmed_by: str = "human", interrupted: bool = False) -> AssociationResult:
     """Persist a recording marker only after explicit human confirmation."""
+    if not isinstance(confirmed, bool):
+        return AssociationResult("invalid", "confirmation_invalid", "confirmation must be boolean")
     if interrupted:
         return AssociationResult("interrupted", "coordination_interrupted", "coordination was interrupted")
     if not confirmed:
@@ -43,8 +46,10 @@ def associate_recording(bundle: RunBundle, run_id: str, *, confirmed: bool,
             or not math.isfinite(fps) or not isinstance(timestamp, int)
             or isinstance(timestamp, bool) or timestamp < 0):
         return AssociationResult("invalid", "marker_malformed", "recording marker is malformed")
-    if max_age_ns is not None and (not isinstance(max_age_ns, int) or max_age_ns < 0):
+    if max_age_ns is not None and (not isinstance(max_age_ns, int) or isinstance(max_age_ns, bool) or max_age_ns < 0):
         return AssociationResult("invalid", "max_age_invalid", "maximum marker age is invalid", marker["recording_id"])
+    if observed_at_ns is not None and (not isinstance(observed_at_ns, int) or isinstance(observed_at_ns, bool) or observed_at_ns < 0):
+        return AssociationResult("invalid", "observation_time_invalid", "observation time is invalid", marker["recording_id"])
     if not isinstance(confirmed_by, str) or not confirmed_by.strip():
         return AssociationResult("invalid", "confirmer_invalid", "confirmation identity is invalid", marker["recording_id"])
     if video_ref is not None and (not isinstance(video_ref, str) or not video_ref.strip()):
@@ -66,29 +71,79 @@ def associate_recording(bundle: RunBundle, run_id: str, *, confirmed: bool,
         values["recording.video_ref"] = video_ref
     try:
         bundle.add_provenance(run_id, values)
-    except BundleError:
+    except BundleError as exc:
+        if str(exc).startswith("conflicting provenance:"):
+            return AssociationResult("rejected", "association_conflict", str(exc), marker["recording_id"])
         return AssociationResult("interrupted", "run_unavailable", "run disappeared during association", marker["recording_id"])
-    return AssociationResult("confirmed", "association_confirmed", "recording marker associated", marker["recording_id"])
+    return AssociationResult("confirmed", "association_confirmed", "recording marker associated",
+                             marker["recording_id"], "marker-associated")
 
 
-def confirm_interactive(prompt, notify) -> bool:
-    """Notify a present operator, then accept only an explicit yes."""
-    notify("OBS recording marker found. Confirm association? [y/N]")
+def confirm_interactive(prompt, notify, *, required: bool = False, marker_found: bool = True) -> bool:
+    """Notify an operator of recording policy, then accept only an explicit yes."""
+    policy = "required" if required else "optional"
+    evidence = "OBS recording marker found." if marker_found else "No OBS recording marker is available."
+    notify(f"OBS recording is {policy}. {evidence} Confirm association? [y/N]")
     return prompt("y/N: ").strip().lower() in {"y", "yes"}
 
 
-def confirm_terminal(prompt=input) -> bool:
-    """Terminal confirmation helper; EOF/interruption is never confirmation."""
-    return prompt("OBS recording is required/optional. Confirm start? [y/N] ").strip().lower() in {"y", "yes"}
+def confirm_terminal(prompt=input, *, required: bool = False) -> bool:
+    """Terminal confirmation helper with an explicit recording policy."""
+    policy = "required" if required else "optional"
+    return prompt(f"OBS recording is {policy}. Confirm start? [y/N] ").strip().lower() in {"y", "yes"}
 
 
 def associate_after_confirmation(bundle: RunBundle, run_id: str, *, marker: dict[str, Any] | None,
                                  confirm, confirmed_by: str, **kwargs) -> AssociationResult:
-    """Connect an operator confirmation callback to the association boundary."""
+    """Connect a confirmation helper to the association boundary.
+
+    Callers should pass ``confirm_terminal`` or ``confirm_interactive`` here so
+    EOF and keyboard interruption become machine-readable association results.
+    """
     try:
         confirmed = confirm() is True
-    except (EOFError, KeyboardInterrupt):
+    except Exception:
+        return associate_recording(bundle, run_id, confirmed=False, marker=marker,
+                                   confirmed_by=confirmed_by, interrupted=True, **kwargs)
+    except KeyboardInterrupt:
         return associate_recording(bundle, run_id, confirmed=False, marker=marker,
                                    confirmed_by=confirmed_by, interrupted=True, **kwargs)
     return associate_recording(bundle, run_id, confirmed=confirmed, marker=marker,
                                confirmed_by=confirmed_by, **kwargs)
+
+
+def coordinate_recording(
+    bundle: RunBundle,
+    run_id: str,
+    *,
+    marker: dict[str, Any] | None,
+    prompt,
+    notify=None,
+    interactive: bool = False,
+    required: bool = False,
+    confirmed_by: str = "human",
+    **kwargs: Any,
+) -> AssociationResult:
+    """Run the user-facing confirmation flow and associate marker evidence."""
+    if interactive:
+        if notify is None:
+            result = AssociationResult("invalid", "notification_missing", "interactive notification callback is required")
+            if required:
+                return AssociationResult("blocked", "recording_required",
+                                         f"required recording coordination failed: {result.code}")
+            return result
+        confirm = lambda: confirm_interactive(prompt, notify, required=required, marker_found=marker is not None)
+    else:
+        confirm = lambda: confirm_terminal(prompt, required=required)
+    result = associate_after_confirmation(
+        bundle, run_id, marker=marker, confirm=confirm, confirmed_by=confirmed_by, **kwargs
+    )
+    if required and result.status != "confirmed":
+        return AssociationResult(
+            "blocked",
+            "recording_required",
+            f"required recording coordination failed: {result.code}",
+            result.recording_id,
+            result.video_status,
+        )
+    return result
