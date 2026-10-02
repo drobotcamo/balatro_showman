@@ -6,7 +6,7 @@ Owner: project lead
 Branch: issue-46-human-confirmed-recording-association
 Worktree: C:\Users\camgr\Documents\code_projects\balatro_showman-issue-46
 Objective: Add human-confirmed, additive recording-marker association for run bundles.
-Status: blocked
+Status: complete
 Scope: ground_truth/recording_association.py, run_bundle/repository.py, focused tests
 Dependencies: #35 marker contract; #44 run-bundle API; D023-D024
 Completed:
@@ -20,9 +20,8 @@ Completed:
 - Normalized ordinary confirmation callback failures to the explicit interrupted
   result so required coordination cannot escape without a machine-readable outcome.
 Next:
-- Obtain fresh approval and required CI for PR #61, then merge and settle Issue #46.
+- None; Issue #46 and PR #61 are merged.
 Decisions: D025; no new run-bundle lifecycle status; existing Provenance remains additive audit metadata.
 Risks: No live OBS interaction was added per #35 boundary; video existence remains
- explicitly unclaimed unless separately verified. PR #61 has no reported CI checks
- or approval, so it cannot be merged under the T2 workflow.
-Validation: 18 focused tests passed; 81 full tests passed; planning/check_contracts.py passed; git diff --check passed.
+ explicitly unclaimed unless separately verified.
+Validation: 18 focused tests passed; 81 full tests passed; planning/check_contracts.py passed; git diff --check passed; PR #61 merged as 06ea3f8.
