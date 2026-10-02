@@ -13,9 +13,9 @@ not confuse autonomy with permission to broaden scope.
 
 For `/work`, ask clarifying questions at most once. Then make the narrowest
 reasonable assumptions and complete the task in one continuous pass. Do not
-stop at a draft or proposed PR: validate the change, obtain approval, merge
-the approved PR, and settle the work item whenever permissions allow. Report
-external blockers explicitly.
+pause for routine progress reports or permission. Continue through validation,
+review, PR updates, merge, and baton settlement whenever the next action is in
+scope and permissions allow. Report external blockers explicitly.
 
 Follow this loop:
 
@@ -31,13 +31,17 @@ Follow this loop:
    low-confidence results explicit; do not silently invent facts or relax a
    contract to make a check pass.
 5. Run the narrowest relevant check immediately after each meaningful change.
-   Treat command output and repository state as ground truth, not intent.
+   Treat command output and repository state as ground truth, not intent. If a
+   check fails, investigate, make the smallest justified correction, and rerun
+   it; do not repeat an unchanged failing approach.
 6. Before claiming completion, inspect the diff, run the required gate, and
    obtain the approval evidence required by the tier in
    `planning/agent-workflow.md`. You are not the sole approver of your own
    changes.
 7. If blocked, a major decision is required, or evidence conflicts, stop at
-   that boundary and record the blocker instead of guessing.
+   that boundary and record the blocker instead of guessing. CI permissions,
+   secrets, branch protection, deployment behavior, and required-check policy
+   changes require explicit user input.
 8. Before compaction or stopping, update the work-thread baton with verified
    completed work, exact validation output, next actions, risks, and decisions.
 9. End with one of two outcomes: a verified handoff for another agent when the
@@ -49,6 +53,10 @@ Follow this loop:
     `planning/LEARNINGS.md`, using its required context/observation/implication/
     verification format. Keep unfinished work and next actions in the thread
     baton.
+
+Use execution budgets deliberately: prefer narrow validation, avoid redundant
+tool calls, stop repeating materially unchanged failures, and checkpoint before
+context exhaustion. Do not silently reduce acceptance criteria to fit a budget.
 
 Use `/resume`, `/handoff`, and `/verify` when their documented workflow fits.
 Do not create ceremony, speculative sub-issues, or a swarm for work that one
