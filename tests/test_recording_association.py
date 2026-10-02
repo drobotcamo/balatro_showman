@@ -101,3 +101,11 @@ def test_interactive_policy_and_direct_confirmation_validation(tmp_path):
     b, _ = bundle(tmp_path)
     assert associate_recording(b, "r1", confirmed=1, marker=marker()).code == "confirmation_invalid"
     assert associate_recording(b, "r1", confirmed=True, marker=marker(), observed_at_ns="now").code == "observation_time_invalid"
+
+
+def test_terminal_confirmation_states_recording_policy():
+    prompts = []
+    assert confirm_terminal(lambda message: prompts.append(message) or "y", required=True)
+    assert "recording is required" in prompts[0]
+    assert not confirm_terminal(lambda message: prompts.append(message) or "n")
+    assert "recording is optional" in prompts[1]

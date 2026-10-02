@@ -82,9 +82,10 @@ def confirm_interactive(prompt, notify, *, required: bool = False) -> bool:
     return prompt("y/N: ").strip().lower() in {"y", "yes"}
 
 
-def confirm_terminal(prompt=input) -> bool:
-    """Terminal confirmation helper; EOF/interruption is never confirmation."""
-    return prompt("OBS recording is required/optional. Confirm start? [y/N] ").strip().lower() in {"y", "yes"}
+def confirm_terminal(prompt=input, *, required: bool = False) -> bool:
+    """Terminal confirmation helper with an explicit recording policy."""
+    policy = "required" if required else "optional"
+    return prompt(f"OBS recording is {policy}. Confirm start? [y/N] ").strip().lower() in {"y", "yes"}
 
 
 def associate_after_confirmation(bundle: RunBundle, run_id: str, *, marker: dict[str, Any] | None,
