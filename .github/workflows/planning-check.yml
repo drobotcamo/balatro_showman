@@ -4,12 +4,14 @@ on:
   push:
     paths:
       - "planning/**"
+      - "tools/**"
       - "AGENTS.md"
       - "CLAUDE.md"
       - ".github/workflows/planning-check.yml"
   pull_request:
     paths:
       - "planning/**"
+      - "tools/**"
       - "AGENTS.md"
       - "CLAUDE.md"
       - ".github/workflows/planning-check.yml"
@@ -19,4 +21,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - run: python3 tools/issue_tags.py check
       - run: python3 planning/check_contracts.py

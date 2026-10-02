@@ -6,7 +6,7 @@ may work on more than one issue.
 
 ## Layout
 
-- `threads/<issue-number>-<short-name>.md`: one handoff per work item. Use the
+- `threads/<issue-number-or-tag>-<short-name>.md`: one handoff per work item. Use the
   template in `../agent-workflow.md` → Handoff Protocol; this file does not
   restate it.
 - `archive/`: completed or abandoned threads, created when first needed.

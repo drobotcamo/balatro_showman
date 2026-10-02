@@ -9,7 +9,7 @@ Route knowledge to the correct layer; do not duplicate it. Procedures go in
 `.opencode/skill/` only when repeatable with a clear trigger.
 
 - Current work and next actions →
-  `planning/agent-state/threads/<issue-number>-<short-name>.md` (template in
+  `planning/agent-state/threads/<issue-number-or-tag>-<short-name>.md` (template in
   `planning/agent-workflow.md` → Handoff Protocol).
 - Durable choices and open questions → `planning/DECISIONS.md` (ADR-lite
   entries; state alternatives when material).
