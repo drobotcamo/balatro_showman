@@ -129,3 +129,15 @@ def test_coordinate_recording_is_the_user_facing_boundary(tmp_path):
                                   notify=notices.append, interactive=True, required=True)
     assert result.status == "confirmed"
     assert "recording is required" in notices[0]
+
+
+def test_missing_marker_notification_does_not_claim_evidence():
+    notices = []
+    assert not confirm_interactive(lambda _: "n", notices.append, marker_found=False)
+    assert "No OBS recording marker is available" in notices[0]
+
+
+def test_result_serializes_explicit_video_status(tmp_path):
+    b, _ = bundle(tmp_path)
+    result = associate_recording(b, "r1", confirmed=True, marker=None)
+    assert result.as_dict()["video_status"] == "unknown"

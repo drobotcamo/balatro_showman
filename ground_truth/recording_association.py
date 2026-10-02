@@ -16,10 +16,11 @@ class AssociationResult:
     code: str
     diagnostic: str
     recording_id: str | None = None
+    video_status: str = "unknown"
 
     def as_dict(self) -> dict[str, Any]:
         return {"status": self.status, "code": self.code, "diagnostic": self.diagnostic,
-                "recording_id": self.recording_id}
+                "recording_id": self.recording_id, "video_status": self.video_status}
 
 
 def associate_recording(bundle: RunBundle, run_id: str, *, confirmed: bool,
@@ -72,13 +73,15 @@ def associate_recording(bundle: RunBundle, run_id: str, *, confirmed: bool,
         bundle.add_provenance(run_id, values)
     except BundleError:
         return AssociationResult("interrupted", "run_unavailable", "run disappeared during association", marker["recording_id"])
-    return AssociationResult("confirmed", "association_confirmed", "recording marker associated", marker["recording_id"])
+    return AssociationResult("confirmed", "association_confirmed", "recording marker associated",
+                             marker["recording_id"], "marker-associated")
 
 
-def confirm_interactive(prompt, notify, *, required: bool = False) -> bool:
+def confirm_interactive(prompt, notify, *, required: bool = False, marker_found: bool = True) -> bool:
     """Notify an operator of recording policy, then accept only an explicit yes."""
     policy = "required" if required else "optional"
-    notify(f"OBS recording is {policy}. OBS recording marker found. Confirm association? [y/N]")
+    evidence = "OBS recording marker found." if marker_found else "No OBS recording marker is available."
+    notify(f"OBS recording is {policy}. {evidence} Confirm association? [y/N]")
     return prompt("y/N: ").strip().lower() in {"y", "yes"}
 
 
@@ -120,7 +123,7 @@ def coordinate_recording(
     if interactive:
         if notify is None:
             return AssociationResult("invalid", "notification_missing", "interactive notification callback is required")
-        confirm = lambda: confirm_interactive(prompt, notify, required=required)
+        confirm = lambda: confirm_interactive(prompt, notify, required=required, marker_found=marker is not None)
     else:
         confirm = lambda: confirm_terminal(prompt, required=required)
     return associate_after_confirmation(
