@@ -37,3 +37,4 @@ What a reviewer should check first; what cannot be verified automatically.
 - [ ] CI is green and the PR base, current diff, and dependency order were checked separately
 - [ ] Merge commit and Issue/thread settlement were verified after merge
 - [ ] If already merged without review evidence, this is recorded as a process violation
+- [ ] `git status` was inspected and no worker-owned leftovers remain outside this PR

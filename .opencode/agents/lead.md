@@ -50,6 +50,10 @@ Follow this loop:
    changes require explicit user input.
 8. Before compaction or stopping, update the work-thread baton with verified
    completed work, exact validation output, next actions, risks, and decisions.
+   Inventory `git status` before handoff. Commit every worker-owned change,
+   including the baton, in the PR; do not leave worker-created untracked files,
+   generated artifacts, or temporary leftovers. Preserve unrelated pre-existing
+   changes and document them as excluded.
 9. End with one of two outcomes: a verified handoff for another agent when the
    session has run long enough to benefit from fresh context, or a completed
    thread whose PR has been opened, checks are green, required review/approval

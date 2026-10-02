@@ -260,6 +260,15 @@ without the required independent evidence. Source: Issue #69 and the T2 gate
 in `planning/agent-workflow.md`, informed by GitHub protected-branch status and
 review semantics and agent-harness guidance from Anthropic and OpenAI.
 
+### D027 — accepted — Worker-owned worktree state must be settled in the PR
+Workers must not hand off or complete with worker-created leftovers in the
+worktree. Every owned change, including handoff artifacts, belongs in the PR;
+temporary and generated files must be removed. Unrelated pre-existing changes
+are preserved and explicitly excluded rather than deleted. Alternative: leave
+local leftovers for the next worker; rejected because it makes ownership and
+review scope ambiguous and can hide incomplete work. Source: Issue #69
+follow-up request and the handoff gate in `planning/agent-workflow.md`.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the

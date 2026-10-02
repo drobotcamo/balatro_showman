@@ -51,6 +51,18 @@ under its Decisions section. This file is a knowledge base, not a task log.
   2025-11-26; OpenAI, “Harness engineering,” 2026-02-11; Issue #69; and the
   regression markers in `planning/check_contracts.py`.
 
+## 2026-10-02: Handoffs need an owned-worktree boundary
+
+- Context: Issue #69 follow-up requested that workers not leave leftovers for
+  later sessions.
+- Observation: A baton is useful only when the next worker can distinguish
+  committed work from local residue; shared worktrees can also contain changes
+  owned by another worker or the user.
+- Implication: Require `git status` inspection, commit all worker-owned changes
+  and handoff artifacts in the PR, remove owned temporary/generated files, and
+  preserve unrelated changes with an explicit exclusion note.
+- Verification/source: D027 and the handoff gate in `planning/agent-workflow.md`.
+
 ## 2026-10-01: PR bodies must use real multiline input
 
 - Context: Recent PR history included bodies with literal `\\n` sequences where
