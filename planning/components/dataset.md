@@ -1,6 +1,6 @@
 # Component Contract: Dataset Production
 
-Status: `planned`
+Status: `planned` (Phase 9 handoff boundary defined)
 
 ## Purpose
 
@@ -17,6 +17,30 @@ earlier by Issue #34; this component owns scale-out dataset production.
 - Pipeline and schema versions.
 - Ground-truth oracle records (for validation splits and outcome labels).
 - Versioned run bundles produced by the ground-truth storage boundary.
+
+## Phase 9 Handoff Boundary
+
+Run-bundle storage is the operational capture boundary, not the Phase 9 export
+format. Dataset production accepts either a versioned SQLite bundle through its
+read-only inspection interface or a legacy oracle directory through the
+read-only compatibility reader. The latter preserves `session.json` and
+`steps.ndjson` objects and reports source hashes; it never repairs or rewrites
+the source.
+
+- `no-video` means no recording association was supplied. It is not a claim
+  that no video exists.
+- `obs` means a recording marker was present in the source or a recording was
+  associated after explicit human confirmation. It is not independent proof
+  that the video file exists.
+- Missing or invalid markers remain explicit diagnostics. Required recording
+  coordination may block capture; optional coordination produces a non-video
+  result rather than silently fabricating provenance.
+- Partial and malformed oracle inputs remain inspectable diagnostics. A
+  partial run may be resumed or reprocessed; malformed source bytes are
+  preserved for diagnosis and are never silently converted into dataset rows.
+- The future export job must checkpoint its input identity,
+  schema/configuration versions, and completed partitions so interruption is
+  resumable without mutating the source bundle.
 
 ## Outputs
 
