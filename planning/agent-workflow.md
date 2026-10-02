@@ -12,7 +12,7 @@ other document restates these rules — they link to this one.
 - `planning/DECISIONS.md`: durable decisions and open questions.
 - `planning/LEARNINGS.md`: reusable findings, failure modes, and techniques.
 - `planning/TOOLING.md`: verified project and machine-specific command recipes.
-- `planning/agent-state/threads/<issue-number>-<short-name>.md`: a work-thread
+- `planning/agent-state/threads/<issue-number-or-tag>-<short-name>.md`: a work-thread
   baton that can be continued by multiple sessions on the same branch/worktree.
 - `.opencode/agents/`: configured agents, including the orchestrator and the
   per-work-item lead; `.opencode/command/`: workflow commands; `.opencode/skill/`:
@@ -28,6 +28,9 @@ GitHub is the coordination authority for parallel work:
   deliverables are merged or explicitly deferred, its acceptance criteria are
   addressed, and remaining uncertainty is recorded. Abandoned or superseded
   work is closed with a reason.
+- New issues receive a unique immutable four-letter tag recorded in
+  `planning/issue-tags.json`. Use `TAG (#N)` in new references; numeric issue
+  references and historical numeric thread filenames remain valid.
 - A dedicated branch and worktree implement the Issue; one or more agent
   sessions may continue the same branch and worktree.
 - A Pull Request is the review, validation, and merge boundary for all work:
@@ -88,6 +91,21 @@ The orchestrator (`../.opencode/agents/orchestrator.md`, invoked via
   user does not answer, or ambiguity remains after that question, make the
   narrowest reasonable assumptions, record them, and attempt the task in one
   continuous pass.
+- Do not pause for routine progress reports or permission. Continue through
+  implementation, validation, review, PR updates, merge, and baton settlement
+  whenever the next action is in scope and permissions allow it.
+- When a routine check fails, investigate the failure, make the smallest
+  justified correction, and rerun the narrowest relevant check. Do not repeat
+  an unchanged failing approach. Ordinary workflow defects may be repaired when
+  they do not change permissions, secrets, branch protection, deployment
+  behavior, or another durable policy.
+- If GitHub reports no checks, inspect branch protection and existing workflow
+  configuration. Do not silently add or alter required checks, permissions,
+  secrets, branch protection, deployment behavior, or other durable CI policy;
+  those are T3 decisions requiring explicit user input.
+- Use a fresh reviewer for T2 work, register every PR with the thread
+  immediately after creation or discovery, and update the relevant thread baton
+  before finishing.
 - Do not stop at a draft, local diff, or proposed PR when the task is
   actionable. Carry the work through validation, an approved PR, merge, and
   settled/closed work-item state whenever repository and GitHub permissions
@@ -105,6 +123,18 @@ The orchestrator (`../.opencode/agents/orchestrator.md`, invoked via
   Include the context, observation, implication, and verification/source; do
   not record generic advice or unverified speculation. Keep session-specific
   next actions in the thread baton instead.
+
+### Execution Budgets
+
+- Prefer the narrowest relevant inspection and validation. Avoid redundant
+  searches, unchanged tool calls, and broad test suites that cannot affect the
+  work item's gate.
+- Treat context, time, retry, and external-action limits as execution budgets.
+  Budgets constrain the method, not the acceptance criteria; do not silently
+  reduce the required outcome.
+- When a materially different approach is unavailable or a budget is becoming
+  limiting, stop starting new exploratory work and leave a verified handoff
+  with evidence, blocker, and concrete next actions.
 
 ## Subagent Policy
 
@@ -174,7 +204,7 @@ Rules common to all tiers:
 
 ## Handoff Protocol
 
-Write or update `planning/agent-state/threads/<issue-number>-<short-name>.md`
+Write or update `planning/agent-state/threads/<issue-number-or-tag>-<short-name>.md`
 before stopping, compacting, or handing work to another session. A thread
 represents a bounded work item, not an OpenCode session. Multiple sessions may
 continue one thread. Keep it factual and short; delete stale claims — it is a
