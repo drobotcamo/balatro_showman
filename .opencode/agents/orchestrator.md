@@ -15,6 +15,10 @@ authority for tiers, handoffs, and merging.
 
 ## Procedure
 
+Use `.opencode/skill/portfolio-state/SKILL.md` for the bounded portfolio-state
+procedure below; this agent remains the sole authority and owns the final
+report.
+
 Run these steps in order, every session, and show your evidence for each:
 
 1. State assessment. Inspect GitHub issues and PRs (`gh issue list`, `gh pr

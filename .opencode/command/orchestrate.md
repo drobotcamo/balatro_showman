@@ -1,6 +1,7 @@
 ---
 description: Orchestrate the portfolio: assess state, audit handoffs, recommend the next work item.
 agent: orchestrator
+skill: portfolio-state
 ---
 Act as the orchestrator for this session: $ARGUMENTS
 
