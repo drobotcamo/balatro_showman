@@ -90,7 +90,11 @@ def confirm_terminal(prompt=input, *, required: bool = False) -> bool:
 
 def associate_after_confirmation(bundle: RunBundle, run_id: str, *, marker: dict[str, Any] | None,
                                  confirm, confirmed_by: str, **kwargs) -> AssociationResult:
-    """Connect an operator confirmation callback to the association boundary."""
+    """Connect a confirmation helper to the association boundary.
+
+    Callers should pass ``confirm_terminal`` or ``confirm_interactive`` here so
+    EOF and keyboard interruption become machine-readable association results.
+    """
     try:
         confirmed = confirm() is True
     except (EOFError, KeyboardInterrupt):

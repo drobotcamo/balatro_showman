@@ -109,3 +109,15 @@ def test_terminal_confirmation_states_recording_policy():
     assert "recording is required" in prompts[0]
     assert not confirm_terminal(lambda message: prompts.append(message) or "n")
     assert "recording is optional" in prompts[1]
+
+
+def test_terminal_confirmation_is_wired_to_association(tmp_path):
+    b, _ = bundle(tmp_path)
+    result = associate_after_confirmation(
+        b,
+        "r1",
+        marker=marker(),
+        confirm=lambda: confirm_terminal(lambda _: "yes", required=True),
+        confirmed_by="terminal",
+    )
+    assert result.status == "confirmed"
