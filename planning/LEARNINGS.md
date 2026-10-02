@@ -33,7 +33,7 @@ under its Decisions section. This file is a knowledge base, not a task log.
 
 - Context: Migration research compared old run reports with current Lua source.
 - Observation: Older reports show per-run request sequences, but current Lua
-  initializes `Bridge.request_id` once and `Game.start_run` changes run identity
+  initializes local `request_counter` once and `Game.start_run` changes run identity
   without resetting it. The bridge still keys in-memory deduplication by request
   ID alone. The lead also reproduced the three capture faults above in isolated
   fixtures during #92.

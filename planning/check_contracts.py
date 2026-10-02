@@ -83,7 +83,7 @@ def check_threads() -> None:
         if historical:
             text = re.sub(r"^(?:[ \t]*-[ \t]+|[ \t]+)(?=[A-Za-z]+:)", "", text, flags=re.M)
         fields = dict(re.findall(
-            r"^([A-Za-z]+):[ \t]*([\s\S]*?)(?=^[A-Za-z]+:|^# |\Z)", text, re.M
+            r"^([A-Za-z]+):[ \t]*([\s\S]*?)(?=^[A-Za-z]+:|^#{1,6}[ \t]+|\Z)", text, re.M
         ))
         # Full historical records retain their old fields. Anything else is compact.
         legacy = all(field in fields for field in LEGACY_THREAD_FIELDS)

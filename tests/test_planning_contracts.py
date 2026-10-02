@@ -60,6 +60,7 @@ class PlanningValidatorTests(unittest.TestCase):
     def test_missing_empty_fenced_and_invalid_checkpoint_data(self):
         for text in (COMPACT.replace("Risks: no live evidence; fixture only\n", ""),
                      COMPACT.replace("Validation: revision abc123; checks passed", "Validation: "),
+                     COMPACT.replace("Validation: revision abc123; checks passed", "Validation:\n## Evidence\nNo validation performed."),
                      "```\n" + COMPACT + "```\n", COMPACT.split("\n", 1)[1]):
             with self.subTest(text=text):
                 checks.errors.clear()
