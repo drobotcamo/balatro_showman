@@ -65,7 +65,8 @@ class RunBundleInspector:
         run, records, integrity = self._load(run_id)
         bad = [r.sequence for r in records if hashlib.sha256(r.payload).hexdigest() != r.sha256 or r.integrity_status == "invalid"]
         actual = hashlib.sha256("".join(r.sha256 for r in records).encode()).hexdigest()
-        aggregate_bad = not integrity or integrity.record_count != len(records) or integrity.bundle_sha256 != actual
+        aggregate_bad = (not integrity or integrity.record_count != len(records)
+                         or integrity.bundle_sha256 != actual or integrity.result != "valid")
         diagnostics = (["aggregate integrity metadata mismatch"] if aggregate_bad else [])
         result = self.envelope("derived", {"status": "invalid" if bad or aggregate_bad else "valid",
             "record_count": len(records), "bad_sequences": bad}, diagnostics)
