@@ -47,6 +47,13 @@ under its Decisions section. This file is a knowledge base, not a task log.
 - Verification/source: PR history reviewed while implementing Issue #37; the
   rule is encoded in `.opencode/skill/deslop/SKILL.md` and `AGENTS.md`.
 
+## 2026-10-01: T2 reviewer evidence must be recorded before merge
+
+- Context: Retrospective review of merged Issue #47 PR #57.
+- Observation: The compatibility implementation and required CI checks passed, but GitHub has no review record and a fresh-context reviewer found unspecified edge cases in incomplete session metadata and blank NDJSON lines.
+- Implication: A green check and a correct-looking diff do not establish the T2 approval boundary; record the independent reviewer verdict on the PR before merging, and keep unresolved compatibility-envelope questions explicit rather than silently enforcing a new interpretation.
+- Verification/source: `gh pr view 57 --json reviews,statusCheckRollup,state,mergedAt`; fresh-context reviewer report; `planning/agent-workflow.md` §Approval And Merging.
+
 ## 2026-09-30: Bounded autonomy is safer than an unconstrained swarm
 
 - Context: The repository needed agents that could make independent progress on
