@@ -84,6 +84,29 @@ def test_callback_interrupt_is_explicitly_interrupted(tmp_path):
     assert result.code == "coordination_interrupted"
 
 
+def test_callback_failure_is_explicitly_interrupted(tmp_path):
+    b, _ = bundle(tmp_path)
+
+    def failed():
+        raise RuntimeError("prompt failed")
+
+    result = associate_after_confirmation(b, "r1", marker=marker(), confirm=failed,
+                                          confirmed_by="terminal")
+    assert result.status == "interrupted"
+    assert result.code == "coordination_interrupted"
+
+
+def test_required_callback_failure_is_blocked(tmp_path):
+    b, _ = bundle(tmp_path)
+
+    def failed(_):
+        raise RuntimeError("prompt failed")
+
+    result = coordinate_recording(b, "r1", marker=marker(), prompt=failed, required=True)
+    assert result.status == "blocked"
+    assert result.code == "recording_required"
+
+
 def test_conflicting_association_is_rejected(tmp_path):
     b, _ = bundle(tmp_path)
     assert associate_recording(b, "r1", confirmed=True, marker=marker()).status == "confirmed"
@@ -131,6 +154,29 @@ def test_coordinate_recording_is_the_user_facing_boundary(tmp_path):
                                   notify=notices.append, interactive=True, required=True)
     assert result.status == "confirmed"
     assert "recording is required" in notices[0]
+
+
+def test_required_recording_failure_blocks_coordination(tmp_path):
+    b, _ = bundle(tmp_path)
+    result = coordinate_recording(b, "r1", marker=marker(), prompt=lambda _: "no", required=True)
+    assert result.status == "blocked"
+    assert result.code == "recording_required"
+
+    result = coordinate_recording(b, "r1", marker=marker(), prompt=lambda _: "yes",
+                                  interactive=True, required=True)
+    assert result.status == "blocked"
+    assert result.code == "recording_required"
+
+    result = coordinate_recording(b, "r1", marker=None, prompt=lambda _: "yes", required=True)
+    assert result.status == "blocked"
+    assert result.code == "recording_required"
+
+
+def test_optional_recording_failure_remains_explicit(tmp_path):
+    b, _ = bundle(tmp_path)
+    result = coordinate_recording(b, "r1", marker=None, prompt=lambda _: "yes")
+    assert result.status == "missing"
+    assert result.code == "marker_missing"
 
 
 def test_missing_marker_notification_does_not_claim_evidence():

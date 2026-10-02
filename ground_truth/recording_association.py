@@ -102,7 +102,10 @@ def associate_after_confirmation(bundle: RunBundle, run_id: str, *, marker: dict
     """
     try:
         confirmed = confirm() is True
-    except (EOFError, KeyboardInterrupt):
+    except Exception:
+        return associate_recording(bundle, run_id, confirmed=False, marker=marker,
+                                   confirmed_by=confirmed_by, interrupted=True, **kwargs)
+    except KeyboardInterrupt:
         return associate_recording(bundle, run_id, confirmed=False, marker=marker,
                                    confirmed_by=confirmed_by, interrupted=True, **kwargs)
     return associate_recording(bundle, run_id, confirmed=confirmed, marker=marker,
@@ -124,10 +127,23 @@ def coordinate_recording(
     """Run the user-facing confirmation flow and associate marker evidence."""
     if interactive:
         if notify is None:
-            return AssociationResult("invalid", "notification_missing", "interactive notification callback is required")
+            result = AssociationResult("invalid", "notification_missing", "interactive notification callback is required")
+            if required:
+                return AssociationResult("blocked", "recording_required",
+                                         f"required recording coordination failed: {result.code}")
+            return result
         confirm = lambda: confirm_interactive(prompt, notify, required=required, marker_found=marker is not None)
     else:
         confirm = lambda: confirm_terminal(prompt, required=required)
-    return associate_after_confirmation(
+    result = associate_after_confirmation(
         bundle, run_id, marker=marker, confirm=confirm, confirmed_by=confirmed_by, **kwargs
     )
+    if required and result.status != "confirmed":
+        return AssociationResult(
+            "blocked",
+            "recording_required",
+            f"required recording coordination failed: {result.code}",
+            result.recording_id,
+            result.video_status,
+        )
+    return result
