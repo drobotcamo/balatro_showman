@@ -476,6 +476,29 @@ class FileIpcBridgeTests(unittest.TestCase):
             self.assertEqual(diagnostic["missing_count"], 1)
             self.assertEqual(diagnostic["cause"], "unknown_possible_overwrite_or_consumer_delay")
 
+    def test_corrupt_diagnostic_tail_does_not_block_session_recovery(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            run_dir = out_dir / "diagnostic-corrupt"
+            run_dir.mkdir(parents=True)
+            (run_dir / "session.json").write_text(json.dumps({
+                "run_id": "diagnostic-corrupt", "n_steps": 1, "outcome": None,
+            }), encoding="utf-8")
+            (run_dir / "steps.ndjson").write_text(json.dumps({
+                "request_id": 1, "_recorded_action": "SkipBlind",
+            }) + "\n", encoding="utf-8")
+            valid_diagnostic = json.dumps({"code": "prior_diagnostic"}) + "\n"
+            corrupt_tail = b'{"code":"unfinished'
+            (run_dir / "capture_diagnostics.ndjson").write_bytes(valid_diagnostic.encode() + corrupt_tail)
+
+            bridge = FileIpcBridge(io_dir, out_dir)
+
+            self.assertIn("diagnostic-corrupt", bridge.open_sessions())
+            self.assertEqual((run_dir / "capture_diagnostics.ndjson.corrupt").read_bytes(), corrupt_tail)
+            self.assertEqual(json.loads((run_dir / "capture_diagnostics.ndjson").read_text())["code"], "prior_diagnostic")
+
 
 if __name__ == "__main__":
     unittest.main()

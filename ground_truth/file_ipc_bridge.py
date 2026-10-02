@@ -72,10 +72,7 @@ class FileIpcBridge:
                     self._attached_recording_ids.add(recording["recording_id"])
                 diagnostics_path = session_path.parent / "capture_diagnostics.ndjson"
                 if diagnostics_path.exists():
-                    for line in diagnostics_path.read_text(encoding="utf-8").splitlines():
-                        diagnostic = json.loads(line)
-                        if isinstance(diagnostic, dict):
-                            self._add_capture_diagnostic(run_id, diagnostic)
+                    self._load_capture_diagnostics(run_id, diagnostics_path)
                 steps_path = session_path.parent / "steps.ndjson"
                 raw = steps_path.read_bytes() if steps_path.exists() else b""
                 valid_records: list[bytes] = []
@@ -143,6 +140,29 @@ class FileIpcBridge:
                     self._write_capture_diagnostics(session["session_dir"], run_id)
             except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError):
                 continue
+
+    def _load_capture_diagnostics(self, run_id: str, path: Path) -> None:
+        raw = path.read_bytes()
+        valid_lines: list[bytes] = []
+        corrupt_tail: bytes | None = None
+        for line in raw.splitlines(keepends=True):
+            try:
+                item = json.loads(line.decode("utf-8"))
+                if not isinstance(item, dict) or not line.endswith(b"\n"):
+                    raise ValueError("invalid diagnostic record")
+            except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+                corrupt_tail = raw[len(b"".join(valid_lines)):]
+                break
+            valid_lines.append(line)
+            self._add_capture_diagnostic(run_id, item)
+        if corrupt_tail is not None:
+            corrupt_path = path.with_name(path.name + ".corrupt")
+            suffix = 1
+            while corrupt_path.exists():
+                corrupt_path = path.with_name(f"{path.name}.corrupt.{suffix}")
+                suffix += 1
+            corrupt_path.write_bytes(corrupt_tail)
+            _atomic_write(path, b"".join(valid_lines).decode("utf-8"))
 
     def _attach_recording_marker(self) -> None:
         marker = self._recording_marker
