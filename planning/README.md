@@ -8,7 +8,7 @@ other work. Winning plays are not a special objective at this stage.
 ## How To Use These Documents
 
 - Read `ROADMAP.md` before starting work.
-- Read the relevant `agent-state/threads/<issue-number>-<short-name>.md` to
+- Read the relevant `agent-state/threads/<issue-number-or-tag>-<short-name>.md` to
   resume work from another session or worktree.
 - Read the relevant component contract before changing that component; its
   inputs, outputs, invariants, and acceptance criteria are the interface

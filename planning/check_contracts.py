@@ -26,6 +26,7 @@ Stdlib only; exit code 1 on any failure.
 from __future__ import annotations
 
 import re
+import json
 import sys
 from pathlib import Path
 
@@ -87,6 +88,16 @@ def check_threads() -> None:
         for field in THREAD_REQUIRED_FIELDS:
             if field not in text:
                 fail(f"{rel}: missing handoff field {field!r}")
+        match = re.fullmatch(r"(?P<id>\d+|[A-Z]{4})-[a-z0-9-]+\.md", path.name)
+        if match and match.group("id").isalpha():
+            tag = match.group("id")
+            registry = load_issue_tags()
+            issue = registry.get(tag)
+            issue_field = re.search(r"^Issue:\s*([A-Z]{4})\s*\(#(\d+)\)", text, re.M)
+            if issue is None:
+                fail(f"{rel}: tag {tag} is not registered")
+            elif not issue_field or issue_field.group(1) != tag or int(issue_field.group(2)) != issue:
+                fail(f"{rel}: Issue field must be {tag} (#{issue})")
 
 
 def strip_fenced(text: str) -> str:
@@ -149,8 +160,6 @@ def check_open_questions() -> None:
 
 
 def check_issue_tags() -> None:
-    import json
-
     path = PLANNING / "issue-tags.json"
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -167,6 +176,16 @@ def check_issue_tags() -> None:
             fail(f"issue-tags.json: invalid issue number for {tag!r}")
     if len(data) != len(set(data.values())):
         fail("issue-tags.json: duplicate issue number")
+
+
+def load_issue_tags() -> dict[str, int]:
+    import json
+
+    try:
+        data = json.loads((PLANNING / "issue-tags.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def check_components() -> None:

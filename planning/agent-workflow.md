@@ -177,7 +177,7 @@ Rules common to all tiers:
 
 ## Handoff Protocol
 
-Write or update `planning/agent-state/threads/<issue-number>-<short-name>.md`
+Write or update `planning/agent-state/threads/<issue-number-or-tag>-<short-name>.md`
 before stopping, compacting, or handing work to another session. A thread
 represents a bounded work item, not an OpenCode session. Multiple sessions may
 continue one thread. Keep it factual and short; delete stale claims — it is a
