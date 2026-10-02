@@ -262,6 +262,25 @@ def check_orchestrator() -> None:
             fail(".opencode/command/orchestrate.md: must wire `agent: orchestrator`")
 
 
+def check_lead_merge_gate() -> None:
+    """Keep the high-risk T2 merge and settlement gate discoverable."""
+    workflow = (PLANNING / "agent-workflow.md").read_text(encoding="utf-8")
+    lead = (ROOT / ".opencode" / "agents" / "lead.md").read_text(encoding="utf-8")
+    command = (ROOT / ".opencode" / "command" / "work.md").read_text(encoding="utf-8")
+    template = (ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text(encoding="utf-8")
+    required = {
+        "workflow merge gate": (workflow, "## T2 Merge And Settlement Gate"),
+        "workflow reviewer rule": (workflow, "Fresh-context `@reviewer` verdict is `holds`"),
+        "workflow violation rule": (workflow, "process\nviolation"),
+        "lead reviewer rule": (lead, "fresh\n   `@reviewer` verdict of `holds`"),
+        "work command reviewer rule": (command, "fresh-context `@reviewer` verdict of\n`holds`"),
+        "PR evidence checklist": (template, "## T2 Merge Evidence"),
+    }
+    for name, (text, marker) in required.items():
+        if marker not in text:
+            fail(f"T2 merge gate: missing {name} marker {marker!r}")
+
+
 def check_references() -> None:
     docs = (
         ROOT / "AGENTS.md",
@@ -300,6 +319,7 @@ def main() -> int:
     check_components()
     check_roadmap()
     check_orchestrator()
+    check_lead_merge_gate()
     check_references()
     for error in errors:
         print(f"FAIL: {error}")

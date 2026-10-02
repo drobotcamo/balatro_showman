@@ -246,6 +246,20 @@ contract. Alternative: treat `required` as advisory notification only; rejected
 because it would allow a run to proceed despite the runner's stated policy.
 Source: user decision for Issue #46, 2026-10-02.
 
+### D026 — accepted — T2 merge and settlement require independent review evidence
+T2 work cannot be merged or marked complete from green CI, a successful merge,
+or a lead's own inspection alone. The current PR must contain a fresh-context
+`@reviewer` verdict of `holds` and its evidence, with `holds with gaps` and
+`refuted` blocking unless the documented exception applies. CI, base/diff,
+dependency order, merge, and post-merge settlement remain separate checks.
+Already-merged work missing review evidence is reported as a process violation.
+This is a narrow enforcement of the existing risk-tiered policy, not a new
+review tier or architecture. Alternative: trust the merge result and CI;
+rejected because Issue #69 demonstrated that this permits completion claims
+without the required independent evidence. Source: Issue #69 and the T2 gate
+in `planning/agent-workflow.md`, informed by GitHub protected-branch status and
+review semantics and agent-harness guidance from Anthropic and OpenAI.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the

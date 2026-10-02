@@ -202,6 +202,25 @@ Rules common to all tiers:
   correct order, and no newer conflicting work changed the acceptance
   criteria. Merge approved PRs rather than leaving integration work idle.
 
+### T2 Merge And Settlement Gate
+
+Before merging a T2 PR, the lead records all of these checks on the PR:
+
+- Fresh-context `@reviewer` verdict is `holds` for the current diff. `holds with
+  gaps` and `refuted` block merge unless the gap is T0-level or the user has
+  explicitly accepted it; the exception and its evidence must be recorded.
+- The reviewer task, verdict, and evidence reference are present on the PR,
+  rather than only in chat or a thread baton.
+- Required CI is green, the PR targets the intended base, the diff is current,
+  and dependency/ordering checks pass. These are verified separately from the
+  reviewer verdict.
+- After merge, the lead verifies the merged commit and records settlement
+  evidence before closing the Issue or marking the thread complete.
+
+An already-merged PR that lacks the required review evidence is a process
+violation. Report it and reopen or remediate the work item as appropriate; do
+not infer compliance from green CI or the fact that the merge succeeded.
+
 ## Handoff Protocol
 
 Write or update `planning/agent-state/threads/<issue-number-or-tag>-<short-name>.md`
