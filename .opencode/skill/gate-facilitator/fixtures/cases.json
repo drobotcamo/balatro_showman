@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0.0",
+  "cases": [
+    {"name": "pass", "protocol": "protocol-1", "human_acceptance": true, "rows": ["pass", "pass", "pass", "pass", "pass", "pass"], "expected": "pass"},
+    {"name": "sendback", "protocol": "protocol-1", "human_acceptance": true, "rows": ["pass", "sendback", "pass", "pass", "pass", "pass"], "expected": "sendback"},
+    {"name": "blocked", "protocol": "protocol-1", "human_acceptance": true, "rows": ["pass", "blocked", "pass", "pass", "pass", "pass"], "expected": "blocked"},
+    {"name": "unknown", "protocol": "protocol-1", "human_acceptance": true, "rows": ["pass", "unknown", "pass", "pass", "pass", "pass"], "expected": "unknown"},
+    {"name": "decision-pending", "protocol": "protocol-1", "human_acceptance": false, "rows": ["pass", "pass", "pass", "pass", "pass", "pass"], "expected": "decision_pending"},
+    {"name": "stale-hash", "protocol": "protocol-1", "human_acceptance": true, "rows": ["pass", "unknown", "pass", "pass", "pass", "pass"], "evidence_issue": "stale_hash", "expected": "unknown"},
+    {"name": "conflicting-evidence", "protocol": "protocol-1", "human_acceptance": true, "rows": ["pass", "unknown", "pass", "pass", "pass", "pass"], "evidence_issue": "conflict", "expected": "unknown"},
+    {"name": "requested-policy-change", "protocol": "protocol-1", "human_acceptance": true, "rows": ["pass", "pass", "pass", "pass", "pass", "pass"], "request": "change_threshold", "expected": "blocked"},
+    {"name": "missing-protocol", "protocol": null, "human_acceptance": true, "rows": [], "expected": "blocked"}
+  ]
+}
