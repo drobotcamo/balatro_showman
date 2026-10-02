@@ -16,3 +16,8 @@ For T2 work, the lead must record a fresh-context `@reviewer` verdict of
 blocks merge unless the permitted exception is explicitly recorded. Verify
 review, CI, base/diff, dependency, merge, and settlement gates separately; a
 merged PR without review evidence is a process violation, not completion.
+
+Before handoff or completion, workers must leave no owned worktree leftovers:
+run `git status`, commit all worker-owned changes and the baton in the PR, and
+remove worker-created temporary or generated artifacts. Never delete unrelated
+pre-existing user or worker changes; identify and exclude them instead.

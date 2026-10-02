@@ -216,6 +216,11 @@ Before merging a T2 PR, the lead records all of these checks on the PR:
   reviewer verdict.
 - After merge, the lead verifies the merged commit and records settlement
   evidence before closing the Issue or marking the thread complete.
+- Before handoff or completion, the worker inventories `git status` and must
+  commit every change it owns, including the thread baton, in the PR. Worker-
+  created untracked files, generated artifacts, and temporary leftovers are
+  not an acceptable handoff state. Pre-existing changes owned by another
+  worker or the user are preserved, identified, and excluded from the PR.
 
 An already-merged PR that lacks the required review evidence is a process
 violation. Report it and reopen or remediate the work item as appropriate; do
