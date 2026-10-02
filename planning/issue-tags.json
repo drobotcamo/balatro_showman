@@ -1,4 +1,10 @@
 {
   "BIRD": 58,
-  "CAGE": 63
+  "CAGE": 63,
+  "GAIT": 79,
+  "YOYO": 80,
+  "LAMP": 81,
+  "MINT": 82,
+  "NOVA": 83,
+  "WAVE": 84
 }
