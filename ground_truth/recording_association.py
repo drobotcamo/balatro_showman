@@ -71,7 +71,9 @@ def associate_recording(bundle: RunBundle, run_id: str, *, confirmed: bool,
         values["recording.video_ref"] = video_ref
     try:
         bundle.add_provenance(run_id, values)
-    except BundleError:
+    except BundleError as exc:
+        if str(exc).startswith("conflicting provenance:"):
+            return AssociationResult("rejected", "association_conflict", str(exc), marker["recording_id"])
         return AssociationResult("interrupted", "run_unavailable", "run disappeared during association", marker["recording_id"])
     return AssociationResult("confirmed", "association_confirmed", "recording marker associated",
                              marker["recording_id"], "marker-associated")

@@ -88,7 +88,9 @@ def test_conflicting_association_is_rejected(tmp_path):
     b, _ = bundle(tmp_path)
     assert associate_recording(b, "r1", confirmed=True, marker=marker()).status == "confirmed"
     other = marker(); other["recording_id"] = "obs-2"
-    assert associate_recording(b, "r1", confirmed=True, marker=other).status == "interrupted"
+    result = associate_recording(b, "r1", confirmed=True, marker=other)
+    assert result.status == "rejected"
+    assert result.code == "association_conflict"
 
 
 def test_interactive_policy_and_direct_confirmation_validation(tmp_path):
