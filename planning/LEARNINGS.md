@@ -36,6 +36,21 @@ under its Decisions section. This file is a knowledge base, not a task log.
   OpenAI, “Harness engineering: leveraging Codex in an agent-first world,”
   2026-02-11, https://openai.com/index/harness-engineering/.
 
+## 2026-10-02: Review evidence must gate completion, not only merge
+
+- Context: Issue #69 found a T2 PR merged with green CI but without the required
+  fresh-context reviewer verdict.
+- Observation: GitHub separates required reviews, status checks, stale-review
+  invalidation, and branch/base requirements; agent-harness guidance likewise
+  emphasizes repository-local evidence, incremental work, and mechanical checks.
+- Implication: The lead must verify and record reviewer, CI, base/diff,
+  dependency, merge, and settlement gates independently. A successful merge
+  cannot retroactively prove review compliance.
+- Verification/source: GitHub protected-branch documentation accessed
+  2026-10-02; Anthropic, “Effective harnesses for long-running agents,”
+  2025-11-26; OpenAI, “Harness engineering,” 2026-02-11; Issue #69; and the
+  regression markers in `planning/check_contracts.py`.
+
 ## 2026-10-01: PR bodies must use real multiline input
 
 - Context: Recent PR history included bodies with literal `\\n` sequences where

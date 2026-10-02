@@ -4,7 +4,7 @@ Tag:
 
 Closes #
 
-Tier: T1 contract (user approval required) | T2 code (agent merges when green)
+Tier: T0 planning/process | T1 contract (user approval required) | T2 code (agent merges when green)
 
 ## What changed
 
@@ -29,3 +29,11 @@ What could not be verified, and why it is acceptable.
 ## Review notes
 
 What a reviewer should check first; what cannot be verified automatically.
+
+## T2 Merge Evidence
+
+- [ ] Fresh-context `@reviewer` verdict is `holds` for the current diff
+- [ ] Reviewer task and evidence are recorded on this PR
+- [ ] CI is green and the PR base, current diff, and dependency order were checked separately
+- [ ] Merge commit and Issue/thread settlement were verified after merge
+- [ ] If already merged without review evidence, this is recorded as a process violation

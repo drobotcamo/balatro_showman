@@ -36,6 +36,12 @@ Follow this loop:
    obtain the approval evidence required by the tier in
    `planning/agent-workflow.md`. You are not the sole approver of your own
    changes.
+   For T2, do not merge or settle until the current PR contains a fresh
+   `@reviewer` verdict of `holds`, the reviewer evidence, green CI, base/diff,
+   and dependency checks. Treat `holds with gaps` and `refuted` as blocking
+   unless the documented exception rule applies. Audit already-merged PRs for
+   missing evidence and report a process violation instead of inferring
+   approval.
 7. If blocked, a major decision is required, or evidence conflicts, stop at
    that boundary and record the blocker instead of guessing.
 8. Before compaction or stopping, update the work-thread baton with verified
