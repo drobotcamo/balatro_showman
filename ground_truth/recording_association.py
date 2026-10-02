@@ -102,3 +102,27 @@ def associate_after_confirmation(bundle: RunBundle, run_id: str, *, marker: dict
                                    confirmed_by=confirmed_by, interrupted=True, **kwargs)
     return associate_recording(bundle, run_id, confirmed=confirmed, marker=marker,
                                confirmed_by=confirmed_by, **kwargs)
+
+
+def coordinate_recording(
+    bundle: RunBundle,
+    run_id: str,
+    *,
+    marker: dict[str, Any] | None,
+    prompt,
+    notify=None,
+    interactive: bool = False,
+    required: bool = False,
+    confirmed_by: str = "human",
+    **kwargs: Any,
+) -> AssociationResult:
+    """Run the user-facing confirmation flow and associate marker evidence."""
+    if interactive:
+        if notify is None:
+            return AssociationResult("invalid", "notification_missing", "interactive notification callback is required")
+        confirm = lambda: confirm_interactive(prompt, notify, required=required)
+    else:
+        confirm = lambda: confirm_terminal(prompt, required=required)
+    return associate_after_confirmation(
+        bundle, run_id, marker=marker, confirm=confirm, confirmed_by=confirmed_by, **kwargs
+    )

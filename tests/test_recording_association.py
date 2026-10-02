@@ -2,7 +2,7 @@ import sqlite3
 import pytest
 
 from ground_truth.recording_association import (associate_after_confirmation, associate_recording,
-                                                confirm_interactive, confirm_terminal)
+                                                confirm_interactive, confirm_terminal, coordinate_recording)
 from run_bundle import RunBundle
 
 
@@ -121,3 +121,11 @@ def test_terminal_confirmation_is_wired_to_association(tmp_path):
         confirmed_by="terminal",
     )
     assert result.status == "confirmed"
+
+
+def test_coordinate_recording_is_the_user_facing_boundary(tmp_path):
+    b, _ = bundle(tmp_path); notices = []
+    result = coordinate_recording(b, "r1", marker=marker(), prompt=lambda _: "yes",
+                                  notify=notices.append, interactive=True, required=True)
+    assert result.status == "confirmed"
+    assert "recording is required" in notices[0]
