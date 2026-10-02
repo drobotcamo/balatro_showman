@@ -1,11 +1,32 @@
 # Phase 0 Inventory and Boundary
 
-Updated: 2026-09-30
+Updated: 2026-10-02
 
 This is a repository inventory, not a claim that any legacy artifact is ready
 for the active pipeline. Active stages must not import from `legacy/`; required
 assets must move to an active, versioned store only after provenance,
 redistribution status, compatibility, and checksums are established.
+
+## Provenance manifest and read-only inventory
+
+`planning/provenance_manifest.schema.json` defines manifest version `1.0.0`.
+`planning/provenance_inventory.py` inventories every file below the four
+candidate roots listed in this document, computes SHA-256 from the file bytes,
+and emits stable, path-sorted JSON. Missing roots are emitted as
+`unavailable`; present candidates remain `not-ready` unless provenance is
+independently verified. Source, revision, license, compatibility, and
+eligibility fields are explicit even when their values are unknown. The tool
+only reads candidate files and writes output when the caller explicitly uses
+`--output` outside the legacy tree.
+
+Reproduce the current inventory from the repository root:
+
+```powershell
+python planning/provenance_inventory.py --output planning/provenance-inventory.json
+```
+
+The report is intentionally generated rather than treated as an active asset
+store. It must not be used to promote a candidate without external evidence.
 
 ## Gate mapping
 
