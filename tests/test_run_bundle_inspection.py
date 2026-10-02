@@ -90,3 +90,17 @@ def test_inspector_does_not_create_a_missing_sqlite_database(tmp_path):
     else:
         raise AssertionError("missing database was accepted")
     assert not path.exists()
+
+
+def test_cli_accepts_documented_plain_sqlite_filename_and_emits_inspection(capsys, tmp_path):
+    from run_bundle.__main__ import main
+
+    b = bundle(tmp_path)
+    b.append("r1", 0, "state", {"chips": 7})
+    path = tmp_path / "run.db"
+
+    assert main(["summary", "--db", str(path), "--run", "r1"]) == 0
+    output = capsys.readouterr().out
+    assert '"status": "observed"' in output
+    assert '"record_count": 1' in output
+    assert '"outcome": null' in output
