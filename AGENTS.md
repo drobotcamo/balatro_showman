@@ -17,6 +17,10 @@ against a Lua ground-truth oracle. `planning/README.md` is the planning index.
   file does not restate them.
 - Inspect `git status`, the GitHub Issue, branch, PR, and worktree before
   editing. Preserve changes you did not make.
+- For run-bundle operations, read `planning/RUN_BUNDLE_OPERATIONS.md`. Use
+  `python -m run_bundle ...` for read-only inspection; pause at the documented
+  terminal checkpoint before recording association and request user input when
+  the summary is incomplete or disputed.
 
 ## Tenets
 

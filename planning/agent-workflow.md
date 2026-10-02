@@ -91,6 +91,21 @@ The orchestrator (`../.opencode/agents/orchestrator.md`, invoked via
   user does not answer, or ambiguity remains after that question, make the
   narrowest reasonable assumptions, record them, and attempt the task in one
   continuous pass.
+- Do not pause for routine progress reports or permission. Continue through
+  implementation, validation, review, PR updates, merge, and baton settlement
+  whenever the next action is in scope and permissions allow it.
+- When a routine check fails, investigate the failure, make the smallest
+  justified correction, and rerun the narrowest relevant check. Do not repeat
+  an unchanged failing approach. Ordinary workflow defects may be repaired when
+  they do not change permissions, secrets, branch protection, deployment
+  behavior, or another durable policy.
+- If GitHub reports no checks, inspect branch protection and existing workflow
+  configuration. Do not silently add or alter required checks, permissions,
+  secrets, branch protection, deployment behavior, or other durable CI policy;
+  those are T3 decisions requiring explicit user input.
+- Use a fresh reviewer for T2 work, register every PR with the thread
+  immediately after creation or discovery, and update the relevant thread baton
+  before finishing.
 - Do not stop at a draft, local diff, or proposed PR when the task is
   actionable. Carry the work through validation, an approved PR, merge, and
   settled/closed work-item state whenever repository and GitHub permissions
@@ -108,6 +123,18 @@ The orchestrator (`../.opencode/agents/orchestrator.md`, invoked via
   Include the context, observation, implication, and verification/source; do
   not record generic advice or unverified speculation. Keep session-specific
   next actions in the thread baton instead.
+
+### Execution Budgets
+
+- Prefer the narrowest relevant inspection and validation. Avoid redundant
+  searches, unchanged tool calls, and broad test suites that cannot affect the
+  work item's gate.
+- Treat context, time, retry, and external-action limits as execution budgets.
+  Budgets constrain the method, not the acceptance criteria; do not silently
+  reduce the required outcome.
+- When a materially different approach is unavailable or a budget is becoming
+  limiting, stop starting new exploratory work and leave a verified handoff
+  with evidence, blocker, and concrete next actions.
 
 ## Subagent Policy
 
@@ -174,6 +201,30 @@ Rules common to all tiers:
   targets the intended branch, required checks pass, dependent PRs are in the
   correct order, and no newer conflicting work changed the acceptance
   criteria. Merge approved PRs rather than leaving integration work idle.
+
+### T2 Merge And Settlement Gate
+
+Before merging a T2 PR, the lead records all of these checks on the PR:
+
+- Fresh-context `@reviewer` verdict is `holds` for the current diff. `holds with
+  gaps` and `refuted` block merge unless the gap is T0-level or the user has
+  explicitly accepted it; the exception and its evidence must be recorded.
+- The reviewer task, verdict, and evidence reference are present on the PR,
+  rather than only in chat or a thread baton.
+- Required CI is green, the PR targets the intended base, the diff is current,
+  and dependency/ordering checks pass. These are verified separately from the
+  reviewer verdict.
+- After merge, the lead verifies the merged commit and records settlement
+  evidence before closing the Issue or marking the thread complete.
+- Before handoff or completion, the worker inventories `git status` and must
+  commit every change it owns, including the thread baton, in the PR. Worker-
+  created untracked files, generated artifacts, and temporary leftovers are
+  not an acceptable handoff state. Pre-existing changes owned by another
+  worker or the user are preserved, identified, and excluded from the PR.
+
+An already-merged PR that lacks the required review evidence is a process
+violation. Report it and reopen or remediate the work item as appropriate; do
+not infer compliance from green CI or the fact that the merge succeeded.
 
 ## Handoff Protocol
 

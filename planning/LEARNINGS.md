@@ -36,6 +36,33 @@ under its Decisions section. This file is a knowledge base, not a task log.
   OpenAI, “Harness engineering: leveraging Codex in an agent-first world,”
   2026-02-11, https://openai.com/index/harness-engineering/.
 
+## 2026-10-02: Review evidence must gate completion, not only merge
+
+- Context: Issue #69 found a T2 PR merged with green CI but without the required
+  fresh-context reviewer verdict.
+- Observation: GitHub separates required reviews, status checks, stale-review
+  invalidation, and branch/base requirements; agent-harness guidance likewise
+  emphasizes repository-local evidence, incremental work, and mechanical checks.
+- Implication: The lead must verify and record reviewer, CI, base/diff,
+  dependency, merge, and settlement gates independently. A successful merge
+  cannot retroactively prove review compliance.
+- Verification/source: GitHub protected-branch documentation accessed
+  2026-10-02; Anthropic, “Effective harnesses for long-running agents,”
+  2025-11-26; OpenAI, “Harness engineering,” 2026-02-11; Issue #69; and the
+  regression markers in `planning/check_contracts.py`.
+
+## 2026-10-02: Handoffs need an owned-worktree boundary
+
+- Context: Issue #69 follow-up requested that workers not leave leftovers for
+  later sessions.
+- Observation: A baton is useful only when the next worker can distinguish
+  committed work from local residue; shared worktrees can also contain changes
+  owned by another worker or the user.
+- Implication: Require `git status` inspection, commit all worker-owned changes
+  and handoff artifacts in the PR, remove owned temporary/generated files, and
+  preserve unrelated changes with an explicit exclusion note.
+- Verification/source: D027 and the handoff gate in `planning/agent-workflow.md`.
+
 ## 2026-10-01: PR bodies must use real multiline input
 
 - Context: Recent PR history included bodies with literal `\\n` sequences where
@@ -46,6 +73,13 @@ under its Decisions section. This file is a knowledge base, not a task log.
   heredocs, then search the final body for unintended `\\n` before submission.
 - Verification/source: PR history reviewed while implementing Issue #37; the
   rule is encoded in `.opencode/skill/deslop/SKILL.md` and `AGENTS.md`.
+
+## 2026-10-01: T2 reviewer evidence must be recorded before merge
+
+- Context: Retrospective review of merged Issue #47 PR #57.
+- Observation: The compatibility implementation and required CI checks passed, but GitHub has no review record and a fresh-context reviewer found unspecified edge cases in incomplete session metadata and blank NDJSON lines.
+- Implication: A green check and a correct-looking diff do not establish the T2 approval boundary; record the independent reviewer verdict on the PR before merging, and keep unresolved compatibility-envelope questions explicit rather than silently enforcing a new interpretation.
+- Verification/source: `gh pr view 57 --json reviews,statusCheckRollup,state,mergedAt`; fresh-context reviewer report; `planning/agent-workflow.md` §Approval And Merging.
 
 ## 2026-09-30: Bounded autonomy is safer than an unconstrained swarm
 
