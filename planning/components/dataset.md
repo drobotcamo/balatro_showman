@@ -8,6 +8,9 @@ Produce large, reproducible, quality-aware datasets from versioned run bundles,
 video, and intermediate pipeline artifacts, with a declared storage format and
 schema versions. Operational run-bundle storage and inspection are established
 earlier by Issue #34; this component owns scale-out dataset production.
+Early D028 slice manifests/export do not pass the broad Phase 9 scale-out gate.
+Their applicable protocol is approved before held-out evaluation, with source-
+level splits and the same provenance/leakage protections below.
 
 ## Inputs
 

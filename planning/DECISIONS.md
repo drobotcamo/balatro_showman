@@ -269,14 +269,45 @@ local leftovers for the next worker; rejected because it makes ownership and
 review scope ambiguous and can hide incomplete work. Source: Issue #69
 follow-up request and the handoff gate in `planning/agent-workflow.md`.
 
+### D028 — accepted — Deliver integrated slices with progressive gates and simpler completion records
+The next delivery sequence is a reliable, inspectable recorded run, a reviewed
+evaluation slice, and a small measured video-only reconstruction. Define and
+approve each slice's evaluation criteria before scoring held-out results; Phase
+0 need not establish numeric thresholds for every future phase before the first
+reconstruction pilot. This changes gate sequencing, not the requirement to
+report provenance, uncertainty, coverage, and independent evaluation evidence.
+
+GitHub is authoritative for live completion state. Eliminate mandatory
+settlement-only PRs and mandatory allocation of new four-letter issue tags;
+existing tags remain valid references. Repository handoffs preserve the context
+needed to resume unfinished work rather than continuously mirroring merge state.
+Implementation and review evidence remain required; post-merge results belong
+on the existing issue or PR.
+
+Implement these changes in one bounded workflow/roadmap reconciliation, then
+prioritize capture reliability and the recorded-run inspection milestone.
+Alternatives: retain all-phase threshold prerequisites and mirrored completion
+records, or add more orchestration; rejected because the retrospective found
+unresolved integration gaps and repeated bookkeeping-only changes. CI changes
+and transport redesign still require their own explicit scope and approval.
+Source: user approved all three decisions requested in
+`planning/PRODUCTION_RETROSPECTIVE_2026-10-02.md`, 2026-10-02. The detailed
+workflow, roadmap and issue text must be reconciled in the implementation step.
+
+D028 supersedes conflicting mandatory tag allocation and post-merge repository
+completion-record requirements. D026's independent review and separate CI/base/
+dependency/merge checks remain; post-merge evidence is recorded on the same PR or
+issue. D027's owned-change and publication accounting remains unchanged, including
+checkpoints for unfinished work. No unpublished-work exception is implied.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the
   initial ontology?
 - **Q02** — Which game assets can be legally and technically sourced for
   redistribution?
-- **Q03** — What numeric threshold does each phase gate require, recorded in
-  the Phase 0 evaluation protocol?
+- **Q03** — Which criteria, thresholds, minimum support and uncertainty rules
+  does each applicable phase/slice protocol require before held-out evaluation?
 - **Q04** — Which visible state cannot be recovered reliably from video alone?
 - **Q05** — Which event labels can be inferred confidently without
   player-input logs, and what oracle agreement rate is required before they

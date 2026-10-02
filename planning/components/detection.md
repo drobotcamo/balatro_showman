@@ -43,8 +43,8 @@ seals) in individual frames.
   ONNX Runtime execution providers and produce contract-compatible output
   within a pinned numeric tolerance; byte-identity across providers is not
   expected (D012, D017).
-- On the Phase 0 real eval set: per-family recall, small-object recall
+- On the applicable approved real evaluation set: per-family recall, small-object recall
   (editions/stickers/seals), and per-family false-positive rate each meet the
-  Phase 0 thresholds.
+  protocol thresholds fixed before held-out evaluation (D028/Q03).
 - Aggregate mAP is reported but is not a sufficient gate.
 - Inference is resumable for long videos.

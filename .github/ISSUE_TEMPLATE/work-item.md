@@ -7,7 +7,10 @@ labels: []
 
 ## Goal
 
-One sentence describing the outcome.
+After this change a user can [action] and receive [artifact].
+
+Owner:
+Next action:
 
 ## Scope
 
@@ -15,9 +18,10 @@ What this Issue owns, including exclusions.
 
 ## Done When
 
-- [ ] Observable result
-- [ ] Required evidence
+- [ ] Demonstrate with [command/input/output or versioned protocol]
+- [ ] Record validation, required review and remaining limits
 
 ## Context
 
-Dependencies, decisions (D###), risks, or parent Issue.
+Actual prerequisite/decision, scope exclusions and decisions (D###).
+Numeric issues are sufficient; historical tags are optional.

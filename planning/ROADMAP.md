@@ -7,11 +7,33 @@ Balatro video, validated against a Lua ground-truth oracle. The first success
 criterion is trustworthy structured data, not an autonomous agent or a winning
 strategy.
 
-Gate conventions: every gate states a metric and a threshold. Thresholds are
-fixed in the Phase 0 evaluation protocol so a gate can pass or fail. Where a
-threshold is not yet known, the gate says `threshold: set in Phase 0`. Phases
-4-10 currently name their metric and owner and defer the numeric threshold to
-Q03.
+Gate conventions: each applicable versioned phase/slice protocol names its
+criteria, metrics, thresholds, minimum support, uncertainty rules and human
+acceptance authority. The owning component proposes criteria; the user approves
+them before held-out collection/scoring. Unknown criteria or inadequate support
+cannot pass. Q03 remains open for unresolved scopes, not a prerequisite to
+unrelated recorder fixtures. Development pilots may inform criteria; held-out
+results may not tune them (D028).
+
+## Integrated Delivery Milestones
+
+1. Reliable recorded-run inspection (#81): fixture reliability, agreed runtime/
+   capture check, finalized audited run, explicit human recording association,
+   measured rendered correspondence and a copy-paste inspection command.
+2. Reviewed evaluation slice (#79/#82): versioned development protocol, minimal
+   annotation/QA/export and reviewed development pilot; then freeze user-approved
+   evaluation criteria before held-out collection/scoring. #82 starts from the
+   development protocol, not #79 closure. #80 blocks only use of unresolved
+   required artifacts, not every optional legacy candidate.
+3. Small measured video-only reconstruction: user-selected pages/fields, oracle-
+   isolated inference, timestamped versioned observations/unknowns and inspectable
+   report of held-out per-field error, support and abstention.
+
+These cross-component slices do not pass skipped broad gates. Phase 0 stays
+`building` and broad phases stay `planned` until their own evidence is accepted.
+Capture existence, alignment accuracy, oracle semantics, evaluation readiness
+and broad phase completion are separate claims. First-slice success is not
+statistical generalization. Exact runtime, targets and thresholds remain decisions.
 
 ## Component Ownership
 
@@ -47,8 +69,8 @@ blocks a gate must appear in this table.
 | Question | Blocks | Why |
 | --- | --- | --- |
 | Q01 | Phase 1 | The initial Balatro version and mod configuration that define the ontology are unresolved. |
-| Q02 | Phase 0-1 | Asset redistribution legality gates the active, provenance-backed asset store. |
-| Q03 | Phase 0 | Numeric gate thresholds are fixed in the Phase 0 evaluation protocol; every later gate depends on it. |
+| Q02 | Artifact-consuming Phase 0-1/slice steps | Eligibility blocks use of unresolved required artifacts; optional candidates do not block unrelated work. |
+| Q03 | Applicable phase/slice evaluation | Approved criteria, thresholds and support must be fixed before held-out evaluation; future-phase thresholds do not block the first pilot. |
 | Q04 | Phase 0, 7 | Which visible state is unrecoverable from video alone bounds reduction and the oracle boundary. |
 | Q05 | Phase 8 | Event labels are trusted only after a stated oracle agreement rate is met. |
 | Q06 | Phase 7-8 | Confidence propagation crosses detection, OCR, composition, reduction, and events. |
@@ -69,7 +91,8 @@ Gate:
 - An evaluation set exists (real clips, disjoint from synthetic backgrounds and
   training video) with a documented annotation protocol.
 - Required assets/weights are versioned with provenance and are not gitignored.
-- Gate thresholds for Phases 1-10 are recorded.
+- The applicable evaluation protocol is versioned and approved before held-out
+  evaluation. Broader phase criteria remain staged obligations, not waived.
 
 ## Phase 1: Ontology, Class Map, and Typography
 
@@ -102,7 +125,7 @@ Gate:
 - Coverage reports expose class imbalance and missing combinations.
 - Glyph crops match the OCR training format and cover all fields and states.
 - Background/seed pools are separated from the Phase 0 evaluation set.
-- Resolution and aspect-ratio diversity meets the Phase 0 protocol.
+- Resolution and aspect-ratio diversity meets the applicable approved protocol.
 
 ## Phase 3: Object Detection
 
@@ -114,9 +137,9 @@ Runtime execution providers: CPU/DirectML for laptop development and a batch
 GPU path executing the same ONNX artifact through ONNX Runtime execution
 providers.
 
-Gate (all measured on the Phase 0 real eval set):
+Gate (all measured on the applicable approved real evaluation set):
 
-- Per-class-family recall meets `threshold: set in Phase 0`; aggregate mAP is
+- Per-class-family recall meets the approved protocol threshold; aggregate mAP is
   reported but not sufficient.
 - Small-object recall (editions/stickers/seals) meets threshold.
 - False-positive rate per family is under threshold.

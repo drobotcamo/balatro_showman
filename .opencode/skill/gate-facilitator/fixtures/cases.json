@@ -1,14 +1,27 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "2.0.0",
+  "protocols": {
+    "slice-1-v1": {"slice": "slice-1", "revision": "fixture-r1", "approved": true, "required": ["ownership", "alignment", "integrity"]},
+    "slice-2-v1": {"slice": "slice-2", "revision": "fixture-r1", "approved": true, "required": ["ownership", "integrity"]},
+    "slice-1-draft": {"slice": "slice-1", "revision": "fixture-r1", "approved": false, "required": ["ownership", "alignment", "integrity"]},
+    "incomplete": {"slice": "slice-1", "revision": "fixture-r1", "approved": true, "required": []}
+  },
+  "request": {"slice": "slice-1", "revision": "fixture-r1"},
   "cases": [
-    {"name": "pass", "protocol": "protocol-1", "human_acceptance": true, "rows": ["pass", "pass", "pass", "pass", "pass", "pass"], "expected": "pass"},
-    {"name": "sendback", "protocol": "protocol-1", "human_acceptance": true, "rows": ["pass", "sendback", "pass", "pass", "pass", "pass"], "expected": "sendback"},
-    {"name": "blocked", "protocol": "protocol-1", "human_acceptance": true, "rows": ["pass", "blocked", "pass", "pass", "pass", "pass"], "expected": "blocked"},
-    {"name": "unknown", "protocol": "protocol-1", "human_acceptance": true, "rows": ["pass", "unknown", "pass", "pass", "pass", "pass"], "expected": "unknown"},
-    {"name": "decision-pending", "protocol": "protocol-1", "human_acceptance": false, "rows": ["pass", "pass", "pass", "pass", "pass", "pass"], "expected": "decision_pending"},
-    {"name": "stale-hash", "protocol": "protocol-1", "human_acceptance": true, "rows": ["pass", "unknown", "pass", "pass", "pass", "pass"], "evidence_issue": "stale_hash", "expected": "unknown"},
-    {"name": "conflicting-evidence", "protocol": "protocol-1", "human_acceptance": true, "rows": ["pass", "unknown", "pass", "pass", "pass", "pass"], "evidence_issue": "conflict", "expected": "unknown"},
-    {"name": "requested-policy-change", "protocol": "protocol-1", "human_acceptance": true, "rows": ["pass", "pass", "pass", "pass", "pass", "pass"], "request": "change_threshold", "expected": "blocked"},
-    {"name": "missing-protocol", "protocol": null, "human_acceptance": true, "rows": [], "expected": "blocked"}
+    {"name": "pass", "protocol": "slice-1-v1", "human_acceptance": true, "rows": {"ownership": "pass", "alignment": "pass", "integrity": "pass"}, "expected": "pass"},
+    {"name": "sendback", "protocol": "slice-1-v1", "human_acceptance": true, "rows": {"ownership": "pass", "alignment": "sendback", "integrity": "pass"}, "expected": "sendback"},
+    {"name": "blocked", "protocol": "slice-1-v1", "human_acceptance": true, "rows": {"ownership": "pass", "alignment": "blocked", "integrity": "pass"}, "expected": "blocked"},
+    {"name": "unknown", "protocol": "slice-1-v1", "human_acceptance": true, "rows": {"ownership": "pass", "alignment": "unknown", "integrity": "pass"}, "expected": "unknown"},
+    {"name": "decision-pending", "protocol": "slice-1-v1", "human_acceptance": false, "rows": {"ownership": "pass", "alignment": "pass", "integrity": "pass"}, "expected": "decision_pending"},
+    {"name": "stale-hash", "protocol": "slice-1-v1", "human_acceptance": true, "rows": {"ownership": "pass", "alignment": "pass", "integrity": "pass"}, "evidence_issue": "stale_hash", "expected": "unknown"},
+    {"name": "conflicting-evidence", "protocol": "slice-1-v1", "human_acceptance": true, "rows": {"ownership": "pass", "alignment": "pass", "integrity": "pass"}, "evidence_issue": "conflict", "expected": "unknown"},
+    {"name": "insufficient-support", "protocol": "slice-1-v1", "human_acceptance": true, "rows": {"ownership": "pass", "alignment": "pass", "integrity": "pass"}, "evidence_issue": "insufficient_support", "expected": "unknown"},
+    {"name": "requested-policy-change", "protocol": "slice-1-v1", "human_acceptance": true, "rows": {"ownership": "pass", "alignment": "pass", "integrity": "pass"}, "request": "change_threshold", "expected": "blocked"},
+    {"name": "missing-protocol", "protocol": null, "human_acceptance": true, "rows": {}, "expected": "blocked"},
+    {"name": "incomplete-protocol", "protocol": "incomplete", "human_acceptance": true, "rows": {}, "expected": "blocked"},
+    {"name": "draft-protocol", "protocol": "slice-1-draft", "human_acceptance": true, "rows": {"ownership": "pass", "alignment": "pass", "integrity": "pass"}, "expected": "blocked"},
+    {"name": "wrong-slice", "protocol": "slice-2-v1", "human_acceptance": true, "rows": {"ownership": "pass", "integrity": "pass"}, "expected": "blocked"},
+    {"name": "wrong-revision", "protocol": "slice-1-v1", "revision": "fixture-r2", "human_acceptance": true, "rows": {"ownership": "pass", "alignment": "pass", "integrity": "pass"}, "expected": "blocked"},
+    {"name": "missing-criterion", "protocol": "slice-1-v1", "human_acceptance": true, "rows": {"ownership": "pass", "integrity": "pass"}, "expected": "blocked"}
   ]
 }

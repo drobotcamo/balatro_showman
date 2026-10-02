@@ -1,6 +1,6 @@
 ---
-description: Prepare a checked-in handoff baton for the next agent session.
-agent: build
+description: Checkpoint unfinished work for a fresh lead session.
+agent: lead
 ---
 Prepare or update `planning/agent-state/threads/<issue-number-or-tag>-<short-name>.md`
 following `planning/agent-workflow.md` → Handoff Protocol. Treat the work
@@ -10,5 +10,8 @@ decisions to `planning/DECISIONS.md` and verified findings to
 `planning/LEARNINGS.md`. Do not rewrite unrelated work. Run
 `python planning/check_contracts.py`, review the resulting diff, and report
 both.
+
+Use the compact unfinished-work format. Record live completion on the existing
+PR/issue; historical pre-merge checkpoints do not need settlement repairs.
 
 Handoff context: $ARGUMENTS

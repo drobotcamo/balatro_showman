@@ -2,14 +2,17 @@
 
 The pipeline has two data channels that meet at validation:
 
-- **Ground-truth channel** (Lua live bridge): exact state, action, and
-  outcome read from the game engine. Small, perfect, and only available for
-  our own modded runs. Used as an oracle and for a hand-checkable eval set.
+- **Ground-truth channel** (Lua live bridge): engine-reference observations,
+  actions and outcomes for our modded runs. Suitability is field/revision-specific:
+  missing reads, defaults and approximations are not perfect truth. Independently
+  check rendered correspondence before using selected fields as an oracle.
 - **Reconstruction channel** (video): estimates the same things from footage
   with no engine access. Large, noisy, and the reason the project exists.
 
 Video-only outputs are scored against the ground-truth channel, not against
-"manual inspection."
+"manual inspection." Independent frame QA validates the reference; it does not
+replace quantitative scoring. D028 delivers integrated slices progressively
+without changing oracle/video separation or claiming broad pipeline completion.
 
 ```text
 OFFLINE TRAINING DATA

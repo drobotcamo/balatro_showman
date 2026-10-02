@@ -8,6 +8,11 @@ Produce exact `(state, action, outcome)` records from the game engine via the
 Lua live bridge, maintain the aligned real-frame evaluation set, and provide the
 minimal annotation/QA tooling the other phase gates depend on.
 
+D028 stages this broad contract through recorded-run inspection, a reviewed
+evaluation slice and measured reconstruction. Engine-reference suitability is
+field/revision-specific; current defaults/coarse legality are limitations, not
+independent proof of engine truth. Broad acceptance below remains an obligation.
+
 ## Inputs
 
 - Modded game client and the Lua bridge (Steamodded).
@@ -50,3 +55,6 @@ minimal annotation/QA tooling the other phase gates depend on.
   Phase 3-8 metrics.
 - The annotation/QA tool can label boxes and text fields on real frames and
   export to the eval manifest format.
+- Bounded slices use named criteria in the applicable approved versioned protocol,
+  fixed before held-out evaluation. Development pilots may inform that protocol;
+  they do not pass the broad Phase 3-8 sufficiency criterion.

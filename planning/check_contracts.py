@@ -19,8 +19,8 @@ Checks (mechanical only; it does not judge prose quality or gate thresholds):
   targets are not present in a fresh checkout.
 - The orchestrator agent (`.opencode/agents/orchestrator.md`) and its
   `/orchestrate` command exist with the required sections and wiring.
-- The portfolio-state skill exists, is wired to `/orchestrate`, and retains
-  the T0/write-boundary and report markers.
+- Commands, roles and configuration retain structural routing/permission boundaries.
+  These checks do not execute an agent or enforce GitHub review/merge behavior.
 
 Stdlib only; exit code 1 on any failure.
 """
@@ -52,19 +52,9 @@ def fail(message: str) -> None:
 
 
 THREAD_REQUIRED_FIELDS = (
-    "Updated:",
-    "Issue:",
-    "PR:",
-    "Owner:",
-    "Branch:",
-    "Worktree:",
-    "Objective:",
-    "Status:",
-    "Scope:",
-    "Dependencies:",
-    "Next:",
-    "Validation:",
+    "Updated", "Issue", "PR", "Branch", "Worktree", "Objective", "Next", "Validation",
 )
+LEGACY_THREAD_FIELDS = ("Owner", "Status", "Scope", "Dependencies")
 
 COMPONENT_REQUIRED_SECTIONS = (
     "## Purpose",
@@ -86,10 +76,23 @@ def check_threads() -> None:
             continue
         if not re.fullmatch(r"(?:\d+|[A-Z]{4})-[a-z0-9-]+\.md", path.name):
             fail(f"{rel}: name must be <issue-number-or-tag>-<short-name>.md")
-        text = path.read_text(encoding="utf-8")
-        for field in THREAD_REQUIRED_FIELDS:
-            if field not in text:
-                fail(f"{rel}: missing handoff field {field!r}")
+        text = strip_fenced(path.read_text(encoding="utf-8"))
+        # Some historical full records indent fields or prefix them with a bullet.
+        historical = all(re.search(rf"^(?:[ \t]*-[ \t]+|[ \t]*){field}:", text, re.M)
+                         for field in LEGACY_THREAD_FIELDS)
+        if historical:
+            text = re.sub(r"^(?:[ \t]*-[ \t]+|[ \t]+)(?=[A-Za-z]+:)", "", text, flags=re.M)
+        fields = dict(re.findall(
+            r"^([A-Za-z]+):[ \t]*([\s\S]*?)(?=^[A-Za-z]+:|^#{1,6}[ \t]+|\Z)", text, re.M
+        ))
+        # Full historical records retain their old fields. Anything else is compact.
+        legacy = all(field in fields for field in LEGACY_THREAD_FIELDS)
+        required = THREAD_REQUIRED_FIELDS + (LEGACY_THREAD_FIELDS if legacy else ("Risks",))
+        if not legacy and not re.search(r"^# .+", text, re.M):
+            fail(f"{rel}: compact checkpoint needs a title")
+        for field in required:
+            if not fields.get(field, "").strip():
+                fail(f"{rel}: missing or empty handoff field {field!r}")
         match = re.fullmatch(r"(?P<id>\d+|[A-Z]{4})-[a-z0-9-]+\.md", path.name)
         if match and match.group("id").isalpha():
             tag = match.group("id")
@@ -164,7 +167,7 @@ def check_open_questions() -> None:
 def check_issue_tags() -> None:
     path = PLANNING / "issue-tags.json"
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=unique_pairs)
     except (OSError, ValueError) as exc:
         fail(f"issue-tags.json: invalid JSON: {exc}")
         return
@@ -174,17 +177,26 @@ def check_issue_tags() -> None:
     for tag, issue in data.items():
         if not isinstance(tag, str) or not re.fullmatch(r"[A-Z]{4}", tag):
             fail(f"issue-tags.json: invalid tag {tag!r}")
-        if not isinstance(issue, int) or issue < 1:
+        if type(issue) is not int or issue < 1:
             fail(f"issue-tags.json: invalid issue number for {tag!r}")
-    if len(data) != len(set(data.values())):
+    if len(data) != len(set(str(value) for value in data.values())):
         fail("issue-tags.json: duplicate issue number")
+
+
+def unique_pairs(pairs: list[tuple[str, object]]) -> dict:
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate key {key!r}")
+        result[key] = value
+    return result
 
 
 def load_issue_tags() -> dict[str, int]:
     import json
 
     try:
-        data = json.loads((PLANNING / "issue-tags.json").read_text(encoding="utf-8"))
+        data = json.loads((PLANNING / "issue-tags.json").read_text(encoding="utf-8"), object_pairs_hook=unique_pairs)
     except (OSError, ValueError):
         return {}
     return data if isinstance(data, dict) else {}
@@ -260,7 +272,7 @@ def check_orchestrator() -> None:
         fail("missing .opencode/command/orchestrate.md")
     else:
         text = command.read_text(encoding="utf-8")
-        if "agent: orchestrator" not in text:
+        if frontmatter(text).get("agent") != "orchestrator":
             fail(".opencode/command/orchestrate.md: must wire `agent: orchestrator`")
 
 
@@ -276,42 +288,93 @@ def check_portfolio_state() -> None:
         "## Procedure",
         "## Budget",
         "## Fixed report",
-        "audit-only mode",
-        "sole portfolio authority",
-        "tools/issue_tags.py register",
-        "Never merge",
-        "final verification",
-        "healthy continuation",
-        "unavailable tag allocator",
     )
     for marker in required:
-        if marker not in text:
-            fail(f"portfolio-state skill: missing marker {marker!r}")
-    command = (ROOT / ".opencode" / "command" / "orchestrate.md").read_text(encoding="utf-8")
-    if "skill: portfolio-state" not in command:
-        fail(".opencode/command/orchestrate.md: must wire `skill: portfolio-state`")
-    agent = (ROOT / ".opencode" / "agents" / "orchestrator.md").read_text(encoding="utf-8")
-    if "portfolio-state" not in agent:
-        fail("orchestrator: must reference portfolio-state skill")
+        if section(text, marker) is None:
+            fail(f"portfolio-state skill: missing section {marker!r}")
+    if frontmatter(text).get("name") != "portfolio-state":
+        fail("portfolio-state skill: incorrect frontmatter name")
+    command = (ROOT / ".opencode/command/orchestrate.md").read_text(encoding="utf-8")
+    if frontmatter(command).get("skill") != "portfolio-state":
+        fail("orchestrate.md: incorrect portfolio-state metadata")
+    agent = (ROOT / ".opencode/agents/orchestrator.md").read_text(encoding="utf-8")
+    if "`.opencode/skill/portfolio-state/SKILL.md`" not in agent:
+        fail("orchestrator.md: missing portfolio-state reference")
+
+
+def frontmatter(text: str) -> dict:
+    """Parse this repository's scalar/nested-map YAML subset, not general YAML.
+
+    Reject unsupported syntax instead of accepting a matching phrase in the body.
+    No third-party parser dependency is needed for these role/command adapters.
+    """
+    match = re.match(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|$)", text, re.S)
+    if not match:
+        raise ValueError("missing frontmatter")
+    result = {}
+    stack = [(-1, result)]
+    for line in match.group(1).splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        row = re.fullmatch(r'( *)("[^"\n]+"|[A-Za-z_][\w-]*):(?:[ \t]+(.*))?', line)
+        if not row:
+            raise ValueError(f"unsupported frontmatter line {line!r}")
+        indent, key, value = len(row[1]), row[2].strip('"'), row[3]
+        while stack[-1][0] >= indent:
+            stack.pop()
+        parent = stack[-1][1]
+        if key in parent:
+            raise ValueError(f"duplicate frontmatter key {key!r}")
+        if value is None:
+            parent[key] = {}
+            stack.append((indent, parent[key]))
+        else:
+            parent[key] = {"true": True, "false": False}.get(value, value.strip('"'))
+    return result
+
+
+def check_agent_wiring() -> None:
+    """Structural adapter checks; not proof of agent obedience or review actions."""
+    try:
+        config = json.loads((ROOT / "opencode.json").read_text(encoding="utf-8"))
+        if config.get("default_agent") != "lead" or config.get("subagent_depth") != 1:
+            fail("opencode.json: expected default lead and depth one")
+        for name, agent in (("work", "lead"), ("resume", "lead"), ("handoff", "lead"),
+                            ("orchestrate", "orchestrator"), ("verify", "reviewer")):
+            path = ROOT / ".opencode" / "command" / f"{name}.md"
+            data = frontmatter(path.read_text(encoding="utf-8"))
+            if data.get("agent") != agent:
+                fail(f"{path.name}: expected agent {agent}")
+            if name == "verify" and data.get("subtask") is not True:
+                fail("verify.md: expected reviewer subtask")
+        for name in ("lead", "orchestrator", "explorer", "reviewer"):
+            path = ROOT / ".opencode" / "agents" / f"{name}.md"
+            data = frontmatter(path.read_text(encoding="utf-8"))
+            expected_mode = "primary" if name in ("lead", "orchestrator") else "subagent"
+            if data.get("mode") != expected_mode:
+                fail(f"{path.name}: expected mode {expected_mode}")
+            permission = data.get("permission", {})
+            if expected_mode == "primary":
+                if permission.get("task") != {"*": "deny", "explorer": "allow", "reviewer": "allow"}:
+                    fail(f"{path.name}: unexpected delegation boundary")
+            elif permission.get("edit") != "deny" or permission.get("task") != "deny":
+                fail(f"{path.name}: expected read-only nondelegating role")
+    except (OSError, ValueError, AttributeError) as exc:
+        fail(f"agent wiring: {exc}")
 
 
 def check_lead_merge_gate() -> None:
-    """Keep the high-risk T2 merge and settlement gate discoverable."""
+    """Canonical sections/references only; does not enforce GitHub behavior."""
     workflow = (PLANNING / "agent-workflow.md").read_text(encoding="utf-8")
     lead = (ROOT / ".opencode" / "agents" / "lead.md").read_text(encoding="utf-8")
     command = (ROOT / ".opencode" / "command" / "work.md").read_text(encoding="utf-8")
     template = (ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md").read_text(encoding="utf-8")
-    required = {
-        "workflow merge gate": (workflow, "## T2 Merge And Settlement Gate"),
-        "workflow reviewer rule": (workflow, "Fresh-context `@reviewer` verdict is `holds`"),
-        "workflow violation rule": (workflow, "process\nviolation"),
-        "lead reviewer rule": (lead, "fresh\n   `@reviewer` verdict of `holds`"),
-        "work command reviewer rule": (command, "fresh-context `@reviewer` verdict of\n`holds`"),
-        "PR evidence checklist": (template, "## T2 Merge Evidence"),
-    }
-    for name, (text, marker) in required.items():
-        if marker not in text:
-            fail(f"T2 merge gate: missing {name} marker {marker!r}")
+    for heading in ("## Lead Loop", "## Approval And Merging", "## Handoff Protocol"):
+        if section(workflow, heading) is None:
+            fail(f"workflow: missing section {heading}")
+    for name, text in (("lead", lead), ("work", command), ("PR template", template)):
+        if "`planning/agent-workflow.md`" not in text:
+            fail(f"{name}: missing canonical workflow reference")
 
 
 def check_references() -> None:
@@ -344,6 +407,7 @@ def check_references() -> None:
 
 
 def main() -> int:
+    errors.clear()
     check_threads()
     check_decisions()
     check_learnings()
@@ -354,6 +418,7 @@ def main() -> int:
     check_orchestrator()
     check_portfolio_state()
     check_lead_merge_gate()
+    check_agent_wiring()
     check_references()
     for error in errors:
         print(f"FAIL: {error}")

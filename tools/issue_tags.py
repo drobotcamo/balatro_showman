@@ -1,4 +1,4 @@
-"""Allocate and validate four-letter issue tags."""
+"""Validate historical issue aliases; optional allocation for compatibility."""
 
 from __future__ import annotations
 
@@ -14,15 +14,24 @@ LOCK = REGISTRY.with_suffix(".lock")
 POOL = ("BIRD", "GAIT", "YOYO", "LAMP", "MINT", "NOVA", "WAVE", "ZEST")
 
 
+def unique_pairs(pairs: list[tuple[str, object]]) -> dict:
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate key {key!r}")
+        result[key] = value
+    return result
+
+
 def load() -> dict[str, int]:
-    data = json.loads(REGISTRY.read_text(encoding="utf-8"))
+    data = json.loads(REGISTRY.read_text(encoding="utf-8"), object_pairs_hook=unique_pairs)
     if not isinstance(data, dict):
         raise ValueError("registry must be a JSON object")
     result: dict[str, int] = {}
     for tag, issue in data.items():
         if not isinstance(tag, str) or len(tag) != 4 or not tag.isascii() or not tag.isalpha() or tag != tag.upper():
             raise ValueError(f"invalid tag: {tag!r}")
-        if not isinstance(issue, int) or issue < 1:
+        if type(issue) is not int or issue < 1:
             raise ValueError(f"invalid issue number for {tag}: {issue!r}")
         result[tag] = issue
     if len(result) != len(set(result.values())):

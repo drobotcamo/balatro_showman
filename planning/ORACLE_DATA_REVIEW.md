@@ -6,6 +6,16 @@ Parent: Issue #6 (Lua producer, merged in PR #9). Owner: Issue #10.
 Evidence is external and not committed (D016): run directories under
 `F:\OBS_RECORDINGS\oracle_runs\`. This document records findings, not data.
 
+Reconciliation, 2026-10-02 (D028): the sections below preserve dated review
+findings and proposals, not a live follow-up queue. Sections 2/6 report a pinned
+29-step run with marker and positive frame mappings; this is different evidence
+from the older runs. Those mappings do not establish measured synchronization
+error or rendered pre-action correspondence. Current recorder fault fixtures
+and semantic limits are recorded in the production retrospective. External video
+was not replayed for this reconciliation. GitHub #81 owns current capture/inspect
+acceptance; #79/#82 stage protocol/tooling, and Q03 criteria are progressive.
+Old all-phase timing/proposal status below is historical, not reinstated policy.
+
 ## 1. Purpose and Scope
 
 Verify the integrity of the two persisted Lua-oracle runs and confirm whether
