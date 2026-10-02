@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://balatro-showman.invalid/provenance-manifest/1.0.0",
+  "title": "Balatro Showman candidate provenance manifest",
+  "type": "object",
+  "required": ["manifest_version", "generated_by", "artifacts"],
+  "properties": {
+    "manifest_version": {"const": "1.0.0"},
+    "generated_by": {"type": "string"},
+    "artifacts": {"type": "array", "items": {"$ref": "#/$defs/artifact"}}
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "required": ["path", "identity", "source", "revision", "license", "checksum", "compatibility", "eligibility", "status"],
+      "properties": {
+        "path": {"type": "string"},
+        "identity": {"type": ["object", "null"]},
+        "source": {"type": ["object", "null"]},
+        "revision": {"type": ["string", "null"]},
+        "license": {"type": ["object", "null"]},
+        "checksum": {"type": ["object", "null"]},
+        "compatibility": {"type": ["object", "null"]},
+        "eligibility": {"type": ["string", "null"]},
+        "status": {"enum": ["verified", "unknown", "unavailable", "incompatible", "not-ready"]}
+      }
+    }
+  }
+}
