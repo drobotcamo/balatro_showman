@@ -9,7 +9,7 @@ against a Lua ground-truth oracle. `planning/README.md` is the planning index.
 ## Read First
 
 - Resuming work: read the relevant
-  `planning/agent-state/threads/<issue-number>-<short-name>.md`.
+  `planning/agent-state/threads/<issue-number-or-tag>-<short-name>.md`.
 - Changing a component: read its contract in `planning/components/` first.
 - Starting a work item, branching, reviewing, approving, merging, handing off,
   or checkpointing context: follow `planning/agent-workflow.md`. It is the
