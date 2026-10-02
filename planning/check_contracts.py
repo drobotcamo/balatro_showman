@@ -19,6 +19,8 @@ Checks (mechanical only; it does not judge prose quality or gate thresholds):
   targets are not present in a fresh checkout.
 - The orchestrator agent (`.opencode/agents/orchestrator.md`) and its
   `/orchestrate` command exist with the required sections and wiring.
+- The portfolio-state skill exists, is wired to `/orchestrate`, and retains
+  the T0/write-boundary and report markers.
 
 Stdlib only; exit code 1 on any failure.
 """
@@ -262,6 +264,37 @@ def check_orchestrator() -> None:
             fail(".opencode/command/orchestrate.md: must wire `agent: orchestrator`")
 
 
+def check_portfolio_state() -> None:
+    skill = ROOT / ".opencode" / "skill" / "portfolio-state" / "SKILL.md"
+    if not skill.is_file():
+        fail("missing .opencode/skill/portfolio-state/SKILL.md")
+        return
+    text = skill.read_text(encoding="utf-8")
+    required = (
+        "## Authority and entry point",
+        "## Modes and write boundary",
+        "## Procedure",
+        "## Budget",
+        "## Fixed report",
+        "audit-only mode",
+        "sole portfolio authority",
+        "tools/issue_tags.py register",
+        "Never merge",
+        "final verification",
+        "healthy continuation",
+        "unavailable tag allocator",
+    )
+    for marker in required:
+        if marker not in text:
+            fail(f"portfolio-state skill: missing marker {marker!r}")
+    command = (ROOT / ".opencode" / "command" / "orchestrate.md").read_text(encoding="utf-8")
+    if "skill: portfolio-state" not in command:
+        fail(".opencode/command/orchestrate.md: must wire `skill: portfolio-state`")
+    agent = (ROOT / ".opencode" / "agents" / "orchestrator.md").read_text(encoding="utf-8")
+    if "portfolio-state" not in agent:
+        fail("orchestrator: must reference portfolio-state skill")
+
+
 def check_lead_merge_gate() -> None:
     """Keep the high-risk T2 merge and settlement gate discoverable."""
     workflow = (PLANNING / "agent-workflow.md").read_text(encoding="utf-8")
@@ -319,6 +352,7 @@ def main() -> int:
     check_components()
     check_roadmap()
     check_orchestrator()
+    check_portfolio_state()
     check_lead_merge_gate()
     check_references()
     for error in errors:
