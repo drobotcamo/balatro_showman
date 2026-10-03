@@ -7,11 +7,12 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 from .models import Base, Run, Record, Provenance, Integrity
 
-STATUSES = {"active", "interrupted", "completed", "won", "lost", "aborted", "endless"}
+STATUSES = {"active", "interrupted", "incomplete", "completed", "won", "lost", "aborted", "endless"}
 FINAL = STATUSES - {"active", "interrupted"}
-ALLOWED = {"active": STATUSES - {"active"}, "interrupted": {"active", "completed", "won", "lost", "aborted", "endless"}}
+ALLOWED = {"active": STATUSES - {"active"}, "interrupted": STATUSES - {"active", "interrupted"}}
 
 class BundleError(Exception): pass
+class ImportConflict(BundleError): pass
 class InvalidTransition(BundleError): pass
 class FinalizedEvidenceError(BundleError): pass
 
@@ -27,6 +28,9 @@ class RunBundle:
                 url = f"sqlite:///{database}"
         make_url(url)
         self._engine = create_engine(url, future=True)
+
+    def close(self):
+        self._engine.dispose()
 
     def create(self, run_id, *, producer_version, provenance=None):
         now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -110,8 +114,15 @@ class RunBundle:
                 created_at = created_at.astimezone(timezone.utc).replace(tzinfo=None)
         except (KeyError, TypeError, ValueError) as exc:
             raise BundleError("oracle session requires a valid started_at timestamp") from exc
+        lifecycle_status = metadata.get("lifecycle_status")
+        if lifecycle_status is None:
+            lifecycle_status = target_status or "active"
+        if lifecycle_status not in STATUSES:
+            raise BundleError(f"unsupported oracle lifecycle status: {lifecycle_status}")
+        if target_status is not None and lifecycle_status != target_status:
+            raise BundleError("oracle outcome conflicts with lifecycle_status")
         finalized_at = None
-        if target_status is not None:
+        if lifecycle_status in FINAL:
             try:
                 finalized_at = datetime.fromisoformat(metadata["ended_at"])
                 if finalized_at.tzinfo is not None:
@@ -119,6 +130,10 @@ class RunBundle:
             except (KeyError, TypeError, ValueError) as exc:
                 raise BundleError("finalized oracle session requires a valid ended_at timestamp") from exc
         producer_version = str(metadata.get("schema_version", "unknown"))
+        source_identity = json.dumps({
+            "session_sha256": hashlib.sha256(session_raw).hexdigest(),
+            "steps_sha256": hashlib.sha256(steps_raw).hexdigest(),
+        }, sort_keys=True, separators=(",", ":"))
         provenance = {
             "oracle.source_directory": str(source.resolve()),
             "oracle.source_session_sha256": hashlib.sha256(session_raw).hexdigest(),
@@ -146,30 +161,87 @@ class RunBundle:
         provenance["oracle.usage"] = json.dumps(usage, sort_keys=True, separators=(",", ":"))
         if "recording" in metadata:
             provenance["oracle.recording"] = json.dumps(metadata["recording"], sort_keys=True, separators=(",", ":"))
-        run_id = metadata["run_id"]
+        provenance.update({"source.type": "file-ipc-oracle", "source.identity": source_identity})
+        envelope = {
+            "run_id": metadata["run_id"],
+            "source_type": "file-ipc-oracle",
+            "source_identity": source_identity,
+            "producer_version": producer_version,
+            "status": lifecycle_status,
+            "outcome": target_status,
+            "created_at": created_at,
+            "finalized_at": finalized_at,
+            "provenance": provenance,
+        }
+        return self.ingest_run(envelope, [{"kind": "step", "payload": record} for record in records])
+
+    def ingest_run(self, envelope, records):
+        """Persist a source-neutral run envelope and ordered typed records atomically."""
+        required = ("run_id", "source_type", "source_identity", "producer_version", "status")
+        if not isinstance(envelope, dict) or any(not envelope.get(key) for key in required):
+            raise BundleError("run envelope requires run_id, source_type, source_identity, producer_version, and status")
+        if any(not isinstance(envelope[key], str) for key in required[:4]):
+            raise BundleError("run_id, source_type, source_identity, and producer_version must be strings")
+        status = envelope["status"]
+        if not isinstance(status, str) or status not in STATUSES:
+            raise BundleError(f"unsupported run status: {status}")
+        outcome = envelope.get("outcome")
+        valid_outcomes = (STATUSES - {"active", "interrupted", "incomplete"}) | {"unknown"}
+        if outcome is not None and (not isinstance(outcome, str) or outcome not in valid_outcomes):
+            raise BundleError(f"unsupported run outcome: {outcome}")
+        if status == "incomplete" and outcome is not None:
+            raise BundleError("incomplete runs must not declare an outcome")
+        if status in FINAL - {"incomplete"} and outcome != status:
+            raise BundleError(f"terminal lifecycle status {status!r} requires the matching outcome")
+        if status in {"active", "interrupted"} and outcome not in (None, "unknown"):
+            raise BundleError(f"run outcome {outcome!r} conflicts with lifecycle status {status!r}")
+        if not isinstance(records, (list, tuple)):
+            raise BundleError("records must be an ordered list")
+        provenance = envelope.get("provenance", {})
+        if not isinstance(provenance, dict):
+            raise BundleError("provenance must be an object")
+        if (provenance.get("source.type") != envelope["source_type"]
+                or provenance.get("source.identity") != envelope["source_identity"]):
+            raise BundleError("provenance source type and identity must match the run envelope")
+        normalized_records = []
+        for record in records:
+            if not isinstance(record, dict) or not isinstance(record.get("kind"), str) or not record["kind"] or "payload" not in record:
+                raise BundleError("each record requires a non-empty kind and payload")
+            try:
+                encoded = json.dumps(record["payload"], sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+            except (TypeError, ValueError) as exc:
+                raise BundleError("record payload must be JSON-serializable") from exc
+            normalized_records.append((record["kind"], encoded))
+        run_id = envelope["run_id"]
         with Session(self._engine) as s, s.begin():
-            if s.get(Run, run_id):
-                raise BundleError("run already exists")
-            run = Run(id=run_id, status=target_status or "active", producer_version=producer_version,
+            existing = s.get(Run, run_id)
+            if existing:
+                existing_provenance = {
+                    row.key: row.value for row in s.scalars(select(Provenance).where(Provenance.run_id == run_id)).all()
+                }
+                if (existing_provenance.get("source.type") == envelope["source_type"]
+                        and existing_provenance.get("source.identity") == envelope["source_identity"]):
+                    return {"run_id": run_id, "record_count": len(normalized_records),
+                            "status": existing.status, "already_imported": True}
+                raise ImportConflict(f"run ID {run_id!r} exists with different source identity")
+            created_at = envelope.get("created_at") or datetime.now(timezone.utc).replace(tzinfo=None)
+            finalized_at = envelope.get("finalized_at")
+            run = Run(id=run_id, status=status, producer_version=str(envelope["producer_version"]),
                       schema_version=self.schema_version, created_at=created_at,
-                      finalized_at=finalized_at, outcome=target_status, integrity_status="valid")
+                      finalized_at=finalized_at, outcome=outcome, integrity_status="valid")
             s.add(run)
             s.flush()
             for key, value in provenance.items():
-                s.add(Provenance(run_id=run_id, key=key, value=value))
-            for sequence, record in enumerate(records):
-                encoded = json.dumps(record, sort_keys=True, separators=(",", ":"),
-                                     ensure_ascii=False).encode("utf-8")
+                s.add(Provenance(run_id=run_id, key=str(key), value=str(value)))
+            hashes = []
+            for sequence, (kind, encoded) in enumerate(normalized_records):
                 digest = hashlib.sha256(encoded).hexdigest()
-                s.add(Record(run_id=run_id, sequence=sequence, kind="step", payload=encoded,
+                hashes.append(digest)
+                s.add(Record(run_id=run_id, sequence=sequence, kind=kind, payload=encoded,
                              sha256=digest, integrity_status="valid"))
-            digest = hashlib.sha256("".join(
-                hashlib.sha256(json.dumps(record, sort_keys=True, separators=(",", ":"),
-                                        ensure_ascii=False).encode("utf-8")).hexdigest()
-                for record in records).encode()).hexdigest()
-            s.add(Integrity(run_id=run_id, record_count=len(records), bundle_sha256=digest,
-                            result="valid"))
-        return {"run_id": run_id, "record_count": len(records), "status": target_status or "active"}
+            digest = hashlib.sha256("".join(hashes).encode()).hexdigest()
+            s.add(Integrity(run_id=run_id, record_count=len(normalized_records), bundle_sha256=digest, result="valid"))
+        return {"run_id": run_id, "record_count": len(normalized_records), "status": status}
 
     def add_provenance(self, run_id, values):
         """Add audit metadata without changing evidence or its integrity hash."""

@@ -35,6 +35,9 @@ class RunBundleInspector:
                 raise InspectionError("storage_not_found", f"database does not exist: {parsed.database}")
         self._engine = create_engine(url, future=True)
 
+    def close(self):
+        self._engine.dispose()
+
     @staticmethod
     def envelope(status, data=None, diagnostics=None):
         return {"status": status, "data": data, "diagnostics": diagnostics or []}

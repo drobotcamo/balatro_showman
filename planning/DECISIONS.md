@@ -392,6 +392,25 @@ actual corrections must remain. Source: user approval for Issue #109 after revie
 of 30 recent PRs; Google Engineering Practices, “The Standard of Code Review”
 and “How to write code review comments”; Anthropic, “Building effective agents.”
 
+### D033 — accepted — Issue #107 intake is unattended and incomplete capture is explicit
+
+RunBundle intake from the file-IPC bridge is hands-off: it imports after durable
+terminal storage and an accepted producer watermark, without a per-run
+confirm/reject/defer prompt or persisted verification result. The user's live
+Balatro smoke run is a one-time acceptance check for this integration. The
+existing Issue #46 recording-association operation remains separate and is not
+called by automatic intake.
+
+When a user cleanly ends capture without a producer terminal outcome, the bridge
+records terminal lifecycle status `incomplete` with no outcome. This is distinct
+from `interrupted`, which remains resumable. A process crash leaves the durable
+session active and recoverable; it does not infer that capture ended. Alternatives:
+the initially misread per-run confirmation checkpoint was rejected by the user;
+reusing `interrupted` for cleanly ended capture was rejected because it implies
+resumability. Source: user clarification and approval during Issue #107 on
+2026-10-03, recorded at
+`https://github.com/drobotcamo/balatro_showman/issues/107#issuecomment-5965862714`.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the
