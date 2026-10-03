@@ -42,6 +42,18 @@ class AgentStructureTests(unittest.TestCase):
             checks.check_agent_wiring()
         self.assertTrue(any("read-only" in error for error in checks.errors))
 
+    def test_production_lead_step_ceiling_is_rejected_by_wiring_check(self):
+        original = Path.read_text
+        def read(path, *args, **kwargs):
+            text = original(path, *args, **kwargs)
+            if path == ROOT / ".opencode/agents/lead.md":
+                return text.replace("mode: primary", "mode: primary\nsteps: 40")
+            return text
+        with patch.object(Path, "read_text", read):
+            checks.check_agent_wiring()
+        self.assertTrue(any("production lead must not have a fixed steps ceiling" in error
+                            for error in checks.errors))
+
     def test_frontmatter_missing_duplicate_or_unsupported_fails(self):
         for text in ("agent: lead", "---\nagent: lead\nagent: build\n---\n", "---\nitems: [a]\n- bad\n---\n"):
             with self.subTest(text=text), self.assertRaises(ValueError):
