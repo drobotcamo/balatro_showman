@@ -21,6 +21,10 @@ different source identity under that run ID is a conflict. Import never
 modifies source evidence. See `planning/RUN_BUNDLE_OPERATIONS.md` for automatic
 intake and recovery.
 
+The intake API requires terminal lifecycle statuses to carry their matching
+outcome. An `incomplete` run must carry no outcome; `active` and `interrupted`
+runs may carry only a missing or explicitly unknown outcome.
+
 The permitted lifecycle graph is: `active` may become `interrupted`,
 `incomplete`, `completed`, `won`, `lost`, `aborted`, or `endless`; `interrupted`
 may resume to `active` or take a terminal outcome. `incomplete` means capture

@@ -189,7 +189,11 @@ class RunBundle:
         valid_outcomes = (STATUSES - {"active", "interrupted", "incomplete"}) | {"unknown"}
         if outcome is not None and (not isinstance(outcome, str) or outcome not in valid_outcomes):
             raise BundleError(f"unsupported run outcome: {outcome}")
-        if outcome in valid_outcomes - {"unknown"} and outcome != status:
+        if status == "incomplete" and outcome is not None:
+            raise BundleError("incomplete runs must not declare an outcome")
+        if status in FINAL - {"incomplete"} and outcome != status:
+            raise BundleError(f"terminal lifecycle status {status!r} requires the matching outcome")
+        if status in {"active", "interrupted"} and outcome not in (None, "unknown"):
             raise BundleError(f"run outcome {outcome!r} conflicts with lifecycle status {status!r}")
         if not isinstance(records, (list, tuple)):
             raise BundleError("records must be an ordered list")

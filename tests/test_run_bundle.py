@@ -170,7 +170,7 @@ def test_source_neutral_video_envelope_is_queryable(tmp_path):
     RunBundle(url).ingest_run({
         "run_id": "video-derived-1", "source_type": "video-reconstruction",
         "source_identity": "video:sha256:abc123/revision:7", "producer_version": "reconstructor/0.1",
-        "status": "completed", "outcome": "unknown",
+        "status": "completed", "outcome": "completed",
         "provenance": {
             "source.type": "video-reconstruction", "source.identity": "video:sha256:abc123/revision:7",
             "video.sha256": "abc123", "processing.revision": "7", "frame_refs": "unknown",
@@ -182,7 +182,7 @@ def test_source_neutral_video_envelope_is_queryable(tmp_path):
     provenance = {item["key"]: item["value"] for item in inspector.provenance("video-derived-1")["data"]}
     assert provenance["video.sha256"] == "abc123"
 
-@pytest.mark.parametrize("status,outcome", [("won", "loss"), ("lost", "not-a-real-outcome"), ("completed", {"value": "won"})])
+@pytest.mark.parametrize("status,outcome", [("won", None), ("won", "loss"), ("lost", "not-a-real-outcome"), ("completed", {"value": "won"})])
 def test_source_neutral_api_rejects_invalid_or_conflicting_outcome(tmp_path, status, outcome):
     url = f"sqlite:///{tmp_path / 'invalid-outcome.db'}"
     cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
