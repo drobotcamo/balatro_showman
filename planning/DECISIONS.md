@@ -305,7 +305,10 @@ checkpoints for unfinished work. No unpublished-work exception is implied.
 - **Q01** — Which exact Balatro version and mod configuration define the
   initial ontology?
 - **Q02** — Which game assets can be legally and technically sourced for
-  redistribution?
+  redistribution? Bounded disposition for the current pilot and future
+  unresolved legacy artifacts: `user-supplied`; no such artifacts are
+  redistributed by this repository. Artifact-specific evidence and
+  compatibility review remain required for every consuming slice.
 - **Q03** — Which criteria, thresholds, minimum support and uncertainty rules
   does each applicable phase/slice protocol require before held-out evaluation?
 - **Q04** — Which visible state cannot be recovered reliably from video alone?

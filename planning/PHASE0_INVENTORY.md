@@ -5,7 +5,9 @@ Updated: 2026-10-02
 This is a repository inventory, not a claim that any legacy artifact is ready
 for the active pipeline. Active stages must not import from `legacy/`; required
 assets must move to an active, versioned store only after provenance,
-redistribution status, compatibility, and checksums are established.
+redistribution status, compatibility, and checksums are established. Issue
+#80's bounded eligibility disposition is in
+`planning/PROVENANCE_ELIGIBILITY.md`.
 
 ## Provenance manifest and read-only inventory
 
@@ -60,4 +62,6 @@ its final approved evaluation protocol. #80 gates only required artifact use.
 Do not promote candidates without source, license, checksum and compatibility.
 Historical reports are preserved; external video was not replayed for this
 reconciliation. Alignment arithmetic alone is not measured frame correspondence.
-No current live acceptance or broad Phase 0 completion is claimed.
+No current live acceptance or broad Phase 0 completion is claimed. No legacy
+candidate has been promoted; the class-map dependency remains unresolved for
+any future class-map-consuming slice.
