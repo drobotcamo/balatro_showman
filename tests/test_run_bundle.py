@@ -157,6 +157,28 @@ def test_file_ipc_oracle_import_keeps_unfinalized_source_active(tmp_path):
     RunBundle(url).import_oracle_directory(source)
     assert RunBundleInspector(url).summary("active-run")["data"]["run"]["status"] == "active"
 
+def test_file_ipc_oracle_import_derives_legacy_usage_without_timestamps(tmp_path):
+    url = f"sqlite:///{tmp_path / 'legacy-import.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    source = tmp_path / "oracle" / "legacy-run"
+    source.mkdir(parents=True)
+    (source / "session.json").write_text(json.dumps({
+        "run_id": "legacy-run", "started_at": "2026-10-03T03:28:55+00:00",
+        "outcome": None, "n_steps": 2,
+    }), encoding="utf-8")
+    (source / "steps.ndjson").write_text("".join(json.dumps({
+        "request_id": index, "_recorded_action": action,
+    }) + "\n" for index, action in ((1, "PlayHand"), (2, "DiscardHand"))), encoding="utf-8")
+    RunBundle(url).import_oracle_directory(source)
+    provenance = {item["key"]: item["value"]
+                  for item in RunBundleInspector(url).provenance("legacy-run")["data"]}
+    assert json.loads(provenance["oracle.usage"]) == {
+        "action_counts": {"DiscardHand": 1, "PlayHand": 1},
+        "first_recorded_at": None,
+        "last_recorded_at": None,
+        "unique_action_count": 2,
+    }
+
 def test_file_ipc_oracle_import_rejects_count_mismatch_before_creating_run(tmp_path):
     url = f"sqlite:///{tmp_path / 'bad-import.db'}"
     cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")

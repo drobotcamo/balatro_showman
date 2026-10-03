@@ -61,10 +61,10 @@ class RunBundle:
                for record in records):
             raise BundleError("every oracle step requires _recorded_action")
         usage = metadata.get("usage")
+        actual_counts = Counter(record["_recorded_action"] for record in records)
         if usage is not None:
             counts = usage.get("action_counts") if isinstance(usage, dict) else None
             unique_count = usage.get("unique_action_count") if isinstance(usage, dict) else None
-            actual_counts = Counter(record["_recorded_action"] for record in records)
             if (not isinstance(counts, dict)
                     or any(not isinstance(name, str) or not isinstance(count, int)
                            or isinstance(count, bool) or count < 0 for name, count in counts.items())
@@ -99,8 +99,24 @@ class RunBundle:
             "oracle.source_steps_sha256": hashlib.sha256(steps_raw).hexdigest(),
             "oracle.outcome": "unknown" if outcome is None else outcome,
         }
-        if "usage" in metadata:
-            provenance["oracle.usage"] = json.dumps(metadata["usage"], sort_keys=True, separators=(",", ":"))
+        if usage is None:
+            step_times = [record.get("_recorded_at") for record in records]
+            if step_times and all(isinstance(value, str) for value in step_times):
+                try:
+                    for value in step_times:
+                        datetime.fromisoformat(value)
+                except ValueError as exc:
+                    raise BundleError("oracle step has an invalid _recorded_at timestamp") from exc
+                first_recorded_at, last_recorded_at = step_times[0], step_times[-1]
+            else:
+                first_recorded_at = last_recorded_at = None
+            usage = {
+                "action_counts": dict(actual_counts),
+                "unique_action_count": len(actual_counts),
+                "first_recorded_at": first_recorded_at,
+                "last_recorded_at": last_recorded_at,
+            }
+        provenance["oracle.usage"] = json.dumps(usage, sort_keys=True, separators=(",", ":"))
         if "recording" in metadata:
             provenance["oracle.recording"] = json.dumps(metadata["recording"], sort_keys=True, separators=(",", ":"))
         run_id = metadata["run_id"]
