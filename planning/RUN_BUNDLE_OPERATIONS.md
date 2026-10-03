@@ -1,8 +1,8 @@
 # Run-Bundle Operations
 
-This guide is the human and agent entrypoint for the Issue #34 run-bundle
-boundary. It describes the current Python module entrypoint and the terminal
-interaction required before associating recording evidence.
+This guide documents the Issue #34 run-bundle boundary and the separate Issue
+#46 recording-association operation. The Issue #107 automatic file-intake path
+does not call recording association and does not pause for user input.
 
 ## Entrypoint
 
@@ -27,20 +27,25 @@ alembic upgrade head
 Run it only when creating or upgrading a bundle under the storage procedure in
 `planning/RUN_BUNDLE_STORAGE.md`. Do not run migrations as part of inspection.
 
-## Importing File-IPC Oracle Runs
+## Automatic File-IPC Intake
 
-After database setup, import one finalized or active oracle directory without
-modifying its source files:
+After migrating the destination once, configure the recorder with the existing
+file source and bundle. The bridge never runs migrations:
 
 ```text
-python -m run_bundle import-oracle --db <bundle.sqlite> --source <run-directory>
-python -m run_bundle summary --db <bundle.sqlite> --run <run-id>
-python -m run_bundle find --db <bundle.sqlite> --run <run-id> --kind step
+python -m ground_truth.file_ipc_bridge --out-dir <oracle-runs> --bundle-db <bundle.sqlite>
 ```
 
-The importer requires `session.json` and `steps.ndjson`, verifies the declared
-step count and recorded action on every step, and rejects an existing run ID.
-If session usage metadata is present, its action counts must match the steps. For
+The bridge imports automatically only after it has durably stored the terminal
+session and accepted every request through the producer watermark. It does not
+prompt for per-run review or confirmation. A human-reviewed live smoke run is a
+one-time acceptance check for this integration, not a runtime step.
+
+The file-source adapter requires `session.json` and `steps.ndjson`, verifies the
+declared step count and recorded action on every step. A repeat import with the same run
+ID and source-file hashes is a no-op success; a different source under that run
+ID is reported as a conflict. If session usage metadata is present, its action
+counts must match the steps. For
 legacy sessions without usage metadata, the importer derives action counts from
 the step records and leaves summary timestamps null when step timestamps are
 not consistently available. Present usage timestamps must be valid UTC ISO-8601
@@ -48,17 +53,52 @@ values and must match the first/last step timestamp when that boundary is
 available. Invalid step timestamps alongside usage metadata are rejected;
 legacy records without session usage keep the original step payload and receive
 null summary timestamps if timestamp coverage is missing or malformed.
-It maps `win`/`loss` to `won`/`lost`, keeps an unfinished source active, and
-stores usage and recording metadata plus SHA-256 hashes of both source files as
-provenance. Evidence records are canonicalized JSON objects; the source files
-remain untouched and their hashes identify the imported source. Import is one
-database transaction. The destination database must already be migrated; the
-import command does not create or upgrade its schema.
+It maps `win`/`loss` to `won`/`lost`, preserves usage and recording metadata, and
+stores source type, source identity and SHA-256 hashes of both source files as
+provenance. Evidence records are canonicalized JSON objects. Import is one
+database transaction, and it never deletes or rewrites source run files. If the
+database is unavailable or import validation fails, the bridge reports a pending
+import and retries while running or after restart. Re-running the manual
+`import-oracle` command is also safe. The destination database must already be
+migrated; the import command does not create or upgrade its schema.
 
-## Terminal Checkpoint
+If the bridge is stopped cleanly with Ctrl+C while a run has no producer
+terminal signal, it stores lifecycle status `incomplete`, keeps outcome unknown,
+and imports that run. This is distinct from a process crash: on restart, an
+active durable session is recovered and remains eligible to resume. A run with
+an incomplete producer watermark is not finalized or imported as a completed
+win/loss; the bridge waits for the missing requests. Source files and queued
+requests remain available for recovery.
 
-Recording association is the one user-facing pause in this bounded workflow.
-Before calling the association operation, present a concise terminal summary:
+## Source-Neutral Intake
+
+Source adapters call `RunBundle.ingest_run(envelope, records)`. The envelope
+contains run ID, source type and identity, producer version, status, outcome,
+timestamps and provenance; each ordered record has a `kind` and source-specific
+JSON payload. For example, a future video adapter can submit frame references,
+confidence or explicit unknown values with video hash and processing revision
+provenance. No video reconstruction is implemented by this boundary.
+
+Run summaries and imported records remain available through the normal
+inspection API/CLI:
+
+```text
+python -m run_bundle summary --db <bundle.sqlite> --run <run-id>
+python -m run_bundle find --db <bundle.sqlite> --run <run-id> --kind step
+python -m run_bundle provenance --db <bundle.sqlite> --run <run-id>
+python -m run_bundle validate --db <bundle.sqlite> --run <run-id> --strict
+```
+
+## Recording-Association Checkpoint (Separate from Run Intake)
+
+This existing checkpoint applies only to callers that explicitly invoke the
+recording-association operation. It controls whether a validated recording
+marker is associated with a run. `FileIpcBridge --bundle-db` does not invoke
+this operation; it does not prompt, wait for a response, or gate RunBundle
+import on confirmation. Run intake above remains automatic.
+
+Before calling the recording-association operation, present a concise terminal
+summary:
 
 - run ID and current lifecycle status;
 - whether a producer marker was found, and its validation summary;
@@ -113,8 +153,8 @@ confirmed.
 
 ## Boundaries
 
-The bundle lifecycle remains `active`, `interrupted`, `completed`, `endless`,
-`won`, `lost`, or `aborted`. Evidence remains append-only at the application
-boundary and terminal outcomes remain immutable. Compatibility adapters remain
-read-only. This guide does not define Phase 9 export storage or deterministic
-replay.
+The bundle lifecycle includes `active`, `interrupted`, `incomplete`,
+`completed`, `endless`, `won`, `lost`, and `aborted`. Evidence remains append-only
+at the application boundary, and terminal outcomes remain immutable.
+Compatibility adapters remain read-only. This guide does not define Phase 9
+export storage or deterministic replay.

@@ -133,3 +133,8 @@ def test_cli_imports_file_ipc_run_for_query(tmp_path, capsys):
     summary = json.loads(capsys.readouterr().out)
     assert summary["data"]["record_count"] == 1
     assert summary["data"]["run"]["outcome"] == "won"
+    (source / "steps.ndjson").write_text((source / "steps.ndjson").read_text() + "\n", encoding="utf-8")
+    assert main(["import-oracle", "--db", str(tmp_path / "import-cli.db"),
+                 "--source", str(source)]) == 2
+    conflict = json.loads(capsys.readouterr().out)
+    assert conflict["diagnostics"][0]["code"] == "run_identity_conflict"
