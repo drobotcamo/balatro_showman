@@ -112,7 +112,11 @@ def test_file_ipc_oracle_import_is_queryable_with_usage_and_source_provenance(tm
         "run_id": "live-run", "schema_version": "producer/1.0.0",
         "started_at": "2026-10-03T03:28:55.076059+00:00",
         "ended_at": "2026-10-03T03:29:37.964304+00:00", "outcome": "loss", "n_steps": 2,
-        "usage": {"action_counts": {"PlayHand": 1, "DiscardHand": 1}, "unique_action_count": 2},
+        "usage": {
+            "action_counts": {"PlayHand": 1, "DiscardHand": 1}, "unique_action_count": 2,
+            "first_recorded_at": "2026-10-03T03:28:55.079178+00:00",
+            "last_recorded_at": "2026-10-03T03:29:35.473195+00:00",
+        },
         "recording": {"recording_id": "obs-1", "fps": 60.0},
     }
     steps = [
@@ -239,5 +243,44 @@ def test_file_ipc_oracle_import_rejects_usage_for_different_action_with_same_tot
     }), encoding="utf-8")
     (source / "steps.ndjson").write_text(json.dumps({"_recorded_action": "DiscardHand"}) + "\n", encoding="utf-8")
     with pytest.raises(BundleError, match="action_counts"):
+        RunBundle(url).import_oracle_directory(source)
+    assert RunBundleInspector(url).list_runs()["data"] == []
+
+def test_file_ipc_oracle_import_rejects_invalid_usage_timestamps(tmp_path):
+    url = f"sqlite:///{tmp_path / 'bad-usage-time.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    source = tmp_path / "oracle" / "bad-usage-time"
+    source.mkdir(parents=True)
+    (source / "session.json").write_text(json.dumps({
+        "run_id": "bad-usage-time", "started_at": "2026-10-03T03:28:55+00:00",
+        "outcome": None, "n_steps": 1, "usage": {
+            "action_counts": {"PlayHand": 1}, "unique_action_count": 1,
+            "first_recorded_at": "not-a-time", "last_recorded_at": "2026-10-03T03:28:55+00:00",
+        },
+    }), encoding="utf-8")
+    (source / "steps.ndjson").write_text(json.dumps({
+        "_recorded_action": "PlayHand", "_recorded_at": "2026-10-03T03:28:55+00:00",
+    }) + "\n", encoding="utf-8")
+    with pytest.raises(BundleError, match="usage timestamps"):
+        RunBundle(url).import_oracle_directory(source)
+    assert RunBundleInspector(url).list_runs()["data"] == []
+
+def test_file_ipc_oracle_import_rejects_invalid_step_timestamp_when_usage_is_present(tmp_path):
+    url = f"sqlite:///{tmp_path / 'bad-step-time.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    source = tmp_path / "oracle" / "bad-step-time"
+    source.mkdir(parents=True)
+    (source / "session.json").write_text(json.dumps({
+        "run_id": "bad-step-time", "started_at": "2026-10-03T03:28:55+00:00",
+        "outcome": None, "n_steps": 1, "usage": {
+            "action_counts": {"PlayHand": 1}, "unique_action_count": 1,
+            "first_recorded_at": "2026-10-03T03:28:55+00:00",
+            "last_recorded_at": "2026-10-03T03:28:55+00:00",
+        },
+    }), encoding="utf-8")
+    (source / "steps.ndjson").write_text(json.dumps({
+        "_recorded_action": "PlayHand", "_recorded_at": "not-a-time",
+    }) + "\n", encoding="utf-8")
+    with pytest.raises(BundleError, match="step timestamps"):
         RunBundle(url).import_oracle_directory(source)
     assert RunBundleInspector(url).list_runs()["data"] == []

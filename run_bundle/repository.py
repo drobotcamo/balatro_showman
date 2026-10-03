@@ -74,6 +74,32 @@ class RunBundle:
                         and (not isinstance(unique_count, int) or isinstance(unique_count, bool)
                              or unique_count != len(actual_counts)))):
                 raise BundleError("oracle usage action_counts must be non-negative and sum to n_steps")
+            first_recorded_at = usage.get("first_recorded_at")
+            last_recorded_at = usage.get("last_recorded_at")
+            if (first_recorded_at is None) != (last_recorded_at is None):
+                raise BundleError("oracle usage first/last timestamps must both be present or both be null")
+            try:
+                if first_recorded_at is not None:
+                    for value in (first_recorded_at, last_recorded_at):
+                        parsed = datetime.fromisoformat(value) if isinstance(value, str) else None
+                        if parsed is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+                            raise ValueError("timestamp must be ISO-8601 UTC")
+            except ValueError as exc:
+                raise BundleError("oracle usage timestamps must be valid ISO-8601 UTC values") from exc
+            step_times = [record.get("_recorded_at") for record in records]
+            has_all_step_times = bool(step_times) and all(value is not None for value in step_times)
+            for value in step_times:
+                if value is None:
+                    continue
+                try:
+                    parsed = datetime.fromisoformat(value) if isinstance(value, str) else None
+                except ValueError:
+                    parsed = None
+                if parsed is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
+                    raise BundleError("oracle step timestamps must be valid ISO-8601 UTC values")
+            if has_all_step_times:
+                if (first_recorded_at, last_recorded_at) != (step_times[0], step_times[-1]):
+                    raise BundleError("oracle usage timestamps do not match the first and last steps")
         outcome = metadata.get("outcome")
         target_status = {"win": "won", "loss": "lost"}.get(outcome)
         if outcome is not None and target_status is None:
