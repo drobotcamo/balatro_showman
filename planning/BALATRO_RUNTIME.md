@@ -72,11 +72,11 @@ preserved at
 The pre-existing `snapshot.json`, `run_end.json`,
 `recording_start_marker.json`, and `action.txt` were preserved at
 `%APPDATA%\\Balatro\\agent_io-pre-issue81-20261002-185452`; no queued request
-files were present. Source and installed hashes now match. Balatro was not
-restarted after this copy, so the loaded build is not yet runtime-verified.
-Follow the reversible update procedure in `planning/BRIDGE_SPIKE.md`, restart
-Balatro, and verify the fresh Lovely log reports
-`build=issue81-file-queue-1` before starting the consumer or recording.
+files were present. Source and installed hashes match. After restarting Balatro,
+the fresh Lovely log `lovely-2026.10.02-19.01.15.log` reported
+`build=issue81-file-queue-1` and the expected `agent_io` path. This verifies
+the loaded producer. The log also retains the previously documented Handy and
+JokerDisplay manifest warnings.
 
 The capture components exist, but there is not yet one command that runs the
 whole capture-to-inspection-and-association path. `ground_truth.file_ipc_bridge`
