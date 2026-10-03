@@ -402,6 +402,36 @@ class FileIpcBridgeTests(unittest.TestCase):
                 self.assertTrue(bridge.step_once())
             self.assertEqual(len((out_dir / "ack-failure" / "steps.ndjson").read_text().splitlines()), 1)
 
+    def test_request_unlink_failure_restarts_and_deduplicates_persisted_step(self) -> None:
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            request_path = _queue_request(io_dir, "unlink-failure", 1)
+            bridge = FileIpcBridge(io_dir, out_dir)
+            original_unlink = Path.unlink
+
+            def fail_request_unlink_once(path, *args, **kwargs):
+                if path == request_path:
+                    raise OSError("injected request unlink failure")
+                return original_unlink(path, *args, **kwargs)
+
+            with patch.object(Path, "unlink", fail_request_unlink_once):
+                with self.assertRaisesRegex(OSError, "request unlink failure"):
+                    bridge.step_once()
+
+            self.assertTrue(request_path.exists())
+            self.assertEqual(len((out_dir / "unlink-failure" / "steps.ndjson").read_text().splitlines()), 1)
+            self.assertEqual(json.loads((out_dir / "unlink-failure" / "session.json").read_text())["n_steps"], 1)
+            restarted = FileIpcBridge(io_dir, out_dir)
+            self.assertTrue(restarted.step_once())
+            self.assertFalse(request_path.exists())
+            self.assertEqual(len((out_dir / "unlink-failure" / "steps.ndjson").read_text().splitlines()), 1)
+            self.assertEqual(json.loads((out_dir / "unlink-failure" / "session.json").read_text())["n_steps"], 1)
+            self.assertEqual((io_dir / "action.txt").read_text(), "1\tSkipBlind\n")
+
     def test_run_end_retries_after_restart_keep_final_outcome(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
