@@ -1,8 +1,11 @@
 import pytest
 import sqlite3
+import json
+import hashlib
 from alembic import command
 from alembic.config import Config
 from run_bundle import RunBundle, BundleError, InvalidTransition, FinalizedEvidenceError
+from run_bundle import RunBundleInspector
 
 def bundle(tmp_path):
     url = f"sqlite:///{tmp_path / 'run.db'}"
@@ -99,3 +102,84 @@ def test_explicit_invalid_status_is_strict_failure(tmp_path):
     b = bundle(tmp_path); b.append_raw("r1", 0, "partial", b"bad")
     with pytest.raises(BundleError, match="integrity failure"):
         b.validate("r1", strict=True)
+
+def test_file_ipc_oracle_import_is_queryable_with_usage_and_source_provenance(tmp_path):
+    url = f"sqlite:///{tmp_path / 'import.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    source = tmp_path / "oracle" / "live-run"
+    source.mkdir(parents=True)
+    session = {
+        "run_id": "live-run", "schema_version": "producer/1.0.0",
+        "started_at": "2026-10-03T03:28:55.076059+00:00",
+        "ended_at": "2026-10-03T03:29:37.964304+00:00", "outcome": "loss", "n_steps": 2,
+        "usage": {"action_counts": {"PlayHand": 1, "DiscardHand": 1}, "unique_action_count": 2},
+        "recording": {"recording_id": "obs-1", "fps": 60.0},
+    }
+    steps = [
+        {"request_id": 1, "_recorded_action": "PlayHand", "_recorded_at": "2026-10-03T03:28:55.079178+00:00"},
+        {"request_id": 2, "_recorded_action": "DiscardHand", "_recorded_at": "2026-10-03T03:29:35.473195+00:00"},
+    ]
+    session_path = source / "session.json"
+    steps_path = source / "steps.ndjson"
+    session_path.write_text(json.dumps(session), encoding="utf-8")
+    steps_path.write_text("".join(json.dumps(step) + "\n" for step in steps), encoding="utf-8")
+
+    result = RunBundle(url).import_oracle_directory(source)
+    assert result == {"run_id": "live-run", "record_count": 2, "status": "lost"}
+    inspector = RunBundleInspector(url)
+    summary = inspector.summary("live-run")["data"]
+    assert summary["run"]["status"] == "lost"
+    assert summary["run"]["outcome"] == "lost"
+    assert summary["run"]["integrity_status"] == "valid"
+    assert summary["run"]["created_at"] == "2026-10-03T03:28:55.076059"
+    assert summary["run"]["finalized_at"] == "2026-10-03T03:29:37.964304"
+    assert summary["integrity"]["result"] == "valid"
+    assert inspector.find_records("live-run", kind="step")["data"][0]["payload"] == steps[0]
+    provenance = {item["key"]: item["value"] for item in inspector.provenance("live-run")["data"]}
+    assert json.loads(provenance["oracle.usage"]) == session["usage"]
+    assert json.loads(provenance["oracle.recording"]) == session["recording"]
+    assert provenance["oracle.source_session_sha256"] == hashlib.sha256(session_path.read_bytes()).hexdigest()
+    assert provenance["oracle.source_steps_sha256"] == hashlib.sha256(steps_path.read_bytes()).hexdigest()
+    with pytest.raises(BundleError, match="already exists"):
+        RunBundle(url).import_oracle_directory(source)
+
+def test_file_ipc_oracle_import_keeps_unfinalized_source_active(tmp_path):
+    url = f"sqlite:///{tmp_path / 'active-import.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    source = tmp_path / "oracle" / "active-run"
+    source.mkdir(parents=True)
+    (source / "session.json").write_text(json.dumps({
+        "run_id": "active-run", "schema_version": "producer/1.0.0",
+        "started_at": "2026-10-03T03:28:55+00:00", "ended_at": None,
+        "outcome": None, "n_steps": 0,
+    }), encoding="utf-8")
+    (source / "steps.ndjson").write_text("", encoding="utf-8")
+    RunBundle(url).import_oracle_directory(source)
+    assert RunBundleInspector(url).summary("active-run")["data"]["run"]["status"] == "active"
+
+def test_file_ipc_oracle_import_rejects_count_mismatch_before_creating_run(tmp_path):
+    url = f"sqlite:///{tmp_path / 'bad-import.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    source = tmp_path / "oracle" / "bad-run"
+    source.mkdir(parents=True)
+    (source / "session.json").write_text(json.dumps({
+        "run_id": "bad-run", "started_at": "2026-10-03T03:28:55+00:00", "n_steps": 1,
+    }), encoding="utf-8")
+    (source / "steps.ndjson").write_text("", encoding="utf-8")
+    with pytest.raises(BundleError, match="n_steps"):
+        RunBundle(url).import_oracle_directory(source)
+    assert RunBundleInspector(url).list_runs()["data"] == []
+
+def test_file_ipc_oracle_import_rejects_inconsistent_usage(tmp_path):
+    url = f"sqlite:///{tmp_path / 'bad-usage-import.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    source = tmp_path / "oracle" / "bad-usage"
+    source.mkdir(parents=True)
+    (source / "session.json").write_text(json.dumps({
+        "run_id": "bad-usage", "started_at": "2026-10-03T03:28:55+00:00",
+        "outcome": None, "n_steps": 1, "usage": {"action_counts": {"PlayHand": 0}},
+    }), encoding="utf-8")
+    (source / "steps.ndjson").write_text(json.dumps({"_recorded_action": "PlayHand"}) + "\n", encoding="utf-8")
+    with pytest.raises(BundleError, match="action_counts"):
+        RunBundle(url).import_oracle_directory(source)
+    assert RunBundleInspector(url).list_runs()["data"] == []
