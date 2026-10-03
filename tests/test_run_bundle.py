@@ -179,6 +179,27 @@ def test_file_ipc_oracle_import_derives_legacy_usage_without_timestamps(tmp_path
         "unique_action_count": 2,
     }
 
+def test_file_ipc_oracle_import_omits_legacy_timestamp_summary_when_any_timestamp_is_invalid(tmp_path):
+    url = f"sqlite:///{tmp_path / 'malformed-time-import.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    source = tmp_path / "oracle" / "malformed-time"
+    source.mkdir(parents=True)
+    (source / "session.json").write_text(json.dumps({
+        "run_id": "malformed-time", "started_at": "2026-10-03T03:28:55+00:00",
+        "outcome": None, "n_steps": 2,
+    }), encoding="utf-8")
+    (source / "steps.ndjson").write_text("".join(json.dumps({
+        "request_id": index, "_recorded_action": action, "_recorded_at": recorded_at,
+    }) + "\n" for index, action, recorded_at in (
+        (1, "PlayHand", "2026-10-03T03:28:55+00:00"), (2, "DiscardHand", "not-a-time"))), encoding="utf-8")
+    RunBundle(url).import_oracle_directory(source)
+    provenance = {item["key"]: item["value"]
+                  for item in RunBundleInspector(url).provenance("malformed-time")["data"]}
+    usage = json.loads(provenance["oracle.usage"])
+    assert usage["action_counts"] == {"DiscardHand": 1, "PlayHand": 1}
+    assert usage["first_recorded_at"] is None
+    assert usage["last_recorded_at"] is None
+
 def test_file_ipc_oracle_import_rejects_count_mismatch_before_creating_run(tmp_path):
     url = f"sqlite:///{tmp_path / 'bad-import.db'}"
     cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")

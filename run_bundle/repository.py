@@ -105,9 +105,10 @@ class RunBundle:
                 try:
                     for value in step_times:
                         datetime.fromisoformat(value)
-                except ValueError as exc:
-                    raise BundleError("oracle step has an invalid _recorded_at timestamp") from exc
-                first_recorded_at, last_recorded_at = step_times[0], step_times[-1]
+                except ValueError:
+                    first_recorded_at = last_recorded_at = None
+                else:
+                    first_recorded_at, last_recorded_at = step_times[0], step_times[-1]
             else:
                 first_recorded_at = last_recorded_at = None
             usage = {
