@@ -73,8 +73,8 @@ blocks a gate must appear in this table.
 | --- | --- | --- |
 | Q01 | Phase 1 | The initial Balatro version and mod configuration that define the ontology are unresolved. |
 | Q02 | Artifact-consuming Phase 0-1/slice steps | Eligibility blocks use of unresolved required artifacts; optional candidates do not block unrelated work. |
-| Q03 | Applicable phase/slice evaluation | Approved criteria, thresholds and support must be fixed before held-out evaluation; future-phase thresholds do not block the first pilot. |
-| Q04 | Phase 0, 7 | Which visible state is unrecoverable from video alone bounds reduction and the oracle boundary. |
+| Q03 | Applicable phase/slice evaluation | First-slice criteria are frozen in `FIRST_SLICE_PROTOCOL_V2.md`; all other applicable scopes must be fixed before their held-out evaluation. Future-phase thresholds do not block the first pilot. |
+| Q04 | Phase 0, 7 | Which visible state is unrecoverable from video alone bounds reduction and the oracle boundary. The first-slice pilot records only field/condition-scoped findings; broader Q04 remains open. |
 | Q05 | Phase 8 | Event labels are trusted only after a stated oracle agreement rate is met. |
 | Q06 | Phase 7-8 | Confidence propagation crosses detection, OCR, composition, reduction, and events. |
 

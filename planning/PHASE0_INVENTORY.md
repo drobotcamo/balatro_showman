@@ -35,10 +35,10 @@ store. It must not be used to promote a candidate without external evidence.
 | Phase 0 output | Owning component | Repository evidence | Status |
 | --- | --- | --- | --- |
 | Public-artifact inventory and provenance records | Ground truth / dataset | Schema and read-only inventory shipped in PR #77; candidate evidence is not eligibility | inventory delivered; adoption unresolved |
-| Aligned `(state, action, outcome)` oracle run | Ground truth | `planning/ORACLE_DATA_REVIEW.md` reports older unpinned runs and a 29-step pinned loss run with marker/positive frame mappings | historical transport/alignment metadata exists; current reliability, semantic suitability and measured rendered correspondence unaccepted |
-| Real-frame eval set, annotation protocol, and QA export | Ground truth | Legacy labeling code exists (`legacy/label_store.py`, `legacy/tools/`), but no active tool, real clips, eval manifest, or protocol was found | blocked on real footage and format decision |
+| Aligned `(state, action, outcome)` oracle run | Ground truth | Historical run evidence plus the marker-associated 197-step Ante 1 session recorded for #79; its first-slice segment is present and a separate Ante 5 continuation is retained as another run | first-slice segment available; full first session has no terminal outcome, and seven sampled frame/step mappings remain unverified for rendered synchronization |
+| Real-frame eval set, annotation protocol, and QA export | Ground truth | `FIRST_SLICE_PROTOCOL_V1.md`/`V2.md`; exporter and guide in PR #112; external user-reviewed seven-frame manifest/report linked from #79/#82 | bounded development sample and tooling delivered; no predictions, held-out set, or broad Phase 3–8 sufficiency claim |
 | Required assets/weights versioned and provenance-backed | Ontology / synthetic data / detection | A legacy YOLO checkpoint and OCR geometry exist; no active-store provenance, license, compatibility, or checksum records were found | not ready to adopt |
-| Applicable evaluation criteria | Owning phase/slice components; protocol owned by ground truth | No approved first-slice protocol established here; Q03 remains staged under D028 | development protocol/pilot next; freeze criteria before held-out evaluation |
+| Applicable evaluation criteria | Owning phase/slice components; protocol owned by ground truth | User-approved `planning/FIRST_SLICE_PROTOCOL_V2.md`; #79 records the scoped decision | first-slice criteria/support/context frozen for prospective held-out use; other phase/slice criteria remain staged; no held-out score exists |
 
 ## Verified reusable references
 
@@ -55,13 +55,10 @@ store. It must not be used to promote a candidate without external evidence.
 
 ## Boundary and next gate
 
-The inventory is shipped, not the next implementation. #81 owns reliable
-recorded-run inspection, starting with recorder fault regressions before live
-capture. #79 supplies a development protocol; #82's minimal tool/pilot informs
-its final approved evaluation protocol. #80 gates only required artifact use.
-Do not promote candidates without source, license, checksum and compatibility.
-Historical reports are preserved; external video was not replayed for this
-reconciliation. Alignment arithmetic alone is not measured frame correspondence.
-No current live acceptance or broad Phase 0 completion is claimed. No legacy
-candidate has been promoted; the class-map dependency remains unresolved for
-any future class-map-consuming slice.
+The inventory is shipped. #79/#82 delivered a bounded first-slice development
+pilot and frozen prospective criteria. No model predictions or held-out source
+set have been evaluated; seven nearest-frame mappings remain unverified for
+rendered synchronization. #80 gates only required artifact use. Do not promote
+candidates without source, license, checksum and compatibility. No broad Phase 0
+completion is claimed. No legacy candidate has been promoted; the class-map
+dependency remains unresolved for any future class-map-consuming slice.
