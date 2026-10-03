@@ -300,6 +300,51 @@ dependency/merge checks remain; post-merge evidence is recorded on the same PR o
 issue. D027's owned-change and publication accounting remains unchanged, including
 checkpoints for unfinished work. No unpublished-work exception is implied.
 
+### D029 — accepted — Oracle file IPC uses durable per-request queue files
+
+Replace the overwriteable snapshot singleton with uniquely named per-run request
+files. The producer publishes each complete JSON request by writing a temporary
+file and renaming it into the queue; request IDs restart within each run and all
+deduplication uses `(run_id, request_id)`. The consumer persists the step and
+session count before acknowledging by removing the queued request. If it crashes
+before removal, restart replays the file against persisted request identity and
+does not append a second row. The producer writes a per-run end signal with the
+highest successfully published request ID. The consumer retains that signal
+until all IDs through the watermark are durable, then persists the terminal
+outcome. Missing IDs remain incomplete and diagnosed; the consumer must not
+finalize merely because the queue is momentarily empty. Producer-side write
+failures remain explicit capture diagnostics and do not block game callbacks.
+
+This is at-least-once file delivery with idempotent consumer persistence, not an
+exactly-once claim. Legacy singleton inputs remain readable with an explicit
+unwatermarked/incomplete diagnostic; they cannot satisfy queue completeness.
+Alternatives: retain the single slot and defer out-of-order completeness (rejected
+because a delayed consumer can lose the terminal request), or add only a terminal
+watermark (rejected because it detects but cannot preserve an overwritten event).
+No database, new runtime dependency, or unbounded wait in the game is introduced.
+Source: user approval during Issue #81 on 2026-10-02.
+
+### D030 — accepted — Required `check` CI runs focused app tests for #81 paths
+
+Keep the existing required status context `check`. Extend the planning-check
+workflow's path filter to run for the #81 Python recorder, bundle-inspection,
+producer-contract test, their focused tests, and their existing
+dependency/configuration paths. Install
+Python 3.11, project runtime dependencies, and pytest, then run the focused
+recorder, producer-contract, and inspection tests together with existing
+issue-tag and planning checks.
+This makes the required check applicable to the current implementation without
+changing branch protection. The full test suite and class-ID generator remain
+unverified by clean-checkout CI because the vendored class-map gitlink has no
+`.gitmodules` URL and the two class-map tests fail in a clean worktree. Do not
+skip or mask them; publishing the approved class-map source or restoring pinned
+submodule retrieval remains a separate user-authorized input decision. The
+focused CI scope must be described accurately and expanded when that input is
+resolved. Alternative: run the whole suite while silently ignoring class-map
+failures (rejected because it conceals missing test inputs). Source: user
+approval during Issue #81 on 2026-10-02; clean worktree reproduced the missing
+CSV on the same date.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the

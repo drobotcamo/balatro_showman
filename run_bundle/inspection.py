@@ -21,6 +21,14 @@ class InspectionError(Exception):
 
 class RunBundleInspector:
     def __init__(self, url: str):
+        # The documented CLI accepts a SQLite filename as well as a SQLAlchemy
+        # URL. Normalize paths here so library and CLI behavior stay identical.
+        if "://" not in url:
+            if url == ":memory:":
+                url = "sqlite:///:memory:"
+            else:
+                database = Path(url).resolve().as_posix()
+                url = f"sqlite:///{database}"
         parsed = make_url(url)
         if parsed.drivername.startswith("sqlite") and parsed.database not in (None, ":memory:"):
             if not Path(parsed.database).exists():
