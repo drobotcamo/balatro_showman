@@ -1,8 +1,8 @@
 # Run-Bundle Operations
 
-This guide is the human and agent entrypoint for the Issue #34 run-bundle
-boundary. It describes the current Python module entrypoint and the terminal
-interaction required before associating recording evidence.
+This guide documents the Issue #34 run-bundle boundary and the separate Issue
+#46 recording-association operation. The Issue #107 automatic file-intake path
+does not call recording association and does not pause for user input.
 
 ## Entrypoint
 
@@ -91,12 +91,14 @@ python -m run_bundle validate --db <bundle.sqlite> --run <run-id> --strict
 
 ## Recording-Association Checkpoint (Separate from Run Intake)
 
-This existing checkpoint controls only whether a validated recording marker is
-associated with a run. It is not a per-run RunBundle import or verification
-step. Run intake above remains automatic.
+This existing checkpoint applies only to callers that explicitly invoke the
+recording-association operation. It controls whether a validated recording
+marker is associated with a run. `FileIpcBridge --bundle-db` does not invoke
+this operation; it does not prompt, wait for a response, or gate RunBundle
+import on confirmation. Run intake above remains automatic.
 
-Recording association is the one user-facing pause in this bounded workflow.
-Before calling the association operation, present a concise terminal summary:
+Before calling the recording-association operation, present a concise terminal
+summary:
 
 - run ID and current lifecycle status;
 - whether a producer marker was found, and its validation summary;
