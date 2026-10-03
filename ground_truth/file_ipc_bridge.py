@@ -66,6 +66,12 @@ class FileIpcBridge:
                 session = json.loads(session_path.read_text(encoding="utf-8"))
                 run_id = str(session["run_id"])
                 session["session_dir"] = session_path.parent
+                session["usage"] = {
+                    "action_counts": {},
+                    "unique_action_count": 0,
+                    "first_recorded_at": None,
+                    "last_recorded_at": None,
+                }
                 if session.get("outcome") is None:
                     self._sessions[run_id] = session
                 else:
@@ -114,6 +120,18 @@ class FileIpcBridge:
                         self._seen_requests.add(key)
                         self._request_actions[key] = record["_recorded_action"]
                         self._request_runs[key] = run_id
+                    recorded_at = record.get("_recorded_at")
+                    if isinstance(recorded_at, str):
+                        self._record_usage(session, str(record["_recorded_action"]), recorded_at)
+                    else:
+                        # Older step files still receive action counts, but do
+                        # not get invented timestamps.
+                        counts = session["usage"]["action_counts"]
+                        action = str(record["_recorded_action"])
+                        if action not in counts:
+                            counts[action] = 0
+                            session["usage"]["unique_action_count"] += 1
+                        counts[action] += 1
                 if bad_tail is not None:
                     corrupt_path = steps_path.with_name("steps.ndjson.corrupt")
                     suffix = 1
@@ -138,6 +156,8 @@ class FileIpcBridge:
                         "cause": "session_count_reconciled_to_valid_persisted_records",
                     })
                     session["n_steps"] = actual_steps
+                    self._write_session(session)
+                else:
                     self._write_session(session)
                 if self._capture_diagnostics.get(run_id):
                     self._write_capture_diagnostics(session["session_dir"], run_id)
@@ -278,6 +298,12 @@ class FileIpcBridge:
                 "ended_at": None,
                 "outcome": None,
                 "n_steps": 0,
+                "usage": {
+                    "action_counts": {},
+                    "unique_action_count": 0,
+                    "first_recorded_at": None,
+                    "last_recorded_at": None,
+                },
                 "session_dir": session_dir,
             }
             if self._recording_marker is not None:
@@ -288,6 +314,23 @@ class FileIpcBridge:
             self._sessions[run_id] = session
             self._write_session(session)
         return session
+
+    @staticmethod
+    def _record_usage(session: dict[str, Any], action: str, recorded_at: str) -> None:
+        usage = session.setdefault("usage", {
+            "action_counts": {},
+            "unique_action_count": 0,
+            "first_recorded_at": None,
+            "last_recorded_at": None,
+        })
+        counts = usage.setdefault("action_counts", {})
+        if action not in counts:
+            usage["unique_action_count"] = int(usage.get("unique_action_count", 0)) + 1
+            counts[action] = 0
+        counts[action] += 1
+        if usage.get("first_recorded_at") is None:
+            usage["first_recorded_at"] = recorded_at
+        usage["last_recorded_at"] = recorded_at
 
     def _write_session(self, session: dict[str, Any]) -> None:
         public = {key: value for key, value in session.items() if key != "session_dir"}
@@ -393,12 +436,14 @@ class FileIpcBridge:
         if isinstance(legal_actions, list) and legal_actions and action not in legal_actions:
             self._invalid_input(input_path, f"action {action!r} is not in legal_actions")
         session = self._session(run_id)
-        record = {**snapshot, "_recorded_action": action}
+        recorded_at = datetime.now(timezone.utc).isoformat()
+        record = {**snapshot, "_recorded_action": action, "_recorded_at": recorded_at}
         self._append_step_durable(session["session_dir"] / "steps.ndjson", record, session)
         self._seen_requests.add(request_key)
         self._request_actions[request_key] = action
         self._request_runs[request_key] = run_id
         session["n_steps"] += 1
+        self._record_usage(session, action, recorded_at)
         self._diagnose_request_gap(session, request_id)
         self._write_session(session)
         _atomic_write(self.action_path, f"{request_id}\t{action}\n")
