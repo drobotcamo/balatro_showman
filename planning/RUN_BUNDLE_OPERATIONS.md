@@ -27,6 +27,34 @@ alembic upgrade head
 Run it only when creating or upgrading a bundle under the storage procedure in
 `planning/RUN_BUNDLE_STORAGE.md`. Do not run migrations as part of inspection.
 
+## Importing File-IPC Oracle Runs
+
+After database setup, import one finalized or active oracle directory without
+modifying its source files:
+
+```text
+python -m run_bundle import-oracle --db <bundle.sqlite> --source <run-directory>
+python -m run_bundle summary --db <bundle.sqlite> --run <run-id>
+python -m run_bundle find --db <bundle.sqlite> --run <run-id> --kind step
+```
+
+The importer requires `session.json` and `steps.ndjson`, verifies the declared
+step count and recorded action on every step, and rejects an existing run ID.
+If session usage metadata is present, its action counts must match the steps. For
+legacy sessions without usage metadata, the importer derives action counts from
+the step records and leaves summary timestamps null when step timestamps are
+not consistently available. Present usage timestamps must be valid UTC ISO-8601
+values and must match the first/last step timestamp when that boundary is
+available. Invalid step timestamps alongside usage metadata are rejected;
+legacy records without session usage keep the original step payload and receive
+null summary timestamps if timestamp coverage is missing or malformed.
+It maps `win`/`loss` to `won`/`lost`, keeps an unfinished source active, and
+stores usage and recording metadata plus SHA-256 hashes of both source files as
+provenance. Evidence records are canonicalized JSON objects; the source files
+remain untouched and their hashes identify the imported source. Import is one
+database transaction. The destination database must already be migrated; the
+import command does not create or upgrade its schema.
+
 ## Terminal Checkpoint
 
 Recording association is the one user-facing pause in this bounded workflow.

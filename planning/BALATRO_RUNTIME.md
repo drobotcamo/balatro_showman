@@ -78,16 +78,12 @@ the fresh Lovely log `lovely-2026.10.02-19.01.15.log` reported
 the loaded producer. The log also retains the previously documented Handy and
 JokerDisplay manifest warnings.
 
-The capture components exist, but there is not yet one command that runs the
-whole capture-to-inspection-and-association path. `ground_truth.file_ipc_bridge`
-writes the legacy `session.json`/`steps.ndjson` directory;
-`planning/audit_oracle_runs.py` checks integrity and
-`planning/align_oracle_video.py` maps timestamps to frame indices.
-`run_bundle.read_oracle_run` is a read-only compatibility API, not a CLI or
-converter. `ground_truth.recording_association` accepts a SQLite `RunBundle`,
-while the file-IPC producer does not write that bundle. Use the current tools
-as separate steps only after the producer is updated; do not describe that as
-a verified end-to-end tool yet.
+`ground_truth.file_ipc_bridge` writes `session.json`/`steps.ndjson` directories.
+They can be inspected directly with `run_bundle.read_oracle_run` or imported
+into SQLite with `python -m run_bundle import-oracle`; subsequent queries use
+the read-only RunBundle inspector. `planning/audit_oracle_runs.py` checks source
+integrity and `planning/align_oracle_video.py` maps timestamps to frame indices.
+These remain separate steps; the producer does not write SQLite directly.
 
 The OBS log `2026-10-02 19-09-19.txt` shows the script loaded, but its recording-
 start event failed because the configured `io_dir` included the unexpanded

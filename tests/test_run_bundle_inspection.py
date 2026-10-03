@@ -1,5 +1,7 @@
 from run_bundle import RunBundleInspector
 from run_bundle import InspectionError
+from alembic import command
+from alembic.config import Config
 
 from test_run_bundle import bundle
 
@@ -104,3 +106,30 @@ def test_cli_accepts_documented_plain_sqlite_filename_and_emits_inspection(capsy
     assert '"status": "observed"' in output
     assert '"record_count": 1' in output
     assert '"outcome": null' in output
+
+
+def test_cli_imports_file_ipc_run_for_query(tmp_path, capsys):
+    import json
+    from run_bundle.__main__ import main
+
+    url = f"sqlite:///{tmp_path / 'import-cli.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    source = tmp_path / "oracle"
+    source.mkdir()
+    (source / "session.json").write_text(json.dumps({
+        "run_id": "cli-run", "schema_version": "producer/1.0.0",
+        "started_at": "2026-10-03T03:28:55+00:00", "ended_at": "2026-10-03T03:29:00+00:00",
+        "outcome": "win", "n_steps": 1,
+    }), encoding="utf-8")
+    (source / "steps.ndjson").write_text(json.dumps({
+        "request_id": 1, "_recorded_action": "PlayHand",
+    }) + "\n", encoding="utf-8")
+
+    assert main(["import-oracle", "--db", str(tmp_path / "import-cli.db"),
+                 "--source", str(source)]) == 0
+    imported = json.loads(capsys.readouterr().out)
+    assert imported["data"] == {"run_id": "cli-run", "record_count": 1, "status": "won"}
+    assert main(["summary", "--db", str(tmp_path / "import-cli.db"), "--run", "cli-run"]) == 0
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["data"]["record_count"] == 1
+    assert summary["data"]["run"]["outcome"] == "won"
