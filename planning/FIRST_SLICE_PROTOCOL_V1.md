@@ -21,13 +21,14 @@ The five stages are:
 2. Select the Small Blind.
 3. Play hands and discard as needed to defeat the Small Blind.
 4. Cash out and reach the shop.
-5. Purchase multiple items from that shop visit.
+5. Purchase various items from that shop visit.
 
 Record the actual number of offers, affordability, selection, completed
-purchases, and resulting state. Preserve shop constraints and any inability to
-make multiple purchases as pilot evidence; do not substitute another shop visit
-or silently treat an unobserved purchase as completed. The pilot review must
-propose an operational completion rule for “various items” for user approval.
+purchases, and resulting state. “Various items” records the user's intended
+stage, not a numeric completion threshold. Preserve shop constraints and any
+inability to make purchases as pilot evidence; do not substitute another shop
+visit or silently treat an unobserved purchase as completed. The pilot review
+must propose an operational completion rule for user approval.
 
 The slice ends after the post-purchase state is observable, or is marked
 incomplete if the run cannot reach that point. Later blinds, later shop visits,

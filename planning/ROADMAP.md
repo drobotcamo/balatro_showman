@@ -25,7 +25,7 @@ results may not tune them (D028).
    evaluation criteria before held-out collection/scoring. #82 starts from the
    development protocol, not #79 closure. The initial slice is defined in
    `FIRST_SLICE_PROTOCOL_V1.md` as one run from starting through Small Blind
-   selection/defeat, cash-out and multiple purchases in the following shop.
+   selection/defeat, cash-out and purchases in the following shop.
    #80 blocks only use of unresolved required artifacts, not every optional
    legacy candidate.
 3. Small measured video-only reconstruction: user-selected pages/fields, oracle-
