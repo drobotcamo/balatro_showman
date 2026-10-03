@@ -143,3 +143,21 @@ def test_cross_split_frame_leak_and_omitted_family_rejected():
     data["frames"][0]["labels"] = []
     with pytest.raises(AnnotationError, match="reviewed family"):
         build(data)
+
+
+def test_duplicate_json_key_diagnosed_before_output(tmp_path):
+    source, dest = tmp_path / "source.json", tmp_path / "manifest.json"
+    encoded = json.dumps(sample())
+    encoded = encoded.replace('"raw": "blind select"',
+                              '"raw": "shop", "raw": "blind select"')
+    source.write_text(encoded, encoding="utf-8")
+    with pytest.raises(AnnotationError, match="duplicate JSON key: raw"):
+        export(source, dest)
+    assert not dest.exists()
+
+
+def test_malformed_split_is_diagnostic():
+    data = sample()
+    data["sources"][0]["split"] = ["development"]
+    with pytest.raises(AnnotationError, match="invalid split"):
+        build(data)

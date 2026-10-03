@@ -50,6 +50,18 @@ def digest(value, where):
             and all(c in "0123456789abcdef" for c in value), f"{where}: lowercase sha256 required")
 
 
+def unique_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        require(key not in result, f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def invalid_constant(value):
+    raise AnnotationError(f"non-finite JSON number: {value}")
+
+
 def box(value, width, height, where):
     require(isinstance(value, list) and len(value) == 4, f"{where}: box must be [x,y,w,h]")
     for v in value:
@@ -76,8 +88,10 @@ def validate(data):
             text(source[key], f"source.{key}")
         for key in ("video_sha256", "session_sha256", "steps_sha256"):
             digest(source[key], f"source.{key}")
-        require(source["split"] in SPLITS, "invalid split")
-        require(source["origin"] in {"real", "synthetic"}, "invalid origin")
+        require(isinstance(source["split"], str) and source["split"] in SPLITS,
+                "invalid split")
+        require(isinstance(source["origin"], str) and source["origin"] in {"real", "synthetic"},
+                "invalid origin")
         require((source["origin"] == "synthetic") == (source["split"] == "synthetic"),
                 "synthetic source must be isolated")
         fields(source["alignment"], {"method", "version", "marker", "offset_ns", "fps"},
@@ -101,6 +115,7 @@ def validate(data):
                        "alignment", "geometry", "coverage", "labels"},
                {"source_id", "index", "timestamp_ns", "step_id", "stage", "frame_sha256",
                 "alignment", "geometry", "coverage", "labels", "exclusion"}, "frame")
+        text(frame["source_id"], "frame.source_id")
         require(frame["source_id"] in sources, "frame source missing")
         require(isinstance(frame["index"], int) and not isinstance(frame["index"], bool)
                 and frame["index"] >= 0, "invalid frame index")
@@ -112,7 +127,7 @@ def validate(data):
         require(frame["timestamp_ns"] >= 0, "negative timestamp")
         require(frame["step_id"] is None or isinstance(frame["step_id"], (str, int)),
                 "invalid step identity")
-        require(frame["stage"] in STAGES, "invalid stage")
+        require(isinstance(frame["stage"], str) and frame["stage"] in STAGES, "invalid stage")
         digest(frame["frame_sha256"], "frame.frame_sha256")
         split = sources[frame["source_id"]]["split"]
         prior = frame_splits.setdefault(frame["frame_sha256"], split)
@@ -120,7 +135,8 @@ def validate(data):
         fields(frame["alignment"], {"state", "uncertainty_frames", "evidence"},
                {"state", "uncertainty_frames", "evidence"}, "frame.alignment")
         alignment = frame["alignment"]
-        require(alignment["state"] in {"confirmed", "unverified", "failed", "disputed"},
+        require(isinstance(alignment["state"], str)
+                and alignment["state"] in {"confirmed", "unverified", "failed", "disputed"},
                 "invalid alignment state")
         require(alignment["uncertainty_frames"] is None or
                 (isinstance(alignment["uncertainty_frames"], int)
@@ -158,7 +174,8 @@ def validate(data):
         fields(frame["coverage"], FAMILIES, FAMILIES, "frame.coverage")
         for family, coverage in frame["coverage"].items():
             fields(coverage, {"state", "reason"}, {"state", "reason"}, "coverage")
-            require(coverage["state"] in {"reviewed", "absent", "unreviewed", "excluded"},
+            require(isinstance(coverage["state"], str)
+                    and coverage["state"] in {"reviewed", "absent", "unreviewed", "excluded"},
                     "invalid family coverage state")
             text(coverage["reason"], f"coverage.{family}.reason")
         require(isinstance(frame["labels"], list), "labels must be list")
@@ -172,10 +189,13 @@ def validate(data):
             for key in ("id", "key", "annotator", "reviewer", "rationale"):
                 text(label[key], f"label.{key}")
             require(label["annotator"] != label["reviewer"], "review must be independent")
-            require(label["family"] in FAMILIES and label["state"] in STATES, "invalid label family/state")
+            require(isinstance(label["family"], str) and label["family"] in FAMILIES
+                    and isinstance(label["state"], str) and label["state"] in STATES,
+                    "invalid label family/state")
             require(frame["coverage"][label["family"]]["state"] == "reviewed",
                     "label family must have reviewed coverage")
-            require(label["review"] in {"agree", "disagree", "excluded"}, "invalid review")
+            require(isinstance(label["review"], str)
+                    and label["review"] in {"agree", "disagree", "excluded"}, "invalid review")
             require(label["id"] not in label_ids, "duplicate label id")
             label_ids.add(label["id"])
             slot = (label["family"], label["key"])
@@ -282,7 +302,8 @@ def export(input_path, output_path):
     dest = Path(output_path).resolve()
     require(source != dest, "output cannot overwrite source evidence")
     require(dest.parent.is_dir(), "output parent does not exist")
-    data = json.loads(source.read_text(encoding="utf-8"))
+    data = json.loads(source.read_text(encoding="utf-8"), object_pairs_hook=unique_pairs,
+                      parse_constant=invalid_constant)
     result = build(data)
     payload = (json.dumps(result, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
                           allow_nan=False) + "\n").encode("utf-8")
