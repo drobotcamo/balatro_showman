@@ -223,6 +223,8 @@ def validate(data):
                         and {"identity", "edition", "seal", "sticker", "modifier"}
                         <= label["attributes"].keys(),
                         "observed object needs box, zone, order and explicit attribute states")
+                for attribute in ("identity", "edition", "seal", "sticker", "modifier"):
+                    text(label["attributes"][attribute], f"object.{attribute}")
             if label["family"] == "transition":
                 require("context_frames" in label and isinstance(label["context_frames"], list)
                         and all(isinstance(i, int) and not isinstance(i, bool) and i >= 0

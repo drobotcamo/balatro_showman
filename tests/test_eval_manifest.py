@@ -100,6 +100,10 @@ def test_object_and_transition_require_inspectable_context():
                  attributes={key: "unknown" for key in
                              ("identity", "edition", "seal", "sticker", "modifier")})
     build(data)
+    label["attributes"]["identity"] = None
+    with pytest.raises(AnnotationError, match="object.identity"):
+        build(data)
+    label["attributes"]["identity"] = "unknown"
     label.pop("attributes")
     with pytest.raises(AnnotationError, match="attribute states"):
         build(data)
