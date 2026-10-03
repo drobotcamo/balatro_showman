@@ -170,6 +170,12 @@ excluded data/files, expected evidence and stopping condition. Never delegate
 ambiguous integration ownership or reinterpret read-only permissions to allow
 fixture writing. The lead executes diagnostics and owns all edits/GitHub writes.
 
+For final-diff review, supply acceptance/exclusions, base/head SHAs, relevant
+contracts, check results, limits and inspectable evidence locations. These are
+leads, not proof. Review when the candidate diff is ready; after a fix,
+resume the same reviewer on the changed diff/current SHA when possible. Linking
+evidence in a PR comment does not change the reviewed revision.
+
 Do not duplicate delegated research; resume the task for follow-up. Returns
 include findings/references, changed files (none), checks/output and unresolved
 questions. Suggestions are evidence, not decisions. Pause speculative portfolio
@@ -191,9 +197,20 @@ Approval cost scales with blast radius:
   no runnable protocol. Specific user decision required; no silent exceptions.
 
 The independent-review rule applies where the tier requires it; it does not
-contradict T0 self-merge. This cross-cutting D028 migration requires fresh review.
+contradict T0 self-merge.
 
 ### Review Evidence
+
+Review the agreed outcome and introduced material defects. A blocker names the
+failed criterion or defect, evidence and smallest fix or required proof. Missing
+proof for a required claim blocks; inherited issues, optional improvements and
+unclaimed/out-of-scope behavior are limits. Verify supplied evidence independently;
+challenge unsound scope without inventing criteria.
+
+Use `refuted` for a disproven required claim, `holds with gaps` for an unverified
+material claim or blocker, and `holds` when the scope is verified without blockers,
+even with named nonblocking limits. The lead fixes blockers, not optional comments.
+An accessible but unlinked artifact does not itself require another review round.
 
 Record once on the current PR: independent reviewer identity/task reference,
 reviewed commit SHA, verdict (`holds`, `holds with gaps`, `refuted`), checks and
@@ -203,11 +220,10 @@ array alone neither proves nor disproves review; the lead's assertion alone is
 not independent evidence. Do not paste entire transcripts.
 
 Changing implementation after review requires review of the changed diff/current
-SHA. Include intended tracked artifacts before the final reviewed commit, rather
-than invalidating review with last-minute checkpoint edits. `holds with gaps` and
-`refuted` block merge unless gaps are T0-level or explicitly accepted by the user;
-record the exception and evidence. The reviewer supplies a verdict, not policy
-authority.
+SHA. Include intended tracked artifacts before the final reviewed commit.
+`holds with gaps` and `refuted` block merge unless gaps are T0-level or explicitly
+accepted by the user; record the exception and evidence. The reviewer supplies a
+verdict, not policy authority.
 
 ### Integration Evidence
 

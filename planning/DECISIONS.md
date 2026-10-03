@@ -373,7 +373,26 @@ recording-preparation requirements, recorded in
 `https://github.com/drobotcamo/balatro_showman/issues/104`; OpenCode Agents
 documentation, “Max steps,” https://opencode.ai/docs/agents/#max-steps.
 
-### D032 — accepted — Issue #107 intake is unattended and incomplete capture is explicit
+### D032 — accepted — Review blocks on material acceptance gaps, not every limit
+
+For tier-required independent review, the lead supplies the agreed acceptance,
+exclusions, reviewed base/head, checks and inspectable evidence locations. The
+read-only reviewer verifies independently and ties blockers to a failed required
+claim, introduced material defect or missing proof needed for acceptance. A
+review can return `holds` with nonblocking limits; `holds with gaps` remains
+blocking for material gaps under D026. Implementation changes require
+current-diff review, preferably by resuming the same reviewer. The lead resolves
+in-scope blockers without routine user pauses; only the user may accept a material
+exception. No new role, skill, CI rule or approval tier is added.
+
+Alternative: require a new review round or user disposition for every uncertainty
+or optional suggestion. Rejected because PRs #102, #105 and #106 needed evidence
+reconciliation after review without a code defect; #93 and #94 show why review of
+actual corrections must remain. Source: user approval for Issue #109 after review
+of 30 recent PRs; Google Engineering Practices, “The Standard of Code Review”
+and “How to write code review comments”; Anthropic, “Building effective agents.”
+
+### D033 — accepted — Issue #107 intake is unattended and incomplete capture is explicit
 
 RunBundle intake from the file-IPC bridge is hands-off: it imports after durable
 terminal storage and an accepted producer watermark, without a per-run
