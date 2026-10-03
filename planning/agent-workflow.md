@@ -120,6 +120,11 @@ restarted game and playing the requested states). Group unavoidable live actions
 into one concise request after preparation, and resume the same issue to verify
 the resulting evidence.
 
+Use accessible configuration/evidence for OBS FPS, destination, and hook settings.
+If any required value is unavailable or ambiguous, do not guess or claim capture
+readiness. Finish all other preparation, then include the specific missing value
+in the minimal user request and do not begin capture until it is confirmed.
+
 The recording action does not satisfy the post-capture association checkpoint.
 Follow `planning/RUN_BUNDLE_OPERATIONS.md`: inspect and present the observed run,
 marker and required/optional status; wait for explicit `confirm`, `decline`, or
