@@ -1,6 +1,6 @@
 # Local Balatro Runtime Reference
 
-Updated: 2026-09-30
+Updated: 2026-10-02
 
 This file records verified paths on the current development machine. Paths are
 machine-specific and are references for agents, not repository dependencies.
@@ -17,22 +17,81 @@ Do not copy saves, logs, dumps, mods, or game assets into this repository.
 | Steamodded config | `C:\\Users\\camgr\\AppData\\Roaming\\Balatro\\config\\Steamodded.jkr` | Config file present |
 | Profiles and saves | `C:\\Users\\camgr\\AppData\\Roaming\\Balatro\\1` | `profile.jkr`, `save.jkr`, `meta.jkr` present |
 
-## Installed mod directories
+## Current runtime and recording configuration
 
-- `BalatroMultiplayer-0.5.5`
-- `Brainstorm-2.0.0-alpha-1`
-- `HandyBalatro`
-- `JokerDisplay-2.0.4`
-- `WhatsInMyFool-main`
-- `smods-main` (Steamodded)
+- Game version in the latest generated Lovely game dump: `1.0.1o-FULL`
+- The installed `Balatro.exe` reports file/product version `11.5 r1`/`11.5`; this
+  is the bundled LÖVE runtime version, not the Balatro content version.
+- Lovely: `0.10.0`, reported by the 2026-10-02 18:08:28 launch log.
+- Steamodded runtime: `26.926.0~dev-a`, reported by the launch log and
+  `smods-main/version.lua`. Its `manifest.json` still says `26.829.0`; use the
+  runtime log/version file for the loaded runtime and retain the discrepancy.
+- OBS profile `Untitled` currently configures `C:\\Users\\camgr\\Videos`,
+  MKV recording, and common FPS `60` in
+  `%APPDATA%\\obs-studio\\basic\\profiles\\Untitled\\basic.ini`.
+- The project OBS hook is `ground_truth/obs_recording_start.py`; the OBS log
+  dated 2026-10-01 confirms it loaded and emitted a `Balatro handshake
+  requested` event. The OBS profile inventory inspected on 2026-10-02 contains
+  no copy of the script, so verify it is still loaded in OBS before capture.
+- User-selected #81 alignment tolerance: **within ±3 frames**. At 60 FPS this
+  is a nominal ±50 ms. Record actual video FPS/presentation timing and measured
+  rendered pre-action correspondence; this setting is a criterion, not evidence
+  that the capture meets it.
 
-Lovely's 2026-09-28 log reports Lovely `0.10.0`, Steamodded
-`26.926.0~dev-a`, and the game directory above. It also reports that
-`BalatroMultiplayer-0.5.5` and `Brainstorm-2.0.0-alpha-1` were blacklisted for
-that launch, and that Steamodded's debug socket started. The log contains
-warnings and errors about invalid metadata for HandyBalatro and JokerDisplay;
-these must be investigated before treating the runtime as a clean oracle
-environment.
+## Mod inventory and latest launch evidence
+
+Mod root: `%APPDATA%\\Balatro\\Mods`.
+
+| Directory | Local metadata/version | Latest launch evidence |
+| --- | --- | --- |
+| `smods-main` | `version.lua`: `26.926.0~dev-a`; manifest says `26.829.0` | Steamodded runtime `26.926.0~dev-a` loaded |
+| `balatro_showman_bridge` | manifest `0.1.0` | Loaded as `issue35-poll-diagnostic-3`; old singleton snapshot producer |
+| `HandyBalatro` | manifest `2.0.6` | Steamodded rejected manifest metadata because required `id` is missing; Lovely patches from Handy still applied |
+| `JokerDisplay-2.0.4` | manifest `2.0.4` | Steamodded rejected manifest metadata because required `id` is missing; Lovely patches from JokerDisplay still applied |
+| `WhatsInMyFool-main` | `wimf.json`: `1.0.0` | Present in mod root; load status not established from the inspected log |
+| `BalatroMultiplayer-0.5.5` | `Multiplayer.json`: `0.5.5` | Blacklisted; skipped by Lovely |
+| `Brainstorm-2.0.0-alpha-1` | version in directory name | Blacklisted; skipped by Lovely |
+| `balatro_showman_bridge.pre-issue15-20261001-verified` | backup directory | Blacklisted; skipped by Lovely |
+| `balatro_showman_bridge.pre-issue35-backup` | backup directory | Blacklisted; skipped by Lovely |
+
+The 2026-10-02 18:08:28 launch log also reports a Handy atlas key collision and
+several Lovely pattern warnings. Do not silently change the mod set for capture;
+record the selected configuration and any observed warnings as provenance.
+
+## Capture readiness
+
+The active producer is **not ready for #81 capture**. The checked-in queue
+producer is build `issue81-file-queue-1`, manifest `0.2.0`, SHA-256
+`C3165AAEC74B6E9FEB71ADAFB5175D6BFCB7CF976E22FDA197AC2C228F2DE5EB`. The
+installed `balatro_showman_bridge/main.lua` is the older
+`issue35-poll-diagnostic-3` build, manifest `0.1.0`, SHA-256
+`B0C607999E7A41D50C3BB51A0E9F1C3DBDB4B2CAAB5650D6FF4B525993D5A787`. Hashes
+do not match. Update the installed copy using the reversible steps in
+`planning/BRIDGE_SPIKE.md` and verify the loaded build/hash after restarting
+Balatro before launching the consumer or recording.
+
+The capture components exist, but there is not yet one command that runs the
+whole capture-to-inspection-and-association path. `ground_truth.file_ipc_bridge`
+writes the legacy `session.json`/`steps.ndjson` directory;
+`planning/audit_oracle_runs.py` checks integrity and
+`planning/align_oracle_video.py` maps timestamps to frame indices.
+`run_bundle.read_oracle_run` is a read-only compatibility API, not a CLI or
+converter. `ground_truth.recording_association` accepts a SQLite `RunBundle`,
+while the file-IPC producer does not write that bundle. Use the current tools
+as separate steps only after the producer is updated; do not describe that as
+a verified end-to-end tool yet.
+
+The OBS script previously loaded successfully and emitted a handshake, but its
+current loaded state is unverified. Its defaults use prefix `issue35`; set the
+OBS script's recording prefix to an Issue 81 label for the new capture. The
+existing OBS profile settings were read-only inspected; no profile or mod files
+were changed.
+
+Evidence inspected read-only: latest Lovely log
+`lovely-2026.10.02-18.08.28.log`, mod manifests/version files, generated
+`lovely/game-dump/globals.lua`, OBS profile `Untitled`, and installed/check-in
+producer hashes. The latest Balatro runtime configuration is not asserted from
+older captures where the current log does not establish it.
 
 ## External references
 
