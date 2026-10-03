@@ -60,15 +60,23 @@ record the selected configuration and any observed warnings as provenance.
 
 ## Capture readiness
 
-The active producer is **not ready for #81 capture**. The checked-in queue
-producer is build `issue81-file-queue-1`, manifest `0.2.0`, SHA-256
-`C3165AAEC74B6E9FEB71ADAFB5175D6BFCB7CF976E22FDA197AC2C228F2DE5EB`. The
-installed `balatro_showman_bridge/main.lua` is the older
-`issue35-poll-diagnostic-3` build, manifest `0.1.0`, SHA-256
-`B0C607999E7A41D50C3BB51A0E9F1C3DBDB4B2CAAB5650D6FF4B525993D5A787`. Hashes
-do not match. Update the installed copy using the reversible steps in
-`planning/BRIDGE_SPIKE.md` and verify the loaded build/hash after restarting
-Balatro before launching the consumer or recording.
+The checked-in queue producer is build `issue81-file-queue-1`, manifest
+`0.2.0`, SHA-256
+`C3165AAEC74B6E9FEB71ADAFB5175D6BFCB7CF976E22FDA197AC2C228F2DE5EB`. On
+2026-10-02, the installed `balatro_showman_bridge/main.lua` was replaced with
+this checked-in copy after the old `issue35-poll-diagnostic-3` build
+(manifest `0.1.0`, SHA-256
+`B0C607999E7A41D50C3BB51A0E9F1C3DBDB4B2CAAB5650D6FF4B525993D5A787`) was
+preserved at
+`%APPDATA%\\Balatro\\bridge-backups\\balatro_showman_bridge-20261002-185452`.
+The pre-existing `snapshot.json`, `run_end.json`,
+`recording_start_marker.json`, and `action.txt` were preserved at
+`%APPDATA%\\Balatro\\agent_io-pre-issue81-20261002-185452`; no queued request
+files were present. Source and installed hashes now match. Balatro was not
+restarted after this copy, so the loaded build is not yet runtime-verified.
+Follow the reversible update procedure in `planning/BRIDGE_SPIKE.md`, restart
+Balatro, and verify the fresh Lovely log reports
+`build=issue81-file-queue-1` before starting the consumer or recording.
 
 The capture components exist, but there is not yet one command that runs the
 whole capture-to-inspection-and-association path. `ground_truth.file_ipc_bridge`
@@ -84,8 +92,10 @@ a verified end-to-end tool yet.
 The OBS script previously loaded successfully and emitted a handshake, but its
 current loaded state is unverified. Its defaults use prefix `issue35`; set the
 OBS script's recording prefix to an Issue 81 label for the new capture. The
-existing OBS profile settings were read-only inspected; no profile or mod files
-were changed.
+existing OBS profile settings were inspected and left unchanged. Only the active
+bridge mod was updated; the previous mod tree and stale IPC files were preserved
+in the backup locations above. The new producer must still be loaded by a fresh
+Balatro startup before capture readiness is confirmed.
 
 Evidence inspected read-only: latest Lovely log
 `lovely-2026.10.02-18.08.28.log`, mod manifests/version files, generated

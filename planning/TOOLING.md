@@ -85,10 +85,11 @@ The Lua producer writes snapshots to `%APPDATA%\Balatro\agent_io`; the
 repository bridge consumes them, acknowledges each action, and writes one run
 directory containing `session.json` and `steps.ndjson`.
 
-1. Install the producer revision to
-   `%APPDATA%\Balatro\Mods\balatro_showman_bridge\main.lua`. Back up the
-   existing file first. Restart Balatro completely after changing the file so
-   Steamodded/Lovely reloads the mod.
+1. Install the producer revision using the reversible, hash-checked procedure
+   in `planning/BRIDGE_SPIKE.md` → Installation. It keeps the previous mod tree
+   outside `Mods`, avoiding duplicate mod IDs. Restart Balatro completely and
+   verify both the source/installed SHA-256 and the loaded build in the latest
+   Lovely log before starting a capture.
 2. From the repository root, start the recorder before starting a run:
 
    ```powershell

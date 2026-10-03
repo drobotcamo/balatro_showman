@@ -93,24 +93,35 @@ state. It does not execute the Balatro runtime or validate game hooks.
    Stop any listed process, and verify that the command returns no bridge
    process before continuing.
 
-2. Copy the mod folder into the Steamodded mod root, preserving a backup of
-   the previous installation:
+2. Copy the mod folder into the Steamodded mod root. Keep timestamped backups
+   outside `Mods` so Steamodded cannot discover a second manifest with the same
+   mod ID:
 
    ```powershell
    $target = "$env:APPDATA\Balatro\Mods\balatro_showman_bridge"
+   $backupRoot = "$env:APPDATA\Balatro\bridge-backups"
+   $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+   $backup = Join-Path $backupRoot "balatro_showman_bridge-$stamp"
+   if (-not (Test-Path "$env:APPDATA\Balatro")) { throw "Balatro data directory not found" }
+   if (Test-Path $backup) { throw "Backup path already exists: $backup" }
+   New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
    if (Test-Path $target) {
-     Rename-Item $target "$target.pre-capture-backup"
+     Move-Item -LiteralPath $target -Destination $backup
    }
    Copy-Item -Recurse -Force `
      "ground_truth\balatro_mod" `
      $target
-   Get-FileHash "ground_truth\balatro_mod\main.lua", "$target\main.lua"
+   $sourceHash = (Get-FileHash "ground_truth\balatro_mod\main.lua" -Algorithm SHA256).Hash
+   $installedHash = (Get-FileHash "$target\main.lua" -Algorithm SHA256).Hash
+   if ($sourceHash -ne $installedHash) { throw "Installed producer hash does not match source" }
+   Get-FileHash "ground_truth\balatro_mod\main.lua", "$target\main.lua" -Algorithm SHA256
    ```
 
-   The two hashes must match. To remove it, delete
-   `$env:APPDATA\Balatro\Mods\balatro_showman_bridge` and restore the backup.
-   Nothing is written outside that folder, `agent_io`, and the Python output
-   directory.
+   Restart Balatro completely and verify the latest Lovely log reports build
+   `issue81-file-queue-1`. The producer hash and loaded build are separate
+   checks. To roll back, close Balatro, move the new active directory out of
+   `Mods`, and move the timestamped backup back to the active target. Keep the
+   backup; do not delete it as part of an update.
 
 3. Launch Balatro and confirm the Lovely log reports the mod loaded:
    search `$env:APPDATA\Balatro\Mods\lovely\log\` for
