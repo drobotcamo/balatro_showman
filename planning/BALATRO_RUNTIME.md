@@ -89,19 +89,21 @@ while the file-IPC producer does not write that bundle. Use the current tools
 as separate steps only after the producer is updated; do not describe that as
 a verified end-to-end tool yet.
 
-The OBS script previously loaded successfully and emitted a handshake, but its
-current loaded state is unverified. Its defaults use prefix `issue35`; set the
-OBS script's recording prefix to an Issue 81 label for the new capture. The
-existing OBS profile settings were inspected and left unchanged. Only the active
-bridge mod was updated; the previous mod tree and stale IPC files were preserved
-in the backup locations above. The new producer must still be loaded by a fresh
-Balatro startup before capture readiness is confirmed.
+The OBS log `2026-10-02 19-09-19.txt` shows the script loaded, but its recording-
+start event failed because the configured `io_dir` included the unexpanded
+`%APPDATA%` variable. OBS script properties do not expand Windows environment
+variables. Set the `agent_io` field to the fully expanded path
+`C:\Users\camgr\AppData\Roaming\Balatro\agent_io` and its recording prefix
+to an Issue 81 label. The existing OBS profile settings were inspected and left
+unchanged. Only the active bridge mod was updated; the previous mod tree and
+stale IPC files were preserved in the backup locations above. The queue producer
+is loaded after restart; the OBS event handshake still needs to succeed before
+starting the game run.
 
-Evidence inspected read-only: latest Lovely log
-`lovely-2026.10.02-18.08.28.log`, mod manifests/version files, generated
-`lovely/game-dump/globals.lua`, OBS profile `Untitled`, and installed/check-in
-producer hashes. The latest Balatro runtime configuration is not asserted from
-older captures where the current log does not establish it.
+Evidence: latest producer startup log `lovely-2026.10.02-19.01.15.log`, failed
+OBS event log `2026-10-02 19-09-19.txt`, mod manifests/version files, generated
+`lovely/game-dump/globals.lua`, OBS profile `Untitled`, installed/check-in
+producer hashes, and the timestamped installation/archive records above.
 
 ## External references
 

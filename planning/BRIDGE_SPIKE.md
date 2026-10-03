@@ -170,9 +170,20 @@ first snapshot is persisted. Never use the wall-clock filename timestamp as a
 substitute.
 
 For an automatic event hook, load `ground_truth/obs_recording_start.py` from
-OBS **Tools > Scripts**. Configure the `agent_io` directory and recording FPS.
-The script writes the request on `OBS_FRONTEND_EVENT_RECORDING_STARTED`; use
-this hook, rather than the manual command above, for Issue #35 evidence.
+OBS **Tools > Scripts**. Set the `agent_io` directory to a fully expanded
+absolute path and configure recording FPS. OBS script properties do not expand
+Windows shell variables, so do not enter `%APPDATA%\Balatro\agent_io` as
+literal text. On the current machine, the value is
+`C:\Users\camgr\AppData\Roaming\Balatro\agent_io`; obtain the
+current value in PowerShell with:
+
+```powershell
+Join-Path $env:APPDATA 'Balatro\agent_io'
+```
+
+Paste the printed path into the OBS script property. The script writes the
+request on `OBS_FRONTEND_EVENT_RECORDING_STARTED`; use this hook, rather than
+the manual command above, for recording evidence.
 
 At the instant OBS recording starts, capture the producer monotonic clock value
 (`capture_timestamp_ns`) from a fresh snapshot or the bridge diagnostic. Pass
