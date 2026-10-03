@@ -273,7 +273,10 @@ class FileIpcBridgeTests(unittest.TestCase):
             output = captured.getvalue()
             self.assertIn("stopped cleanly", output)
             self.assertIn("smoke-6", output)
-            self.assertIn("1 steps recorded, outcome pending", output)
+            self.assertIn("1 steps recorded, outcome unknown", output)
+            session = json.loads((root / "runs" / "smoke-6" / "session.json").read_text())
+            self.assertEqual(session["lifecycle_status"], "incomplete")
+            self.assertIsNone(session["outcome"])
             self.assertEqual(
                 json.loads((root / "runs" / "smoke-6" / "session.json").read_text())["n_steps"],
                 1,
@@ -763,6 +766,113 @@ class FileIpcBridgeTests(unittest.TestCase):
                 self.assertTrue(bridge.step_once())
             self.assertFalse(request_path.exists())
             self.assertEqual(len((out_dir / "queued-retry" / "steps.ndjson").read_text().splitlines()), 1)
+
+    def test_watermarked_finalization_imports_once_and_survives_restart(self) -> None:
+        from alembic import command
+        from alembic.config import Config
+        from run_bundle import RunBundleInspector
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            db_path = root / "bundle.sqlite"
+            url = f"sqlite:///{db_path.as_posix()}"
+            cfg = Config("alembic.ini")
+            cfg.set_main_option("sqlalchemy.url", url)
+            command.upgrade(cfg, "head")
+            _queue_request(io_dir, "automatic-import", 1)
+            (io_dir / "run_end_automatic-import.json").write_text(json.dumps({
+                "ipc_schema_version": "file-queue/1.0.0", "run_id": "automatic-import",
+                "last_request_id": 1, "outcome": "win",
+            }), encoding="utf-8")
+
+            bridge = FileIpcBridge(io_dir, out_dir, bundle_db=url)
+            self.assertTrue(bridge.step_once())
+            source_dir = out_dir / "automatic-import"
+            source_hash = __import__("hashlib").sha256((source_dir / "steps.ndjson").read_bytes()).hexdigest()
+            inspector = RunBundleInspector(url)
+            self.assertEqual(inspector.summary("automatic-import")["data"]["record_count"], 1)
+            self.assertEqual(len(inspector.find_records("automatic-import", kind="step")["data"]), 1)
+            self.assertEqual(inspector.summary("automatic-import")["data"]["run"]["status"], "won")
+            self.assertEqual(inspector.validate("automatic-import")["data"]["status"], "valid")
+            provenance = {item["key"]: item["value"] for item in inspector.provenance("automatic-import")["data"]}
+            self.assertIn("oracle.usage", provenance)
+            self.assertIn("oracle.source_session_sha256", provenance)
+
+            restarted = FileIpcBridge(io_dir, out_dir, bundle_db=url)
+            self.assertTrue(restarted.step_once())
+            self.assertEqual(inspector.summary("automatic-import")["data"]["record_count"], 1)
+            self.assertEqual(__import__("hashlib").sha256((source_dir / "steps.ndjson").read_bytes()).hexdigest(), source_hash)
+            self.assertTrue((source_dir / "session.json").exists())
+            inspector.close()
+
+    def test_database_unavailable_keeps_finalized_source_for_retry(self) -> None:
+        from alembic import command
+        from alembic.config import Config
+        from run_bundle import RunBundleInspector
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            db_path = root / "bundle.sqlite"
+            url = f"sqlite:///{db_path.as_posix()}"
+            _queue_request(io_dir, "retry-import", 1)
+            (io_dir / "run_end_retry-import.json").write_text(json.dumps({
+                "ipc_schema_version": "file-queue/1.0.0", "run_id": "retry-import",
+                "last_request_id": 1, "outcome": "loss",
+            }), encoding="utf-8")
+            bridge = FileIpcBridge(io_dir, out_dir, bundle_db=url)
+            self.assertTrue(bridge.step_once())
+            self.assertTrue((out_dir / "retry-import" / "session.json").exists())
+            self.assertTrue((out_dir / "retry-import" / "steps.ndjson").exists())
+            self.assertNotIn("retry-import", bridge._imported_sessions)
+
+            cfg = Config("alembic.ini")
+            cfg.set_main_option("sqlalchemy.url", url)
+            command.upgrade(cfg, "head")
+            bridge._import_retry_after["retry-import"] = 0
+            self.assertTrue(bridge.step_once())
+            inspector = RunBundleInspector(url)
+            self.assertEqual(inspector.summary("retry-import")["data"]["run"]["status"], "lost")
+            inspector.close()
+
+    def test_clean_stop_imports_incomplete_without_an_outcome(self) -> None:
+        import contextlib
+        import io as io_module
+        from alembic import command
+        from alembic.config import Config
+        from run_bundle import RunBundleInspector
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            url = f"sqlite:///{(root / 'bundle.sqlite').as_posix()}"
+            cfg = Config("alembic.ini")
+            cfg.set_main_option("sqlalchemy.url", url)
+            command.upgrade(cfg, "head")
+            _queue_request(io_dir, "incomplete-stop", 1)
+            bridge = FileIpcBridge(io_dir, out_dir, bundle_db=url)
+            original_step = bridge.step_once
+            calls = {"count": 0}
+
+            def stop_after_recording():
+                calls["count"] += 1
+                if calls["count"] > 1:
+                    raise KeyboardInterrupt
+                return original_step()
+
+            bridge.step_once = stop_after_recording
+            with contextlib.redirect_stdout(io_module.StringIO()):
+                bridge.serve()
+            inspector = RunBundleInspector(url)
+            summary = inspector.summary("incomplete-stop")["data"]
+            self.assertEqual(summary["run"]["status"], "incomplete")
+            self.assertIsNone(summary["run"]["outcome"])
+            self.assertEqual(summary["record_count"], 1)
+            inspector.close()
 
 
 if __name__ == "__main__":

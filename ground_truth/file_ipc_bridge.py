@@ -39,10 +39,12 @@ def _atomic_write(path: Path, text: str) -> None:
 class FileIpcBridge:
     """Persist queued snapshots before acknowledging them by request removal."""
 
-    def __init__(self, io_dir: Path, out_dir: Path, action: str | None = None) -> None:
+    def __init__(self, io_dir: Path, out_dir: Path, action: str | None = None,
+                 bundle_db: str | None = None) -> None:
         self.io_dir = io_dir
         self.out_dir = out_dir
         self.action = action
+        self._bundle_db = bundle_db
         self.snapshot_path = io_dir / "snapshot.json"
         self.action_path = io_dir / "action.txt"
         self.run_end_path = io_dir / "run_end.json"
@@ -56,6 +58,8 @@ class FileIpcBridge:
         self._attached_recording_ids: set[str] = set()
         self._recording_marker: dict[str, Any] | None = None
         self._capture_diagnostics: dict[str, list[dict[str, Any]]] = {}
+        self._imported_sessions: set[str] = set()
+        self._import_retry_after: dict[str, float] = {}
         self._recover_sessions()
 
     def _recover_sessions(self) -> None:
@@ -73,7 +77,7 @@ class FileIpcBridge:
                     "first_recorded_at": None,
                     "last_recorded_at": None,
                 }
-                if session.get("outcome") is None:
+                if session.get("outcome") is None and session.get("lifecycle_status") != "incomplete":
                     self._sessions[run_id] = session
                 else:
                     self._finalized_sessions.add(run_id)
@@ -549,6 +553,7 @@ class FileIpcBridge:
                 })
                 self._write_capture_diagnostics(session["session_dir"], target)
             session["outcome"] = outcome
+            session["lifecycle_status"] = {"win": "won", "loss": "lost"}[outcome]
             session["ended_at"] = datetime.now(timezone.utc).isoformat()
             self._write_session(session)
             del self._sessions[target]
@@ -560,7 +565,37 @@ class FileIpcBridge:
     def step_once(self) -> bool:
         self._attach_recording_marker()
         did_work = self._handle_snapshot()
-        return self._handle_run_end() or did_work
+        did_work = self._handle_run_end() or did_work
+        return self._retry_pending_imports() or did_work
+
+    def _retry_pending_imports(self) -> bool:
+        if self._bundle_db is None:
+            return False
+        from sqlalchemy.exc import SQLAlchemyError
+        from run_bundle.repository import BundleError, RunBundle
+
+        now = time.monotonic()
+        did_work = False
+        for run_id, session in sorted(self._finalized_session_data.items()):
+            if run_id in self._imported_sessions or now < self._import_retry_after.get(run_id, 0):
+                continue
+            source = Path(session["session_dir"])
+            bundle = None
+            try:
+                bundle = RunBundle(self._bundle_db)
+                result = bundle.import_oracle_directory(source)
+            except (OSError, ValueError, BundleError, SQLAlchemyError) as error:
+                self._import_retry_after[run_id] = now + 5.0
+                print(f"[file_ipc_bridge] import pending for run {run_id}: {error}", file=sys.stderr)
+                continue
+            finally:
+                if bundle is not None:
+                    bundle.close()
+            self._imported_sessions.add(run_id)
+            self._import_retry_after.pop(run_id, None)
+            print(f"[file_ipc_bridge] imported run {run_id} into RunBundle ({result['record_count']} records)")
+            did_work = True
+        return did_work
 
     def open_sessions(self) -> dict[str, dict[str, Any]]:
         """Sessions recorded but not yet finalized by a run_end signal."""
@@ -572,7 +607,46 @@ class FileIpcBridge:
                 f"[file_ipc_bridge] run {run_id} interrupted before run_end "
                 f"({session['n_steps']} steps recorded, outcome pending)"
             )
+        for run_id, session in sorted(self._finalized_session_data.items()):
+            if session.get("lifecycle_status") == "incomplete":
+                print(f"[file_ipc_bridge] run {run_id} marked incomplete ({session['n_steps']} steps recorded, outcome unknown)")
         print("[file_ipc_bridge] stopped cleanly (Ctrl+C)")
+
+    def _mark_open_sessions_incomplete(self) -> None:
+        for run_id, session in list(self._sessions.items()):
+            # Leave queued work recoverable if either a producer request or a
+            # terminal signal is still waiting to be consumed.
+            pending_paths = list(self.io_dir.glob("request_*.json"))
+            if self.snapshot_path.exists():
+                pending_paths.append(self.snapshot_path)
+            pending_paths.extend(self.io_dir.glob("run_end_*.json"))
+            if self.run_end_path.exists():
+                pending_paths.append(self.run_end_path)
+            pending = False
+            for path in pending_paths:
+                try:
+                    item = json.loads(path.read_text(encoding="utf-8"))
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                    continue
+                if path.name.startswith("run_end"):
+                    if item.get("run_id") in (None, run_id):
+                        pending = True
+                        break
+                else:
+                    meta = item.get("meta")
+                    if isinstance(meta, dict) and meta.get("run_id") == run_id:
+                        request_id = str(item.get("request_id", ""))
+                        if f"{run_id}\x00{request_id}" not in self._seen_requests:
+                            pending = True
+                            break
+            if pending:
+                continue
+            session["lifecycle_status"] = "incomplete"
+            session["ended_at"] = datetime.now(timezone.utc).isoformat()
+            self._write_session(session)
+            del self._sessions[run_id]
+            self._finalized_sessions.add(run_id)
+            self._finalized_session_data[run_id] = session
 
     def serve(self, timeout: float | None = None) -> None:
         self.io_dir.mkdir(parents=True, exist_ok=True)
@@ -583,7 +657,8 @@ class FileIpcBridge:
                 if not self.step_once():
                     time.sleep(0.02)
         except KeyboardInterrupt:
-            pass
+            self._mark_open_sessions_incomplete()
+            self._retry_pending_imports()
         self._report()
 
 
@@ -597,11 +672,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--io-dir", type=Path, default=_default_io_dir())
     parser.add_argument("--out-dir", type=Path, required=True)
+    parser.add_argument("--bundle-db", help="migrated SQLite RunBundle database for automatic import")
     parser.add_argument("--action", help="Safe smoke-test action when the snapshot has no action_taken")
     parser.add_argument("--timeout", type=float)
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
-    bridge = FileIpcBridge(args.io_dir, args.out_dir, args.action)
+    bridge = FileIpcBridge(args.io_dir, args.out_dir, args.action, args.bundle_db)
     if args.once:
         bridge.io_dir.mkdir(parents=True, exist_ok=True)
         bridge.out_dir.mkdir(parents=True, exist_ok=True)

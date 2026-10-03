@@ -17,7 +17,7 @@ def test_lifecycle_and_immutable_evidence(tmp_path):
     assert b.validate("r1") == {"status": "valid", "record_count": 1, "bad_sequences": []}
     with pytest.raises(FinalizedEvidenceError): b.append("r1", 1, "state", {})
 
-@pytest.mark.parametrize("outcome", ["interrupted", "completed", "won", "lost", "endless", "aborted"])
+@pytest.mark.parametrize("outcome", ["interrupted", "incomplete", "completed", "won", "lost", "endless", "aborted"])
 def test_all_outcomes(tmp_path, outcome):
     b = bundle(tmp_path); b.transition("r1", outcome)
 
@@ -144,8 +144,59 @@ def test_file_ipc_oracle_import_is_queryable_with_usage_and_source_provenance(tm
     assert json.loads(provenance["oracle.recording"]) == session["recording"]
     assert provenance["oracle.source_session_sha256"] == hashlib.sha256(session_path.read_bytes()).hexdigest()
     assert provenance["oracle.source_steps_sha256"] == hashlib.sha256(steps_path.read_bytes()).hexdigest()
-    with pytest.raises(BundleError, match="already exists"):
-        RunBundle(url).import_oracle_directory(source)
+    assert RunBundle(url).import_oracle_directory(source)["already_imported"] is True
+
+def test_file_ipc_retry_conflicts_when_same_run_id_has_different_source(tmp_path):
+    url = f"sqlite:///{tmp_path / 'conflict.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    sources = [tmp_path / "source-a", tmp_path / "source-b"]
+    for source, action in zip(sources, ("PlayHand", "DiscardHand")):
+        source.mkdir()
+        (source / "session.json").write_text(json.dumps({
+            "run_id": "same-id", "started_at": "2026-10-03T03:28:55+00:00",
+            "outcome": None, "n_steps": 1,
+        }), encoding="utf-8")
+        (source / "steps.ndjson").write_text(json.dumps({"_recorded_action": action}) + "\n", encoding="utf-8")
+    bundle = RunBundle(url)
+    bundle.import_oracle_directory(sources[0])
+    with pytest.raises(BundleError, match="different source identity"):
+        bundle.import_oracle_directory(sources[1])
+    assert sources[0].joinpath("steps.ndjson").exists()
+    assert sources[1].joinpath("steps.ndjson").exists()
+
+def test_source_neutral_video_envelope_is_queryable(tmp_path):
+    url = f"sqlite:///{tmp_path / 'video-envelope.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    RunBundle(url).ingest_run({
+        "run_id": "video-derived-1", "source_type": "video-reconstruction",
+        "source_identity": "video:sha256:abc123/revision:7", "producer_version": "reconstructor/0.1",
+        "status": "completed", "outcome": "unknown",
+        "provenance": {
+            "source.type": "video-reconstruction", "source.identity": "video:sha256:abc123/revision:7",
+            "video.sha256": "abc123", "processing.revision": "7", "frame_refs": "unknown",
+        },
+    }, [{"kind": "frame-observation", "payload": {"frame": 12, "state": "unknown", "confidence": None}}])
+    inspector = RunBundleInspector(url)
+    assert inspector.summary("video-derived-1")["data"]["run"]["status"] == "completed"
+    assert inspector.find_records("video-derived-1")["data"][0]["payload"]["state"] == "unknown"
+    provenance = {item["key"]: item["value"] for item in inspector.provenance("video-derived-1")["data"]}
+    assert provenance["video.sha256"] == "abc123"
+
+def test_incomplete_import_has_no_invented_outcome(tmp_path):
+    url = f"sqlite:///{tmp_path / 'incomplete.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    source = tmp_path / "incomplete"
+    source.mkdir()
+    (source / "session.json").write_text(json.dumps({
+        "run_id": "incomplete-run", "schema_version": "producer/1.0.0",
+        "started_at": "2026-10-03T03:28:55+00:00", "ended_at": "2026-10-03T03:29:01+00:00",
+        "outcome": None, "lifecycle_status": "incomplete", "n_steps": 0,
+    }), encoding="utf-8")
+    (source / "steps.ndjson").write_text("", encoding="utf-8")
+    RunBundle(url).import_oracle_directory(source)
+    run = RunBundleInspector(url).summary("incomplete-run")["data"]["run"]
+    assert run["status"] == "incomplete"
+    assert run["outcome"] is None
 
 def test_file_ipc_oracle_import_keeps_unfinalized_source_active(tmp_path):
     url = f"sqlite:///{tmp_path / 'active-import.db'}"

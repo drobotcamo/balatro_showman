@@ -9,14 +9,23 @@ JSON UTF-8 bytes, or unmodified raw bytes, hashed with SHA-256. Final outcomes
 reject further evidence writes; validation reports and persists integrity
 failures without rewriting payloads.
 
-`python -m run_bundle import-oracle` copies one file-IPC `session.json` and
-`steps.ndjson` run into the database in one transaction. It stores canonical
-step JSON as records and retains source-file SHA-256 values, usage metadata,
-and recording metadata as provenance. Import never modifies the source run;
-the original files remain the byte-level evidence. See
-`planning/RUN_BUNDLE_OPERATIONS.md` for the command and inspection sequence.
+`RunBundle.ingest_run(envelope, records)` is the source-neutral intake API. An
+envelope supplies run identity, source type and identity, producer version,
+lifecycle/outcome and provenance; ordered typed records carry their source-
+specific payloads. Source adapters own validation and call this API. The
+file-IPC oracle adapter is `RunBundle.import_oracle_directory`; it stores
+canonical step JSON and retains SHA-256 values for `session.json` and
+`steps.ndjson`, usage metadata and recording metadata as provenance. Repeating
+an import with the same run ID and source identity is a no-op success; a
+different source identity under that run ID is a conflict. Import never
+modifies source evidence. See `planning/RUN_BUNDLE_OPERATIONS.md` for automatic
+intake and recovery.
 
 The permitted lifecycle graph is: `active` may become `interrupted`,
-`completed`, `won`, `lost`, `aborted`, or `endless`; `interrupted` may resume
-to `active` or take any terminal outcome. Terminal outcomes, including the
-distinct `endless` outcome, cannot transition or accept evidence.
+`incomplete`, `completed`, `won`, `lost`, `aborted`, or `endless`; `interrupted`
+may resume to `active` or take a terminal outcome. `incomplete` means capture
+was explicitly ended without a producer terminal outcome; it is distinct from
+`interrupted`, which remains recoverable/resumable. Terminal outcomes, including
+`incomplete` and the distinct `endless` outcome, cannot transition or accept
+evidence. A process crash leaves the durable source recoverable as active; it
+does not invent an incomplete outcome.
