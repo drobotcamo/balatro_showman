@@ -52,6 +52,7 @@ class FileIpcBridge:
         self._request_runs: dict[str, str] = {}
         self._sessions: dict[str, dict[str, Any]] = {}
         self._finalized_sessions: set[str] = set()
+        self._finalized_session_data: dict[str, dict[str, Any]] = {}
         self._attached_recording_ids: set[str] = set()
         self._recording_marker: dict[str, Any] | None = None
         self._capture_diagnostics: dict[str, list[dict[str, Any]]] = {}
@@ -76,6 +77,7 @@ class FileIpcBridge:
                     self._sessions[run_id] = session
                 else:
                     self._finalized_sessions.add(run_id)
+                    self._finalized_session_data[run_id] = session
                 recording = session.get("recording")
                 if isinstance(recording, dict) and isinstance(recording.get("recording_id"), str):
                     self._attached_recording_ids.add(recording["recording_id"])
@@ -116,10 +118,9 @@ class FileIpcBridge:
                     if numeric_id is not None:
                         previous_request_id = numeric_id
                     key = f"{run_id}\x00{request_id}"
-                    if session.get("outcome") is None:
-                        self._seen_requests.add(key)
-                        self._request_actions[key] = record["_recorded_action"]
-                        self._request_runs[key] = run_id
+                    self._seen_requests.add(key)
+                    self._request_actions[key] = record["_recorded_action"]
+                    self._request_runs[key] = run_id
                     recorded_at = record.get("_recorded_at")
                     if isinstance(recorded_at, str):
                         self._record_usage(session, str(record["_recorded_action"]), recorded_at)
@@ -415,19 +416,19 @@ class FileIpcBridge:
         if not isinstance(meta, dict) or not isinstance(meta.get("run_id"), str) or not meta["run_id"]:
             self._invalid_input(input_path, f"{input_path.name} requires meta.run_id")
         run_id = str(meta["run_id"])
-        if run_id in self._finalized_sessions:
-            self._invalid_input(
-                input_path,
-                f"snapshot received after run {run_id!r} was finalized; evidence retained in quarantine",
-            )
         request_key = f"{run_id}\x00{request_id}"
         if request_key in self._seen_requests:
-            session = self._sessions[run_id]
+            session = self._sessions.get(run_id) or self._finalized_session_data[run_id]
             self._write_session(session)
             self._write_capture_diagnostics(session["session_dir"], run_id)
             _atomic_write(self.action_path, f"{request_id}\t{self._request_actions[request_key]}\n")
             input_path.unlink(missing_ok=True)
             return
+        if run_id in self._finalized_sessions:
+            self._invalid_input(
+                input_path,
+                f"snapshot received after run {run_id!r} was finalized; evidence retained in quarantine",
+            )
 
         action = snapshot.get("action_taken") or self.action
         legal_actions = snapshot.get("legal_actions")
@@ -552,11 +553,7 @@ class FileIpcBridge:
             self._write_session(session)
             del self._sessions[target]
             self._finalized_sessions.add(target)
-            request_ids = [request for request, owner in self._request_runs.items() if owner == target]
-            for request in request_ids:
-                self._seen_requests.remove(request)
-                del self._request_actions[request]
-                del self._request_runs[request]
+            self._finalized_session_data[target] = session
         signal_path.unlink(missing_ok=True)
         return True
 
