@@ -1,7 +1,7 @@
 import argparse, json, sys
 from sqlalchemy.exc import SQLAlchemyError
 from .inspection import InspectionError, RunBundleInspector
-from .repository import BundleError, RunBundle
+from .repository import BundleError, ImportConflict, RunBundle
 
 def main(argv=None):
     p = argparse.ArgumentParser(); sub = p.add_subparsers(dest="command", required=True)
@@ -32,6 +32,8 @@ def main(argv=None):
             else: out = getattr(i, a.command)(a.run)
     except InspectionError as e:
         out = {"status": "unknown", "data": None, "diagnostics": [{"code": e.code, "message": e.message}]}; print(json.dumps(out), file=sys.stdout); return 2
+    except ImportConflict as e:
+        out = {"status": "unknown", "data": None, "diagnostics": [{"code": "run_identity_conflict", "message": str(e)}]}; print(json.dumps(out), file=sys.stdout); return 2
     except BundleError as e:
         out = {"status": "unknown", "data": None, "diagnostics": [{"code": "import_failed", "message": str(e)}]}; print(json.dumps(out), file=sys.stdout); return 2
     except (SQLAlchemyError, OSError) as e:

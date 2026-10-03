@@ -182,6 +182,19 @@ def test_source_neutral_video_envelope_is_queryable(tmp_path):
     provenance = {item["key"]: item["value"] for item in inspector.provenance("video-derived-1")["data"]}
     assert provenance["video.sha256"] == "abc123"
 
+@pytest.mark.parametrize("status,outcome", [("won", "loss"), ("lost", "not-a-real-outcome"), ("completed", {"value": "won"})])
+def test_source_neutral_api_rejects_invalid_or_conflicting_outcome(tmp_path, status, outcome):
+    url = f"sqlite:///{tmp_path / 'invalid-outcome.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    envelope = {
+        "run_id": "bad-envelope", "source_type": "video-reconstruction",
+        "source_identity": "video:abc", "producer_version": "reconstructor/0.1",
+        "status": status, "outcome": outcome,
+        "provenance": {"source.type": "video-reconstruction", "source.identity": "video:abc"},
+    }
+    with pytest.raises(BundleError):
+        RunBundle(url).ingest_run(envelope, [])
+
 def test_incomplete_import_has_no_invented_outcome(tmp_path):
     url = f"sqlite:///{tmp_path / 'incomplete.db'}"
     cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")

@@ -59,6 +59,7 @@ class FileIpcBridge:
         self._recording_marker: dict[str, Any] | None = None
         self._capture_diagnostics: dict[str, list[dict[str, Any]]] = {}
         self._imported_sessions: set[str] = set()
+        self._import_conflicts: dict[str, str] = {}
         self._import_retry_after: dict[str, float] = {}
         self._recover_sessions()
 
@@ -572,18 +573,23 @@ class FileIpcBridge:
         if self._bundle_db is None:
             return False
         from sqlalchemy.exc import SQLAlchemyError
-        from run_bundle.repository import BundleError, RunBundle
+        from run_bundle.repository import BundleError, ImportConflict, RunBundle
 
         now = time.monotonic()
         did_work = False
         for run_id, session in sorted(self._finalized_session_data.items()):
-            if run_id in self._imported_sessions or now < self._import_retry_after.get(run_id, 0):
+            if (run_id in self._imported_sessions or run_id in self._import_conflicts
+                    or now < self._import_retry_after.get(run_id, 0)):
                 continue
             source = Path(session["session_dir"])
             bundle = None
             try:
                 bundle = RunBundle(self._bundle_db)
                 result = bundle.import_oracle_directory(source)
+            except ImportConflict as error:
+                self._import_conflicts[run_id] = str(error)
+                print(f"[file_ipc_bridge] import conflict for run {run_id}: {error}", file=sys.stderr)
+                continue
             except (OSError, ValueError, BundleError, SQLAlchemyError) as error:
                 self._import_retry_after[run_id] = now + 5.0
                 print(f"[file_ipc_bridge] import pending for run {run_id}: {error}", file=sys.stderr)
@@ -610,6 +616,8 @@ class FileIpcBridge:
         for run_id, session in sorted(self._finalized_session_data.items()):
             if session.get("lifecycle_status") == "incomplete":
                 print(f"[file_ipc_bridge] run {run_id} marked incomplete ({session['n_steps']} steps recorded, outcome unknown)")
+        for run_id, message in sorted(self._import_conflicts.items()):
+            print(f"[file_ipc_bridge] import conflict for run {run_id}: {message}", file=sys.stderr)
         print("[file_ipc_bridge] stopped cleanly (Ctrl+C)")
 
     def _mark_open_sessions_incomplete(self) -> None:

@@ -874,6 +874,47 @@ class FileIpcBridgeTests(unittest.TestCase):
             self.assertEqual(summary["record_count"], 1)
             inspector.close()
 
+    def test_import_conflict_is_reported_and_not_retried_as_transient(self) -> None:
+        import contextlib
+        import io as io_module
+        from alembic import command
+        from alembic.config import Config
+        from run_bundle import RunBundle
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            url = f"sqlite:///{(root / 'bundle.sqlite').as_posix()}"
+            cfg = Config("alembic.ini")
+            cfg.set_main_option("sqlalchemy.url", url)
+            command.upgrade(cfg, "head")
+            existing = root / "existing-source"
+            existing.mkdir(parents=True)
+            (existing / "session.json").write_text(json.dumps({
+                "run_id": "source-collision", "schema_version": "producer/1.0.0",
+                "started_at": "2026-10-03T03:28:55+00:00", "ended_at": None,
+                "outcome": None, "n_steps": 0,
+            }), encoding="utf-8")
+            (existing / "steps.ndjson").write_text("", encoding="utf-8")
+            seeded = RunBundle(url)
+            seeded.import_oracle_directory(existing)
+            seeded.close()
+
+            _queue_request(io_dir, "source-collision", 1)
+            (io_dir / "run_end_source-collision.json").write_text(json.dumps({
+                "ipc_schema_version": "file-queue/1.0.0", "run_id": "source-collision",
+                "last_request_id": 1, "outcome": "win",
+            }), encoding="utf-8")
+            bridge = FileIpcBridge(io_dir, out_dir, bundle_db=url)
+            errors = io_module.StringIO()
+            with contextlib.redirect_stderr(errors):
+                bridge.step_once()
+                bridge.step_once()
+            self.assertIn("import conflict for run source-collision", errors.getvalue())
+            self.assertEqual(len(bridge._import_conflicts), 1)
+            self.assertTrue((out_dir / "source-collision" / "steps.ndjson").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

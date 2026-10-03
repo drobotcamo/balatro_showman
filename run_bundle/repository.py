@@ -185,6 +185,12 @@ class RunBundle:
         status = envelope["status"]
         if not isinstance(status, str) or status not in STATUSES:
             raise BundleError(f"unsupported run status: {status}")
+        outcome = envelope.get("outcome")
+        valid_outcomes = (STATUSES - {"active", "interrupted", "incomplete"}) | {"unknown"}
+        if outcome is not None and (not isinstance(outcome, str) or outcome not in valid_outcomes):
+            raise BundleError(f"unsupported run outcome: {outcome}")
+        if outcome in valid_outcomes - {"unknown"} and outcome != status:
+            raise BundleError(f"run outcome {outcome!r} conflicts with lifecycle status {status!r}")
         if not isinstance(records, (list, tuple)):
             raise BundleError("records must be an ordered list")
         provenance = envelope.get("provenance", {})
@@ -218,7 +224,7 @@ class RunBundle:
             finalized_at = envelope.get("finalized_at")
             run = Run(id=run_id, status=status, producer_version=str(envelope["producer_version"]),
                       schema_version=self.schema_version, created_at=created_at,
-                      finalized_at=finalized_at, outcome=envelope.get("outcome"), integrity_status="valid")
+                      finalized_at=finalized_at, outcome=outcome, integrity_status="valid")
             s.add(run)
             s.flush()
             for key, value in provenance.items():
