@@ -1,4 +1,5 @@
 import hashlib, json
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from sqlalchemy import create_engine, select
@@ -63,13 +64,15 @@ class RunBundle:
         if usage is not None:
             counts = usage.get("action_counts") if isinstance(usage, dict) else None
             unique_count = usage.get("unique_action_count") if isinstance(usage, dict) else None
+            actual_counts = Counter(record["_recorded_action"] for record in records)
             if (not isinstance(counts, dict)
                     or any(not isinstance(name, str) or not isinstance(count, int)
                            or isinstance(count, bool) or count < 0 for name, count in counts.items())
+                    or counts != dict(actual_counts)
                     or sum(counts.values()) != len(records)
                     or ("unique_action_count" in usage
                         and (not isinstance(unique_count, int) or isinstance(unique_count, bool)
-                             or unique_count != len(counts)))):
+                             or unique_count != len(actual_counts)))):
                 raise BundleError("oracle usage action_counts must be non-negative and sum to n_steps")
         outcome = metadata.get("outcome")
         target_status = {"win": "won", "loss": "lost"}.get(outcome)

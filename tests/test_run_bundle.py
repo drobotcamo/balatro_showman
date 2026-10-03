@@ -183,3 +183,18 @@ def test_file_ipc_oracle_import_rejects_inconsistent_usage(tmp_path):
     with pytest.raises(BundleError, match="action_counts"):
         RunBundle(url).import_oracle_directory(source)
     assert RunBundleInspector(url).list_runs()["data"] == []
+
+def test_file_ipc_oracle_import_rejects_usage_for_different_action_with_same_total(tmp_path):
+    url = f"sqlite:///{tmp_path / 'wrong-action-import.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    source = tmp_path / "oracle" / "wrong-action"
+    source.mkdir(parents=True)
+    (source / "session.json").write_text(json.dumps({
+        "run_id": "wrong-action", "started_at": "2026-10-03T03:28:55+00:00",
+        "outcome": None, "n_steps": 1,
+        "usage": {"action_counts": {"PlayHand": 1}, "unique_action_count": 1},
+    }), encoding="utf-8")
+    (source / "steps.ndjson").write_text(json.dumps({"_recorded_action": "DiscardHand"}) + "\n", encoding="utf-8")
+    with pytest.raises(BundleError, match="action_counts"):
+        RunBundle(url).import_oracle_directory(source)
+    assert RunBundleInspector(url).list_runs()["data"] == []

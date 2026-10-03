@@ -39,7 +39,8 @@ python -m run_bundle find --db <bundle.sqlite> --run <run-id> --kind step
 ```
 
 The importer requires `session.json` and `steps.ndjson`, verifies the declared
-step count and recorded action on every step, and rejects an existing run ID.
+step count and that usage action counts match the recorded action on every step,
+and rejects an existing run ID.
 It maps `win`/`loss` to `won`/`lost`, keeps an unfinished source active, and
 stores usage and recording metadata plus SHA-256 hashes of both source files as
 provenance. Evidence records are canonicalized JSON objects; the source files
