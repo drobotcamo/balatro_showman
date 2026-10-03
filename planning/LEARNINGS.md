@@ -15,6 +15,28 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-03: One OBS recording can span multiple oracle run IDs
+
+- Context: The Issue #79 development capture contained an Ante 1 run segment,
+  followed by a second oracle session in the same video.
+- Observation: The first session ended at Ante 5 with no terminal signal; the
+  second began in the identical Ante 5 state 13.6 seconds later and ended in a
+  win. `Game.start_run` assigns a new producer `run_id`, and the bridge attaches
+  a given recording marker ID only once. Consequently the marker appeared on the
+  first session only. A single OBS file can therefore cover multiple oracle IDs
+  even when the saved game state continues across the boundary.
+- Implication: Preserve each oracle session as its own run, inspect the video
+  across the boundary, and associate only the marker-supported run unless a
+  separate, explicit association is recorded for another segment. Do not infer
+  continuity from either run ID or video membership alone.
+- Verification/source: Source inspection of `ground_truth/balatro_mod/main.lua`
+  (`Game.start_run`) and `ground_truth/file_ipc_bridge.py`
+  (`_attached_recording_ids`); Issue #79 recording `issue81-20261003T070517Z`,
+  sessions `25980339600-7022` and `778812964300-9775`, their 197 ordered steps,
+  and the 60 FPS video. The first-slice segment is confirmed to be in the first
+  session; the overall capture is a single observed instance, not a frequency
+  estimate.
+
 ## 2026-10-02: Passing local tests leave capture lifecycle faults uncovered
 
 - Context: Production retrospective of the active file-IPC recorder.
