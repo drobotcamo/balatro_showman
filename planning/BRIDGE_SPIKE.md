@@ -81,7 +81,7 @@ state. It does not execute the Balatro runtime or validate game hooks.
 
 ## Installation (reversible)
 
-1. Stop every existing bridge process before starting a capture. A single
+1. Inspect existing bridge processes before preparing a capture. A single
    consumer must own the shared `agent_io` directory:
 
    ```powershell
@@ -90,8 +90,15 @@ state. It does not execute the Balatro runtime or validate game hooks.
      Select-Object ProcessId, CommandLine
    ```
 
-   Stop any listed process, and verify that the command returns no bridge
-   process before continuing.
+   If no bridge process is listed, start the documented client in Smoke test.
+   If exactly one expected, healthy client already owns this IPC directory,
+   reuse it and verify its output directory and process state; do not start a
+   duplicate. If a listed process is stale, conflicting, or its ownership/path
+   is unclear, do not terminate it or start another client without explicit
+   authorization. Report the PID/command line and request only the permission
+   needed to stop or reconfigure that process. After an authorized stop, verify
+   the old process exited before starting its replacement. Preserve queue and
+   run files; inspection never authorizes deleting them.
 
 2. Copy the mod folder into the Steamodded mod root. Keep timestamped backups
    outside `Mods` so Steamodded cannot discover a second manifest with the same
@@ -135,8 +142,10 @@ state. It does not execute the Balatro runtime or validate game hooks.
 
 ## Smoke test
 
-1. With no other bridge process running, start the repository client, writing
-   outside the repository:
+1. Ensure one expected bridge client owns the shared IPC directory, using the
+   process inspection in Installation. Start the repository client only if no
+   client is already running and starting it is authorized. Write output outside
+   the repository:
 
    ```powershell
    py -3 -m ground_truth.file_ipc_bridge `

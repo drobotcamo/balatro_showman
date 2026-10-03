@@ -49,14 +49,105 @@ Do not delete unfamiliar worktrees or discard changes to resolve uncertainty.
    Obtain the tier's approval and fresh review of the current implementation.
 5. Integrate when authorized. Verify merge and post completion evidence on the
    same PR/issue; close only when acceptance is addressed or explicitly deferred.
-6. If blocked or context-limited, leave one factual unfinished-work checkpoint
-   with exact results, ownership exclusions and the requested next action.
+6. If only a genuine human/external blocker remains, or context is exhausted
+   after independent acceptance work, leave the factual unfinished-work
+   checkpoint specified below. A checkpoint resumes this issue; it is not
+   completion.
+
+### `/work` Continuation
+
+The assigned issue's complete `Done When` list is the unit of work. After every
+meaningful code, review, or integration slice, re-read the list and classify each
+criterion as verified, pending, explicitly deferred with user acceptance, or
+blocked by a named external action/decision. Continue every pending criterion that
+can be advanced safely within this issue's scope. A focused test, partial PR,
+reviewer verdict, progress summary, or ordinary tool/step budget is not completion
+and does not by itself justify returning control to the user.
 
 For `/work`, ask clarifying questions at most once, then use the narrowest
 reasonable assumptions. Do not pause for routine progress or permissions already
-granted. Continue through review/publication/integration when in scope and allowed.
-A draft, local diff or ready-to-review state is not completion. Report external
-blockers instead of inventing success or manufacturing a handoff boundary.
+granted. Continue through validation, current-diff review, publication, required
+checks, blocker resolution, merge, and same-issue completion when authorized. The
+session's target is a merged issue or one exact human/external action that blocks
+the remaining acceptance. A draft, local diff or ready-to-review state is not
+completion. Keep remediation within the assigned issue; do not modify unrelated
+PRs to make progress look continuous.
+
+### Blocked PRs
+
+A blocked PR requires diagnosis and the next safe remediation action, not a status-
+only handoff. Inspect the current head SHA and compare it with the SHA named by
+review and checks; any material commit after review requires a fresh review of the
+current diff. Inspect the exact failing check, reviewer finding, intended base and
+merge conflict, dependency order, required-check applicability, and relevant
+permissions. For an independent PR, target the integration branch; for dependent
+work, target its declared parent and preserve merge order. Correct a wrong base or
+dependency order using the repository's supported rebase/retarget process; do not
+force-push or bypass protection. Fix in-scope code/test/review findings, rerun
+affected checks, and obtain fresh review after a material diff change. If the
+blocker is a genuinely missing external permission, CI-policy decision, secret,
+human evidence, or service access, finish independent acceptance work first and
+request only that specific action with evidence. Do not repeatedly retry an
+unchanged failure or bypass required gates. When a required check is absent,
+inspect workflow path filters and branch protection; report the exact gap and
+request approval before changing required-check policy. Once the blocker clears,
+resume integration and merge without requiring the user to remind the lead.
+
+If new independently deliverable work is needed to finish or safely defer the
+assigned outcome, search existing issues first. Create/update one bounded future
+issue with owner, outcome, scope, dependencies and `Done When`; obtain fresh
+reviewer critique of duplication, completeness and dependency accuracy before
+calling it ready. This is an issue-definition quality check, not a new universal
+approval tier. Continue the parent issue's remaining acceptance while the future
+item is pending; do not create issues for code slices, testing, review, blockers
+or settlement ceremony.
+
+### Human Input And Recording Preparation
+
+Before asking the user to perform a live recording action, complete the safe,
+agent-owned preparation in the existing `planning/TOOLING.md` and
+`planning/BRIDGE_SPIKE.md` procedure. Verify the checked-in and installed producer
+hashes/build/schema, supported Balatro/Steamodded/Lovely versions, restart need,
+OBS hook settings available from configuration, FPS and destination, IO/output
+paths and capacity, audit/alignment commands, and fixture/smoke behavior. Inspect
+queue evidence without deleting it. Inspect bridge processes before starting one:
+reuse a verified healthy expected process or start the documented bridge when no
+conflicting process exists and the action is authorized. Never terminate an
+existing process, restart the game, or control OBS without the specific required
+authorization. A blocker in preparation is diagnosed before asking the user to
+debug it; ask only for the precise human action that remains (such as launching a
+restarted game and playing the requested states). Group unavoidable live actions
+into one concise request after preparation, and resume the same issue to verify
+the resulting evidence.
+
+Use accessible configuration/evidence for OBS FPS, destination, and hook settings.
+If any required value is unavailable or ambiguous, do not guess or claim capture
+readiness. Finish all other preparation, then include the specific missing value
+in the minimal user request and do not begin capture until it is confirmed.
+
+The recording action does not satisfy the post-capture association checkpoint.
+Follow `planning/RUN_BUNDLE_OPERATIONS.md`: inspect and present the observed run,
+marker and required/optional status; wait for explicit `confirm`, `decline`, or
+`interrupt`; associate only after explicit confirmation and valid marker evidence.
+For required recording, any non-confirmed result remains `blocked` with
+`recording_required` and must not mutate association provenance (D025). The
+terminal checkpoint does not start, stop, inspect, or control OBS.
+
+### Context Exhaustion
+
+Genuine context exhaustion is the continuation boundary referenced in Lead Loop
+step 6, not issue completion or a reason to silently omit remaining work. Finish
+all independent acceptance that fits the session; inventory the complete remaining
+criteria; preserve and publish owned work under D027; checkpoint exact verified
+state, blockers, paths and next action; and resume the same issue in a fresh lead
+session. If publication is unavailable, report exact D027 blocker state without
+claiming a compliant published handoff. Do not create a replacement issue or
+restart completed slices.
+
+The production lead has no fixed agentic-iteration ceiling: OpenCode's `steps`
+setting forces a text-only response when the maximum is reached. Bounded
+read-only explorer/reviewer limits remain configured. Removing the arbitrary lead
+ceiling does not override provider/context limits or this checkpoint rule.
 
 ## Orchestrator
 

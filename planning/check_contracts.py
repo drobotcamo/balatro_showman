@@ -359,8 +359,16 @@ def check_agent_wiring() -> None:
                     fail(f"{path.name}: unexpected delegation boundary")
             elif permission.get("edit") != "deny" or permission.get("task") != "deny":
                 fail(f"{path.name}: expected read-only nondelegating role")
+            if name == "lead":
+                check_lead_step_ceiling(data)
     except (OSError, ValueError, AttributeError) as exc:
         fail(f"agent wiring: {exc}")
+
+
+def check_lead_step_ceiling(data: dict) -> None:
+    """The production lead must not be forced into a text-only stop mid-issue."""
+    if "steps" in data:
+        fail("lead.md: production lead must not have a fixed steps ceiling")
 
 
 def check_lead_merge_gate() -> None:

@@ -9,6 +9,8 @@ from unittest.mock import patch
 from planning import check_contracts as checks
 from tools import issue_tags
 
+REPO_ROOT = Path(__file__).parents[1]
+
 COMPACT = """# Work Checkpoint
 Updated: 2026-10-02
 Issue: #123
@@ -105,3 +107,16 @@ class PlanningValidatorTests(unittest.TestCase):
         checks.check_decisions()
         self.assertTrue(any("duplicate" in error for error in checks.errors))
         self.assertTrue(any("order" in error for error in checks.errors))
+
+    def test_production_lead_has_no_fixed_step_ceiling(self):
+        lead = checks.frontmatter(
+            (REPO_ROOT / ".opencode" / "agents" / "lead.md").read_text(encoding="utf-8")
+        )
+        self.assertNotIn("steps", lead)
+        checks.errors.clear()
+        checks.check_lead_step_ceiling({"mode": "primary"})
+        self.assertEqual(checks.errors, [])
+        checks.check_lead_step_ceiling({"mode": "primary", "steps": 40})
+        self.assertEqual(checks.errors, [
+            "lead.md: production lead must not have a fixed steps ceiling"
+        ])

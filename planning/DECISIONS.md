@@ -345,6 +345,34 @@ failures (rejected because it conceals missing test inputs). Source: user
 approval during Issue #81 on 2026-10-02; clean worktree reproduced the missing
 CSV on the same date.
 
+### D031 — accepted — `/work` continues through acceptance with prepared human checkpoints
+
+The assigned issue's acceptance list is the unit of `/work`; the lead continues
+in-scope implementation, review, blocker remediation, required validation and
+integration until merged, or until one precise human/external action blocks the
+remaining work. A partial slice, green focused suite, review verdict, or status
+summary is not completion. Genuine context exhaustion checkpoints and resumes
+the same issue and does not waive D027 publication accounting.
+
+Before asking for live recording input, the lead follows the established run
+procedure and completes safe, authorized producer/runtime/OBS-configuration/path/
+smoke/bridge preparation. User input is minimized and requested only for the
+remaining human action. The post-capture D025 terminal association confirmation
+remains separate and mandatory for required recording. New independent work is
+duplicate-checked, bounded, and gets reviewer critique before it is presented as
+ready; this does not create a new universal approval tier. The production lead
+has no fixed OpenCode `steps` ceiling because reaching it forces a text-only
+response; read-only reviewer/explorer limits and genuine context checkpoints
+remain. No CI, permission, deployment, producer protocol, or human-control
+authority is broadened.
+
+Alternatives: stop after individual PR slices and ask the user to re-prompt, or
+retain a fixed lead iteration cap; rejected because both create avoidable early
+stops before issue acceptance. Source: user's direct `/work` continuation and
+recording-preparation requirements, recorded in
+`https://github.com/drobotcamo/balatro_showman/issues/104`; OpenCode Agents
+documentation, “Max steps,” https://opencode.ai/docs/agents/#max-steps.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the
