@@ -40,6 +40,13 @@ class BalatroModManifestTests(unittest.TestCase):
         for area in ("G.shop_jokers", "G.shop_vouchers", "G.shop_booster", "G.pack_cards"):
             self.assertIn(area, text, area)
 
+    def test_producer_declares_queued_request_and_terminal_watermark_protocol(self) -> None:
+        text = (MOD_DIR / "main.lua").read_text(encoding="utf-8")
+        self.assertIn('"ipc_schema_version":"file-queue/1.0.0"', text)
+        self.assertIn('"last_request_id":', text)
+        self.assertIn('"producer_write_failures":', text)
+        self.assertIn("request_", text)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,28 +4,38 @@ This spike exercises the existing file-IPC oracle contract:
 
 ```
 Lua producer (game)                 Python client (repo)
-snapshot.json  ───────────────▶     record aligned step
-action.txt     ◀───────────────     acknowledgement (not consumed by observe producer)
-run_end.json   ───────────────▶     finalize outcome
+request_<run>_<id>.json ──────────▶  record aligned step
+                       ◀──────────  remove request after durable persistence (ack)
+run_end_<run>.json ──────────────▶  drain through last_request_id, finalize outcome
 ```
 
 ## Contract
 
-- Input: the Lua-side `snapshot.json` in the shared `agent_io` directory.
-- Acknowledgement: `<request_id>\t<action>\n` in `action.txt`, written by the
-  client. The observe-mode producer records the player's real action and does
-  not read or dispatch `action.txt`; the acknowledgement is advisory.
+- Input: one immutable `request_<run_id>_<request_id>.json` file per captured
+  request in the shared `agent_io` directory. IDs restart within each run and
+  are only meaningful with the run ID.
+- Acknowledgement: after the step and session count are durable, the client
+  removes the request file. If it crashes before removal, restart replays the
+  request using `(run_id, request_id)` deduplication. `action.txt` remains a
+  legacy/advisory response and is not the queue acknowledgement.
 - Record: `<out-dir>/<run_id>/steps.ndjson`, with `_recorded_action` added.
-- Outcome: a Lua-side `run_end.json` containing `run_id` and `outcome`
-  (`win` or `loss`) finalizes `session.json`.
+- Outcome: a Lua-side `run_end_<run_id>.json` containing `run_id`, `outcome`
+  (`win` or `loss`), and `last_request_id`. The client retains it until every
+  request ID through the watermark is persisted, then finalizes `session.json`.
+  Missing requests leave the run incomplete and diagnosed; an empty queue alone
+  is not evidence that the producer is drained. Legacy `snapshot.json` and
+  `run_end.json` remain readable but have no terminal watermark and are not
+  proof of complete delivery.
 
 ## Lua producer
 
 `ground_truth/balatro_mod/` is a minimal Steamodded mod (`manifest.json` +
 `main.lua`) that emits the contract's Lua side. It hooks the game's own action
-callbacks and writes a snapshot *before* the action runs, so the captured state
-is the decision state and `action_taken` is the player's real action. On game
-over it writes `run_end.json` with the real outcome.
+callbacks and writes a per-request file *before* the action runs, so the captured
+state is the decision state and `action_taken` is the player's real action. On
+game over it writes a run-scoped end signal and highest successfully published
+request ID. The producer does not wait for the consumer; queued files remain
+available if the consumer is delayed or stopped.
 
 Transport revisions (the `live/X.Y.Z` label is the producer snapshot
 contract only; it is never the granularized step schema `3.0.0`):
@@ -56,6 +66,18 @@ contract only; it is never the granularized step schema `3.0.0`):
 ```text
 py -3 -m unittest tests.test_file_ipc_bridge tests.test_balatro_mod
 ```
+
+The checked-in producer filesystem fixture runs against the installed LÖVE
+runtime and writes only below the selected temporary `%APPDATA%` directory:
+
+```powershell
+$env:APPDATA = Join-Path $env:TEMP ("balatro-showman-queue-" + [guid]::NewGuid().ToString("N"))
+New-Item -ItemType Directory -Path "$env:APPDATA\Balatro\agent_io" -Force | Out-Null
+lovec tests/lua_file_ipc_fixture
+```
+
+It validates queued request files and the terminal watermark with stub game
+state. It does not execute the Balatro runtime or validate game hooks.
 
 ## Installation (reversible)
 
@@ -92,10 +114,13 @@ py -3 -m unittest tests.test_file_ipc_bridge tests.test_balatro_mod
 
 3. Launch Balatro and confirm the Lovely log reports the mod loaded:
    search `$env:APPDATA\Balatro\Mods\lovely\log\` for
-   `[balatro_showman_bridge] loaded; io_dir=...`.
-   Before recording, trigger one snapshot and inspect it. It must contain
-   `"schema_version":"producer/1.0.0"`, `step_id`, and
-   `capture_timestamp_ns`; abort if it contains `live/2.0.0` or `live/3.0.0`.
+   `[balatro_showman_bridge] loaded; build=issue81-file-queue-1; io_dir=...`.
+   Before recording, trigger one action and inspect its queued
+   `request_<run>_<id>.json`. It must contain
+   `"schema_version":"producer/1.0.0"`,
+   `"ipc_schema_version":"file-queue/1.0.0"`, `step_id`, and
+   `capture_timestamp_ns`; abort if the installed producer still writes only
+   `snapshot.json`.
 
 ## Smoke test
 
@@ -108,10 +133,12 @@ py -3 -m unittest tests.test_file_ipc_bridge tests.test_balatro_mod
      --out-dir "$env:TEMP\balatro_showman_runs"
    ```
 
-2. Start a run. `SelectBlind`, play/discard, and shop actions each write one
-   `snapshot.json`; the client records it to `steps.ndjson`.
+2. Start a run. `SelectBlind`, play/discard, and shop actions each publish a
+   distinct `request_<run>_<id>.json`. The client persists it to `steps.ndjson`
+   before removing the request file as its acknowledgement.
 3. End the run for real (failing the first blind is a quick `loss`). The
-   producer writes `run_end.json`; the client finalizes `session.json`.
+   producer writes `run_end_<run>.json` with `last_request_id`; the client waits
+   for all requests through that watermark before finalizing `session.json`.
 4. Report the field values from `steps.ndjson` and `session.json` in Issue #6.
    Keep saves, logs, dumps, and game assets local.
 

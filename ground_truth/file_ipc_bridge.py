@@ -19,7 +19,10 @@ OUTCOMES = {"win", "loss"}
 
 def _atomic_write(path: Path, text: str) -> None:
     temporary = path.with_name(path.name + ".tmp")
-    temporary.write_text(text, encoding="utf-8")
+    with temporary.open("w", encoding="utf-8", newline="") as stream:
+        stream.write(text)
+        stream.flush()
+        os.fsync(stream.fileno())
     last_error: OSError | None = None
     for attempt in range(10):
         try:
@@ -34,7 +37,7 @@ def _atomic_write(path: Path, text: str) -> None:
 
 
 class FileIpcBridge:
-    """Record snapshots while acknowledging each one through action.txt."""
+    """Persist queued snapshots before acknowledging them by request removal."""
 
     def __init__(self, io_dir: Path, out_dir: Path, action: str | None = None) -> None:
         self.io_dir = io_dir
@@ -117,7 +120,7 @@ class FileIpcBridge:
                     while corrupt_path.exists():
                         corrupt_path = steps_path.with_name(f"steps.ndjson.corrupt.{suffix}")
                         suffix += 1
-                    corrupt_path.write_bytes(bad_tail)
+                    self._write_bytes_durable(corrupt_path, bad_tail)
                     self._add_capture_diagnostic(run_id, {
                         "code": "invalid_ndjson_tail_quarantined",
                         "path": corrupt_path.name,
@@ -139,7 +142,9 @@ class FileIpcBridge:
                 if self._capture_diagnostics.get(run_id):
                     self._write_capture_diagnostics(session["session_dir"], run_id)
             except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError):
-                continue
+                # Do not start consuming queued requests when durable state
+                # could not be reconstructed; that could duplicate evidence.
+                raise
 
     def _load_capture_diagnostics(self, run_id: str, path: Path) -> None:
         raw = path.read_bytes()
@@ -161,8 +166,49 @@ class FileIpcBridge:
             while corrupt_path.exists():
                 corrupt_path = path.with_name(f"{path.name}.corrupt.{suffix}")
                 suffix += 1
-            corrupt_path.write_bytes(corrupt_tail)
+            self._write_bytes_durable(corrupt_path, corrupt_tail)
             _atomic_write(path, b"".join(valid_lines).decode("utf-8"))
+
+    @staticmethod
+    def _write_bytes_durable(path: Path, raw: bytes) -> None:
+        with path.open("xb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+
+    def _append_step_durable(self, steps_path: Path, record: dict[str, Any], session: dict[str, Any]) -> None:
+        original_size = steps_path.stat().st_size if steps_path.exists() else 0
+        try:
+            with steps_path.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(record, separators=(",", ":")) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+        except OSError:
+            try:
+                partial = steps_path.read_bytes()[original_size:] if steps_path.exists() else b""
+                if partial:
+                    corrupt_path = steps_path.with_name("steps.ndjson.corrupt")
+                    suffix = 1
+                    while corrupt_path.exists():
+                        corrupt_path = steps_path.with_name(f"steps.ndjson.corrupt.{suffix}")
+                        suffix += 1
+                    self._write_bytes_durable(corrupt_path, partial)
+                    with steps_path.open("r+b") as stream:
+                        stream.truncate(original_size)
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    self._add_capture_diagnostic(str(session["run_id"]), {
+                        "code": "failed_append_bytes_quarantined",
+                        "path": corrupt_path.name,
+                        "byte_count": len(partial),
+                        "sha256": hashlib.sha256(partial).hexdigest(),
+                    })
+                    self._write_capture_diagnostics(session["session_dir"], str(session["run_id"]))
+            except OSError:
+                # The queued source remains unacknowledged; startup recovery
+                # will retain and diagnose any incomplete steps tail.
+                pass
+            raise
 
     def _attach_recording_marker(self) -> None:
         marker = self._recording_marker
@@ -288,20 +334,47 @@ class FileIpcBridge:
         self._write_capture_diagnostics(session["session_dir"], run_id)
 
     def _handle_snapshot(self) -> bool:
-        snapshot = self._read_json(self.snapshot_path)
-        if snapshot is None:
-            return False
+        paths = sorted(self.io_dir.glob("request_*.json"))
+        if self.snapshot_path.exists():
+            paths.append(self.snapshot_path)
+        snapshots: list[tuple[Path, dict[str, Any]]] = []
+        for path in paths:
+            snapshot = self._read_json(path)
+            if snapshot is not None:
+                snapshots.append((path, snapshot))
+        def sort_key(item: tuple[Path, dict[str, Any]]) -> tuple[str, int, Any]:
+            meta = item[1].get("meta")
+            run_id = str(meta.get("run_id", "")) if isinstance(meta, dict) else ""
+            request_id = item[1].get("request_id")
+            try:
+                return run_id, 0, int(request_id)
+            except (TypeError, ValueError):
+                return run_id, 1, str(request_id)
+
+        snapshots.sort(key=sort_key)
+        did_work = False
+        for path, snapshot in snapshots:
+            self._process_snapshot(path, snapshot)
+            did_work = True
+        return did_work
+
+    def _process_snapshot(self, input_path: Path, snapshot: dict[str, Any]) -> None:
+        if input_path.name.startswith("request_") and snapshot.get("ipc_schema_version") != "file-queue/1.0.0":
+            self._invalid_input(input_path, f"{input_path.name} requires ipc_schema_version file-queue/1.0.0")
         request_id = snapshot.get("request_id")
-        if request_id is None:
-            self._invalid_input(self.snapshot_path, "snapshot.json requires request_id")
-        request_key = str(request_id)
+        if (isinstance(request_id, bool)
+                or not isinstance(request_id, (int, str))
+                or not str(request_id).isdigit()
+                or int(request_id) < 1):
+            self._invalid_input(input_path, f"{input_path.name} requires a positive integer request_id")
+        request_id = int(request_id)
         meta = snapshot.get("meta")
-        if not isinstance(meta, dict) or meta.get("run_id") is None:
-            self._invalid_input(self.snapshot_path, "snapshot.json requires meta.run_id")
+        if not isinstance(meta, dict) or not isinstance(meta.get("run_id"), str) or not meta["run_id"]:
+            self._invalid_input(input_path, f"{input_path.name} requires meta.run_id")
         run_id = str(meta["run_id"])
         if run_id in self._finalized_sessions:
             self._invalid_input(
-                self.snapshot_path,
+                input_path,
                 f"snapshot received after run {run_id!r} was finalized; evidence retained in quarantine",
             )
         request_key = f"{run_id}\x00{request_id}"
@@ -310,19 +383,18 @@ class FileIpcBridge:
             self._write_session(session)
             self._write_capture_diagnostics(session["session_dir"], run_id)
             _atomic_write(self.action_path, f"{request_id}\t{self._request_actions[request_key]}\n")
-            self.snapshot_path.unlink(missing_ok=True)
-            return True
+            input_path.unlink(missing_ok=True)
+            return
 
         action = snapshot.get("action_taken") or self.action
         legal_actions = snapshot.get("legal_actions")
         if not isinstance(action, str) or not action:
-            self._invalid_input(self.snapshot_path, "an action is required via snapshot.action_taken or --action")
+            self._invalid_input(input_path, f"an action is required via {input_path.name}.action_taken or --action")
         if isinstance(legal_actions, list) and legal_actions and action not in legal_actions:
-            self._invalid_input(self.snapshot_path, f"action {action!r} is not in legal_actions")
+            self._invalid_input(input_path, f"action {action!r} is not in legal_actions")
         session = self._session(run_id)
         record = {**snapshot, "_recorded_action": action}
-        with (session["session_dir"] / "steps.ndjson").open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps(record, separators=(",", ":")) + "\n")
+        self._append_step_durable(session["session_dir"] / "steps.ndjson", record, session)
         self._seen_requests.add(request_key)
         self._request_actions[request_key] = action
         self._request_runs[request_key] = run_id
@@ -330,27 +402,106 @@ class FileIpcBridge:
         self._diagnose_request_gap(session, request_id)
         self._write_session(session)
         _atomic_write(self.action_path, f"{request_id}\t{action}\n")
-        self.snapshot_path.unlink(missing_ok=True)
-        return True
+        input_path.unlink(missing_ok=True)
+
+    def _has_complete_requests(self, run_id: str, last_request_id: int) -> bool:
+        request_ids = {
+            int(key.split("\x00", 1)[1]) for key in self._seen_requests
+            if key.startswith(run_id + "\x00") and key.split("\x00", 1)[1].isdigit()
+            and 1 <= int(key.split("\x00", 1)[1]) <= last_request_id
+        }
+        if last_request_id == 0:
+            return True
+        return len(request_ids) == last_request_id and min(request_ids, default=0) == 1 and max(request_ids, default=0) == last_request_id
 
     def _handle_run_end(self) -> bool:
-        signal = self._read_json(self.run_end_path)
-        if signal is None:
-            return False
+        paths = sorted(self.io_dir.glob("run_end_*.json"))
+        if self.run_end_path.exists():
+            paths.append(self.run_end_path)
+        did_work = False
+        for path in paths:
+            signal = self._read_json(path)
+            if signal is None:
+                continue
+            did_work = self._process_run_end(path, signal) or did_work
+        return did_work
+
+    def _process_run_end(self, signal_path: Path, signal: dict[str, Any]) -> bool:
+        if signal_path != self.run_end_path and signal.get("ipc_schema_version") != "file-queue/1.0.0":
+            self._invalid_input(signal_path, f"{signal_path.name} requires ipc_schema_version file-queue/1.0.0")
         outcome = signal.get("outcome")
         if outcome not in OUTCOMES:
-            self._invalid_input(self.run_end_path, "run_end.json outcome must be 'win' or 'loss'")
+            self._invalid_input(signal_path, f"{signal_path.name} outcome must be 'win' or 'loss'")
         run_id = signal.get("run_id")
+        if signal_path != self.run_end_path and not isinstance(run_id, str):
+            self._invalid_input(signal_path, f"{signal_path.name} requires run_id")
         targets = [str(run_id)] if run_id is not None else list(self._sessions)
+        watermark = signal.get("last_request_id")
+        if watermark is not None and (
+            not isinstance(watermark, int) or isinstance(watermark, bool) or watermark < 0
+        ):
+            self._invalid_input(signal_path, f"{signal_path.name} has invalid last_request_id")
+        if watermark is not None and run_id is not None:
+            run_id = str(run_id)
+            targets = [run_id]
+            if run_id not in self._sessions and run_id not in self._finalized_sessions and watermark == 0:
+                self._session(run_id)
+            if run_id not in self._finalized_sessions and not self._has_complete_requests(run_id, watermark):
+                session = self._sessions.get(run_id)
+                if session is not None:
+                    present = {
+                        int(key.split("\x00", 1)[1]) for key in self._seen_requests
+                        if key.startswith(run_id + "\x00") and key.split("\x00", 1)[1].isdigit()
+                        and 1 <= int(key.split("\x00", 1)[1]) <= watermark
+                    }
+                    missing = []
+                    candidate = 1
+                    while candidate <= watermark and len(missing) < 32:
+                        if candidate not in present:
+                            missing.append(candidate)
+                        candidate += 1
+                    self._add_capture_diagnostic(run_id, {
+                        "code": "terminal_requests_pending",
+                        "last_request_id": watermark,
+                        "missing_count": watermark - len(present),
+                        "missing_request_ids": missing,
+                    })
+                    self._write_capture_diagnostics(session["session_dir"], run_id)
+                return False
+            session = self._sessions.get(run_id)
+            if session is not None:
+                changed = False
+                for diagnostic in self._capture_diagnostics.get(run_id, []):
+                    if (diagnostic.get("code") == "terminal_requests_pending"
+                            and diagnostic.get("last_request_id") == watermark
+                            and not diagnostic.get("resolved", False)):
+                        diagnostic["resolved"] = True
+                        changed = True
+                if changed:
+                    self._write_capture_diagnostics(session["session_dir"], run_id)
         if not any(target in self._sessions for target in targets):
             if targets and all(target in self._finalized_sessions for target in targets):
-                self.run_end_path.unlink(missing_ok=True)
+                signal_path.unlink(missing_ok=True)
                 return True
             return False
         for target in targets:
             session = self._sessions.get(target)
             if session is None:
                 continue
+            if watermark is None:
+                self._add_capture_diagnostic(target, {
+                    "code": "terminal_watermark_missing",
+                    "cause": "legacy_run_end_cannot_prove_queue_completeness",
+                })
+                self._write_capture_diagnostics(session["session_dir"], target)
+            producer_errors = signal.get("producer_write_failures", 0)
+            if isinstance(producer_errors, int) and producer_errors > 0:
+                self._add_capture_diagnostic(target, {
+                    "code": "producer_request_write_failures",
+                    "count": producer_errors,
+                    "capture_completeness": "incomplete",
+                })
+                self._write_capture_diagnostics(session["session_dir"], target)
             session["outcome"] = outcome
             session["ended_at"] = datetime.now(timezone.utc).isoformat()
             self._write_session(session)
@@ -361,7 +512,7 @@ class FileIpcBridge:
                 self._seen_requests.remove(request)
                 del self._request_actions[request]
                 del self._request_runs[request]
-        self.run_end_path.unlink(missing_ok=True)
+        signal_path.unlink(missing_ok=True)
         return True
 
     def step_once(self) -> bool:

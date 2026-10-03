@@ -6,6 +6,17 @@ from pathlib import Path
 from ground_truth.file_ipc_bridge import FileIpcBridge
 
 
+def _queue_request(io_dir: Path, run_id: str, request_id: int) -> Path:
+    path = io_dir / f"request_{run_id}_{request_id:012d}.json"
+    path.write_text(json.dumps({
+        "ipc_schema_version": "file-queue/1.0.0",
+        "request_id": request_id,
+        "meta": {"run_id": run_id},
+        "action_taken": "SkipBlind",
+    }), encoding="utf-8")
+    return path
+
+
 class FileIpcBridgeTests(unittest.TestCase):
     def test_snapshot_action_and_run_end_are_recorded(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -37,6 +48,9 @@ class FileIpcBridgeTests(unittest.TestCase):
             session = json.loads((out_dir / "smoke-1" / "session.json").read_text())
             self.assertEqual(session["outcome"], "win")
             self.assertEqual(session["n_steps"], 1)
+            diagnostics = [json.loads(line) for line in
+                           (out_dir / "smoke-1" / "capture_diagnostics.ndjson").read_text().splitlines()]
+            self.assertTrue(any(item["code"] == "terminal_watermark_missing" for item in diagnostics))
 
     def test_action_must_be_legal(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -281,6 +295,54 @@ class FileIpcBridgeTests(unittest.TestCase):
             self.assertEqual((io_dir / "action.txt").read_text(), "9\tSkipBlind\n")
             self.assertEqual(len((out_dir / "failure" / "steps.ndjson").read_text().splitlines()), 1)
 
+    def test_partial_append_failure_is_quarantined_before_retry(self) -> None:
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            request_path = _queue_request(io_dir, "partial-write", 1)
+            bridge = FileIpcBridge(io_dir, out_dir)
+            original_open = Path.open
+
+            class PartialWriter:
+                def __init__(self, stream):
+                    self.stream = stream
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, exc_type, exc, traceback):
+                    self.stream.close()
+
+                def write(self, text):
+                    self.stream.write(text[:12])
+                    self.stream.flush()
+                    raise OSError("injected partial append failure")
+
+                def flush(self):
+                    return self.stream.flush()
+
+                def fileno(self):
+                    return self.stream.fileno()
+
+            def partial_open(path, *args, **kwargs):
+                stream = original_open(path, *args, **kwargs)
+                if path.name == "steps.ndjson" and "a" in args:
+                    return PartialWriter(stream)
+                return stream
+
+            with patch.object(Path, "open", partial_open):
+                with self.assertRaisesRegex(OSError, "partial append failure"):
+                    bridge.step_once()
+            self.assertTrue(request_path.exists())
+            self.assertEqual((out_dir / "partial-write" / "steps.ndjson").read_bytes(), b"")
+            self.assertEqual(len((out_dir / "partial-write" / "steps.ndjson.corrupt").read_bytes()), 12)
+            self.assertTrue(bridge.step_once())
+            self.assertFalse(request_path.exists())
+            self.assertEqual(len((out_dir / "partial-write" / "steps.ndjson").read_text().splitlines()), 1)
+
     def test_session_update_failure_retries_without_duplicate_append(self) -> None:
         from unittest.mock import patch
 
@@ -498,6 +560,102 @@ class FileIpcBridgeTests(unittest.TestCase):
             self.assertIn("diagnostic-corrupt", bridge.open_sessions())
             self.assertEqual((run_dir / "capture_diagnostics.ndjson.corrupt").read_bytes(), corrupt_tail)
             self.assertEqual(json.loads((run_dir / "capture_diagnostics.ndjson").read_text())["code"], "prior_diagnostic")
+
+    def test_queued_requests_are_sorted_and_removed_after_durable_ack(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            ten = _queue_request(io_dir, "queued", 10)
+            two = _queue_request(io_dir, "queued", 2)
+
+            bridge = FileIpcBridge(io_dir, out_dir)
+            self.assertTrue(bridge.step_once())
+
+            records = [json.loads(line) for line in (out_dir / "queued" / "steps.ndjson").read_text().splitlines()]
+            self.assertEqual([record["request_id"] for record in records], [2, 10])
+            self.assertFalse(two.exists())
+            self.assertFalse(ten.exists())
+            self.assertEqual((io_dir / "action.txt").read_text(), "10\tSkipBlind\n")
+
+    def test_terminal_watermark_waits_for_queued_requests_across_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            end_path = io_dir / "run_end_watermark.json"
+            end_path.write_text(json.dumps({
+                "run_id": "watermark", "ipc_schema_version": "file-queue/1.0.0",
+                "outcome": "win", "last_request_id": 2,
+            }), encoding="utf-8")
+            _queue_request(io_dir, "watermark", 1)
+
+            bridge = FileIpcBridge(io_dir, out_dir)
+            self.assertTrue(bridge.step_once())
+            self.assertTrue(end_path.exists())
+            self.assertFalse(bridge.step_once())
+            diagnostic = json.loads((out_dir / "watermark" / "capture_diagnostics.ndjson").read_text())
+            self.assertEqual(diagnostic["code"], "terminal_requests_pending")
+            self.assertEqual(diagnostic["missing_request_ids"], [2])
+
+            restarted = FileIpcBridge(io_dir, out_dir)
+            _queue_request(io_dir, "watermark", 2)
+            self.assertTrue(restarted.step_once())
+            session = json.loads((out_dir / "watermark" / "session.json").read_text())
+            self.assertEqual(session["n_steps"], 2)
+            self.assertEqual(session["outcome"], "win")
+            diagnostics = [json.loads(line) for line in
+                           (out_dir / "watermark" / "capture_diagnostics.ndjson").read_text().splitlines()]
+            pending = next(item for item in diagnostics if item["code"] == "terminal_requests_pending")
+            self.assertTrue(pending["resolved"])
+            self.assertFalse(end_path.exists())
+
+    def test_producer_write_failures_mark_final_run_incomplete(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            _queue_request(io_dir, "producer-errors", 1)
+            (io_dir / "run_end_producer-errors.json").write_text(json.dumps({
+                "run_id": "producer-errors",
+                "ipc_schema_version": "file-queue/1.0.0",
+                "outcome": "loss",
+                "last_request_id": 1,
+                "producer_write_failures": 2,
+            }), encoding="utf-8")
+
+            bridge = FileIpcBridge(io_dir, out_dir)
+            self.assertTrue(bridge.step_once())
+            diagnostics = [json.loads(line) for line in
+                           (out_dir / "producer-errors" / "capture_diagnostics.ndjson").read_text().splitlines()]
+            self.assertTrue(any(item["code"] == "producer_request_write_failures"
+                                and item["capture_completeness"] == "incomplete" for item in diagnostics))
+
+    def test_queued_session_write_failure_keeps_request_for_retry(self) -> None:
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            request_path = _queue_request(io_dir, "queued-retry", 1)
+            bridge = FileIpcBridge(io_dir, out_dir)
+            original_write = bridge._write_session
+            calls = {"count": 0}
+
+            def fail_after_append(session):
+                calls["count"] += 1
+                if calls["count"] == 2:
+                    raise OSError("injected queue session failure")
+                return original_write(session)
+
+            with patch.object(bridge, "_write_session", fail_after_append):
+                with self.assertRaisesRegex(OSError, "injected queue session failure"):
+                    bridge.step_once()
+                self.assertTrue(request_path.exists())
+                self.assertTrue(bridge.step_once())
+            self.assertFalse(request_path.exists())
+            self.assertEqual(len((out_dir / "queued-retry" / "steps.ndjson").read_text().splitlines()), 1)
 
 
 if __name__ == "__main__":

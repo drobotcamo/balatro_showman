@@ -3,8 +3,8 @@
 -- Minimal Phase 0 Lua producer for the existing file-IPC oracle contract
 -- (README: planning/BRIDGE_SPIKE.md). It observes the running game and writes:
 --
---   %APPDATA%/Balatro/agent_io/snapshot.json   (state + action_taken + meta)
---   %APPDATA%/Balatro/agent_io/run_end.json    (run_id + outcome "win"|"loss")
+--   %APPDATA%/Balatro/agent_io/request_<run_id>_<request_id>.json (queued step)
+--   %APPDATA%/Balatro/agent_io/run_end_<run_id>.json (outcome + final request watermark)
 --
 -- consumed by ground_truth/file_ipc_bridge.py.
 --
@@ -48,14 +48,15 @@ local function io_dir()
 end
 
 local IO_DIR = io_dir()
-local SNAPSHOT_PATH = IO_DIR .. "\\snapshot.json"
 local RECORDING_START_PATH = IO_DIR .. "\\recording_start.json"
 local RECORDING_MARKER_PATH = IO_DIR .. "\\recording_start_marker.json"
-local RUN_END_PATH = IO_DIR .. "\\run_end.json"
 
 local request_counter = 0
+local producer_write_failures = 0
 local run_id = nil
+local run_ending = false
 local run_finalized = false
+local finalization_failure_logged = false
 local hooks_installed = false
 local last_emit_clock = -math.huge
 local last_emit_seconds = -math.huge
@@ -1174,6 +1175,7 @@ local function encode_meta(page)
     '"pack_key":' .. (key and j_str(key) or "null"),
     '"sent_at_real_time":' .. j_num(os.time()),
     '"producer":"balatro_showman_bridge"',
+    '"producer_revision":"issue81-file-queue-1"',
     '"smoke_subset":true',
     '"page":' .. j_str(page),
     '"runtime":' .. runtime,
@@ -1203,6 +1205,51 @@ local function write_atomic(path, text)
   end
   os.remove(tmp)
   return false
+end
+
+local function filename_token(value)
+  return tostring(value):gsub("[^%w_-]", "_")
+end
+
+local function request_path(target_run_id, request_id)
+  return IO_DIR .. "\\request_" .. filename_token(target_run_id) .. "_"
+    .. string.format("%012d", request_id) .. ".json"
+end
+
+local function run_end_path(target_run_id)
+  return IO_DIR .. "\\run_end_" .. filename_token(target_run_id) .. ".json"
+end
+
+local function file_exists(path)
+  local handle = io.open(path, "rb")
+  if not handle then return false end
+  handle:close()
+  return true
+end
+
+-- Queue entries are immutable and become visible only after a successful
+-- rename. A failed write leaves the request counter unchanged.
+local function write_new_atomic(path, text)
+  if file_exists(path) then return false end
+  local tmp = path .. ".tmp"
+  local handle = io.open(tmp, "wb")
+  if not handle then return false end
+  local ok, write_error = handle:write(text)
+  local closed, close_error = handle:close()
+  if not ok or closed == nil then
+    os.remove(tmp)
+    return false, write_error or close_error
+  end
+  if file_exists(path) then
+    os.remove(tmp)
+    return false
+  end
+  local renamed, rename_error = os.rename(tmp, path)
+  if not renamed then
+    os.remove(tmp)
+    return false, rename_error
+  end
+  return true
 end
 
 local function poll_recording_start()
@@ -1263,6 +1310,7 @@ local function build_snapshot(rid, page, action_label)
   local legal_actions = compute_legal_actions(page, action_label, values, basis)
   local parts = {
     '"schema_version":"producer/1.0.0"',
+    '"ipc_schema_version":"file-queue/1.0.0"',
     '"step_id":' .. j_str(run_id .. ":" .. tostring(rid)),
     '"capture_timestamp_ns":' .. j_num(timestamp_ns),
     '"request_id":' .. tostring(rid),
@@ -1296,28 +1344,44 @@ function Bridge.emit(action_label)
   if not (G and G.STAGE == G.STAGES.RUN) then return end
   if not run_id then
     run_id = tostring(math.floor(love.timer.getTime() * 1e9)) .. "-" .. tostring(math.random(1000, 9999))
+    request_counter = 0
+    producer_write_failures = 0
+    run_ending = false
     run_finalized = false
   end
-  -- Coalesce actions that fire back-to-back (e.g. buy_from_shop -> use_card)
-  -- so a later write cannot overwrite a snapshot the Python client has not
-  -- consumed yet. The first action in the pair is the meaningful one.
+  if run_ending or run_finalized then return end
+  -- Keep the existing intentional 30 ms coalescing, but queue each published
+  -- request separately so a delayed client cannot overwrite it.
   local now = os.clock()
   if now - last_emit_seconds < 0.03 then return end
   last_emit_seconds = now
-  request_counter = request_counter + 1
+  local next_request_id = request_counter + 1
   local page = current_page()
-  local wrote = write_atomic(SNAPSHOT_PATH, build_snapshot(request_counter, page, action_label))
+  local path = request_path(run_id, next_request_id)
+  local wrote = write_new_atomic(path, build_snapshot(next_request_id, page, action_label))
   if not wrote then
-    print("[balatro_showman_bridge] could not write " .. SNAPSHOT_PATH)
+    producer_write_failures = producer_write_failures + 1
+    print("[balatro_showman_bridge] could not enqueue request " .. tostring(next_request_id) .. " at " .. path)
+  else
+    request_counter = next_request_id
   end
 end
 
 local function finalize(outcome)
   if run_finalized or not run_id then return end
-  run_finalized = true
-  local body = '{"run_id":' .. j_str(run_id) .. ',"outcome":' .. j_str(outcome) .. "}"
-  if not write_atomic(RUN_END_PATH, body) then
-    print("[balatro_showman_bridge] could not write " .. RUN_END_PATH)
+  run_ending = true
+  local end_path = run_end_path(run_id)
+  local body = '{"run_id":' .. j_str(run_id)
+    .. ',"ipc_schema_version":"file-queue/1.0.0"'
+    .. ',"outcome":' .. j_str(outcome)
+    .. ',"last_request_id":' .. tostring(request_counter)
+    .. ',"producer_write_failures":' .. tostring(producer_write_failures) .. "}"
+  local wrote = write_new_atomic(end_path, body)
+  if wrote then
+    run_finalized = true
+  elseif not finalization_failure_logged then
+    finalization_failure_logged = true
+    print("[balatro_showman_bridge] could not write " .. end_path .. "; will retry")
   end
 end
 
@@ -1406,7 +1470,11 @@ local function install_game_hooks()
   if type(original_start_run) == "function" then
     Game.start_run = function(self, ...)
       run_id = tostring(math.floor(love.timer.getTime() * 1e9)) .. "-" .. tostring(math.random(1000, 9999))
+      request_counter = 0
+      producer_write_failures = 0
+      run_ending = false
       run_finalized = false
+      finalization_failure_logged = false
       return original_start_run(self, ...)
     end
   end
@@ -1428,6 +1496,6 @@ pcall(function() love.filesystem.createDirectory("agent_io") end)
 install_game_hooks()
 install_action_hooks()
 
-print("[balatro_showman_bridge] loaded; build=issue35-poll-diagnostic-3; io_dir=" .. IO_DIR)
+print("[balatro_showman_bridge] loaded; build=issue81-file-queue-1; io_dir=" .. IO_DIR)
 
 return Bridge
