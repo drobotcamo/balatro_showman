@@ -30,6 +30,8 @@ other work. Winning plays are not a special objective at this stage.
 - `PHASE0_INVENTORY.md`: Phase 0 artifact inventory, provenance, and boundary.
 - `FIRST_SLICE_PROTOCOL_V1.md`: development protocol for the initial Small Blind
   and first-shop evaluation slice; held-out criteria remain pending approval.
+- `FIRST_SLICE_PILOT_REVIEW.md`: proposed pilot reporting formulas, initial
+  unmeasured recoverability matrix, and preparation for criteria approval.
 - `BRIDGE_SPIKE.md`: file-IPC oracle contract and the Lua producer spike.
 - `ORACLE_DATA_REVIEW.md`: issue #10 integrity and storage-conformance findings.
 - `PERSISTENT_STATE_OWNERSHIP.md`: issue #14 oracle-vs-reducer decision note.
