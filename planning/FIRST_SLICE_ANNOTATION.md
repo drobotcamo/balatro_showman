@@ -42,6 +42,10 @@ nonempty evidence note. `confirmed` requires a step and a measured uncertainty;
 it is not assigned automatically from timestamps. Optional `exclusion` records
 why the frame is not usable for comparison. Unaligned/disputed samples remain
 visible in output and are not scored by this exporter.
+`coverage` explicitly lists all five label families; each has `state`
+(`reviewed`, `absent`, `unreviewed`, or `excluded`) and a reason. Reviewed
+families require at least one label, and only reviewed families can contain
+labels. An empty label list does not silently count as a negative example.
 
 `geometry` declares `canonical_size` and `source_size` in pixels, positive
 per-axis `scale`, `offset`, and `active_source_box` as `[x,y,w,h]` source pixels.
@@ -63,8 +67,9 @@ for an unobserved state. Any `inferred` value is separate and cites its
 `method` and `evidence`. Optional `zone`, `order`, `attributes` (including
 identity, edition, seal, sticker, modifier, and visibility when applicable),
 and canonical `box` retain visible object details. Observed objects require
-all four (box, zone, order, attributes); attributes should explicitly record
-unknown modifier/edition/seal/sticker/identity rather than inventing them.
+all four (box, zone, order, attributes); attributes require identity, edition,
+seal, sticker and modifier keys. Explicitly record `unknown`, `not_applicable`
+or the actual visible value per key rather than inventing them.
 A `transition` also declares
 `context_frames` from the same source; do not use future context to rewrite an
 earlier raw observation. Oracle fields and producer page labels must **not** be
@@ -76,13 +81,16 @@ are for validation only.
 or unresolved. `rationale` records the review basis. A disagreement does not
 erase the original. Unresolved cases must use a non-observed state; this tool
 does not elevate producer labels to independent review. The exporter rejects
-duplicate frames/slots, malformed geometry, incomplete review, missing source
-or alignment provenance, invalid version/hash/split/context, and synthetic
-leakage. It sorts sources, frames, labels and count rows deterministically.
+duplicate frames/slots, malformed geometry, incomplete family inventory, missing
+source or alignment provenance, invalid version/hash/split/context, identical
+frame hashes across splits, and synthetic leakage. It sorts sources, frames,
+labels and count rows deterministically.
 
 `pilot_counts` reports observed/unknown/etc. and agreement/disagreement counts
-by source, stage, and family. These are inventory counts, **not** accuracy,
-coverage denominator, alignment success, or a sufficiency claim. A bounded
+by source, stage, and family. `coverage_counts` reports sampled frame counts by
+source/stage/family/coverage state; the sampled set is not an independently
+verified eligible denominator. These are inventory counts, **not** accuracy,
+alignment success, or a sufficiency claim. A bounded
 pilot still needs independently inspected real frames and a per-recording
 report of sampled/eligible/missing/excluded stages and families, disagreements
 and adjudications, correspondence evidence, and limitations under the

@@ -94,12 +94,13 @@ def validate(data):
             groups[key] = source["split"]
 
     seen_frames = set()
+    frame_splits = {}
     frame_indices = {}
     for frame in data["frames"]:
         fields(frame, {"source_id", "index", "timestamp_ns", "step_id", "stage", "frame_sha256",
-                       "alignment", "geometry", "labels"},
+                       "alignment", "geometry", "coverage", "labels"},
                {"source_id", "index", "timestamp_ns", "step_id", "stage", "frame_sha256",
-                "alignment", "geometry", "labels", "exclusion"}, "frame")
+                "alignment", "geometry", "coverage", "labels", "exclusion"}, "frame")
         require(frame["source_id"] in sources, "frame source missing")
         require(isinstance(frame["index"], int) and not isinstance(frame["index"], bool)
                 and frame["index"] >= 0, "invalid frame index")
@@ -113,6 +114,9 @@ def validate(data):
                 "invalid step identity")
         require(frame["stage"] in STAGES, "invalid stage")
         digest(frame["frame_sha256"], "frame.frame_sha256")
+        split = sources[frame["source_id"]]["split"]
+        prior = frame_splits.setdefault(frame["frame_sha256"], split)
+        require(prior == split, "identical frame across splits")
         fields(frame["alignment"], {"state", "uncertainty_frames", "evidence"},
                {"state", "uncertainty_frames", "evidence"}, "frame.alignment")
         alignment = frame["alignment"]
@@ -151,6 +155,12 @@ def validate(data):
                 and ox + cw * sx <= active[0] + active[2] + 1e-8
                 and oy + ch * sy <= active[1] + active[3] + 1e-8,
                 "canonical viewport outside active region")
+        fields(frame["coverage"], FAMILIES, FAMILIES, "frame.coverage")
+        for family, coverage in frame["coverage"].items():
+            fields(coverage, {"state", "reason"}, {"state", "reason"}, "coverage")
+            require(coverage["state"] in {"reviewed", "absent", "unreviewed", "excluded"},
+                    "invalid family coverage state")
+            text(coverage["reason"], f"coverage.{family}.reason")
         require(isinstance(frame["labels"], list), "labels must be list")
         label_ids, occupied = set(), set()
         for label in frame["labels"]:
@@ -163,6 +173,8 @@ def validate(data):
                 text(label[key], f"label.{key}")
             require(label["annotator"] != label["reviewer"], "review must be independent")
             require(label["family"] in FAMILIES and label["state"] in STATES, "invalid label family/state")
+            require(frame["coverage"][label["family"]]["state"] == "reviewed",
+                    "label family must have reviewed coverage")
             require(label["review"] in {"agree", "disagree", "excluded"}, "invalid review")
             require(label["id"] not in label_ids, "duplicate label id")
             label_ids.add(label["id"])
@@ -207,14 +219,20 @@ def validate(data):
             if label["family"] == "object" and label["state"] == "observed":
                 require("box" in label and isinstance(label.get("zone"), str)
                         and bool(label["zone"].strip()) and "order" in label
-                        and isinstance(label.get("attributes"), dict) and label["attributes"],
-                        "observed object needs box, zone, order and visible attributes")
+                        and isinstance(label.get("attributes"), dict)
+                        and {"identity", "edition", "seal", "sticker", "modifier"}
+                        <= label["attributes"].keys(),
+                        "observed object needs box, zone, order and explicit attribute states")
             if label["family"] == "transition":
                 require("context_frames" in label and isinstance(label["context_frames"], list)
                         and all(isinstance(i, int) and not isinstance(i, bool) and i >= 0
                                 for i in label["context_frames"]), "transition needs context frames")
             elif "context_frames" in label:
                 raise AnnotationError("only transitions may use context frames")
+        for family in FAMILIES:
+            if frame["coverage"][family]["state"] == "reviewed":
+                require(any(label["family"] == family for label in frame["labels"]),
+                        "reviewed family needs a label or absent coverage")
     for frame in data["frames"]:
         for label in frame["labels"]:
             if label["family"] == "transition":
@@ -228,12 +246,16 @@ def build(data):
     sources = sorted(data["sources"], key=lambda s: s["id"])
     frames = []
     counts = Counter()
+    coverage_counts = Counter()
     for frame in sorted(data["frames"], key=lambda f: (f["source_id"], f["index"])):
         entry = dict(frame)
         entry["labels"] = []
         geometry = frame["geometry"]
         sx, sy = geometry["scale"]
         ox, oy = geometry["offset"]
+        for family, coverage in frame["coverage"].items():
+            coverage_counts[(frame["source_id"], frame["stage"], family,
+                             coverage["state"])] += 1
         for label in sorted(frame["labels"], key=lambda l: (l["family"], l["key"])):
             item = dict(label)
             if "box" in item:
@@ -245,8 +267,11 @@ def build(data):
     report = [{"source_id": s, "stage": stage, "family": family, "state": state,
                "review": review, "count": count}
               for (s, stage, family, state, review), count in sorted(counts.items())]
+    coverage_report = [{"source_id": s, "stage": stage, "family": family,
+                        "state": state, "frame_count": count}
+                       for (s, stage, family, state), count in sorted(coverage_counts.items())]
     return {"schema": MANIFEST, "protocol": PROTOCOL, "sources": sources,
-            "frames": frames, "pilot_counts": report,
+            "frames": frames, "pilot_counts": report, "coverage_counts": coverage_report,
             "scoring_status": "development_only_unscored"}
 
 

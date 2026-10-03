@@ -24,6 +24,9 @@ def sample():
                     "geometry": {"canonical_size": [960, 540], "source_size": [1920, 1080],
                                  "scale": [2, 2], "offset": [0, 0],
                                  "active_source_box": [0, 0, 1920, 1080]},
+                    "coverage": {family: {"state": "reviewed" if family == "page" else "absent",
+                                          "reason": "visible heading" if family == "page" else "not sampled"}
+                                 for family in ("page", "control", "object", "ocr", "transition")},
                     "labels": [{"id": "page-1", "family": "page", "key": "page_name",
                                 "state": "observed", "raw": "blind select", "normalized": "blind_select",
                                 "inferred": None, "annotator": "first", "reviewer": "second",
@@ -91,11 +94,17 @@ def test_source_split_and_synthetic_isolation():
 def test_object_and_transition_require_inspectable_context():
     data = sample()
     label = data["frames"][0]["labels"][0]
-    label.update(family="object", zone="hand", order=0, attributes={"edition": "unknown"})
+    data["frames"][0]["coverage"]["page"]["state"] = "absent"
+    data["frames"][0]["coverage"]["object"]["state"] = "reviewed"
+    label.update(family="object", zone="hand", order=0,
+                 attributes={key: "unknown" for key in
+                             ("identity", "edition", "seal", "sticker", "modifier")})
     build(data)
     label.pop("attributes")
-    with pytest.raises(AnnotationError, match="visible attributes"):
+    with pytest.raises(AnnotationError, match="attribute states"):
         build(data)
+    data["frames"][0]["coverage"]["object"]["state"] = "absent"
+    data["frames"][0]["coverage"]["transition"]["state"] = "reviewed"
     label.update(family="transition", context_frames=[999])
     with pytest.raises(AnnotationError, match="missing source frames"):
         build(data)
@@ -113,3 +122,20 @@ def test_unknown_review_and_unverified_alignment_remain_visible():
     assert result["scoring_status"] == "development_only_unscored"
     assert result["frames"][0]["labels"][0]["state"] == "ambiguous"
     assert result["pilot_counts"][0]["count"] == 1
+
+
+def test_cross_split_frame_leak_and_omitted_family_rejected():
+    data = sample()
+    second = copy.deepcopy(data["sources"][0])
+    second.update(id="independent", group="play-2", run_id="run-2", split="held_out",
+                  video_sha256="e" * 64)
+    data["sources"].append(second)
+    frame = copy.deepcopy(data["frames"][0])
+    frame["source_id"] = "independent"
+    data["frames"].append(frame)
+    with pytest.raises(AnnotationError, match="identical frame"):
+        build(data)
+    data = sample()
+    data["frames"][0]["labels"] = []
+    with pytest.raises(AnnotationError, match="reviewed family"):
+        build(data)
