@@ -44,8 +44,8 @@ If session usage metadata is present, its action counts must match the steps. Fo
 legacy sessions without usage metadata, the importer derives action counts from
 the step records and leaves summary timestamps null when step timestamps are
 not consistently available. Present usage timestamps must be valid UTC ISO-8601
-values and, when every step timestamp is valid, must match the first and last
-step timestamps. Invalid step timestamps alongside usage metadata are rejected;
+values and must match the first/last step timestamp when that boundary is
+available. Invalid step timestamps alongside usage metadata are rejected;
 legacy records without session usage keep the original step payload and receive
 null summary timestamps if timestamp coverage is missing or malformed.
 It maps `win`/`loss` to `won`/`lost`, keeps an unfinished source active, and

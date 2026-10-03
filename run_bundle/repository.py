@@ -87,7 +87,6 @@ class RunBundle:
             except ValueError as exc:
                 raise BundleError("oracle usage timestamps must be valid ISO-8601 UTC values") from exc
             step_times = [record.get("_recorded_at") for record in records]
-            has_all_step_times = bool(step_times) and all(value is not None for value in step_times)
             for value in step_times:
                 if value is None:
                     continue
@@ -97,9 +96,10 @@ class RunBundle:
                     parsed = None
                 if parsed is None or parsed.utcoffset() != timezone.utc.utcoffset(parsed):
                     raise BundleError("oracle step timestamps must be valid ISO-8601 UTC values")
-            if has_all_step_times:
-                if (first_recorded_at, last_recorded_at) != (step_times[0], step_times[-1]):
-                    raise BundleError("oracle usage timestamps do not match the first and last steps")
+            if step_times:
+                if (step_times[0] is not None and first_recorded_at != step_times[0]
+                        or step_times[-1] is not None and last_recorded_at != step_times[-1]):
+                    raise BundleError("oracle usage timestamps do not match available boundary steps")
         outcome = metadata.get("outcome")
         target_status = {"win": "won", "loss": "lost"}.get(outcome)
         if outcome is not None and target_status is None:

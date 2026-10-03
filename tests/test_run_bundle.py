@@ -284,3 +284,24 @@ def test_file_ipc_oracle_import_rejects_invalid_step_timestamp_when_usage_is_pre
     with pytest.raises(BundleError, match="step timestamps"):
         RunBundle(url).import_oracle_directory(source)
     assert RunBundleInspector(url).list_runs()["data"] == []
+
+def test_file_ipc_oracle_import_checks_available_boundary_timestamp(tmp_path):
+    url = f"sqlite:///{tmp_path / 'partial-boundary-import.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    source = tmp_path / "oracle" / "partial-boundary"
+    source.mkdir(parents=True)
+    (source / "session.json").write_text(json.dumps({
+        "run_id": "partial-boundary", "started_at": "2026-10-03T03:28:55+00:00",
+        "outcome": None, "n_steps": 2, "usage": {
+            "action_counts": {"PlayHand": 1, "DiscardHand": 1}, "unique_action_count": 2,
+            "first_recorded_at": "2026-10-03T03:29:00+00:00",
+            "last_recorded_at": "2026-10-03T03:29:10+00:00",
+        },
+    }), encoding="utf-8")
+    (source / "steps.ndjson").write_text("".join(json.dumps(step) + "\n" for step in (
+        {"_recorded_action": "PlayHand", "_recorded_at": "2026-10-03T03:28:55+00:00"},
+        {"_recorded_action": "DiscardHand"},
+    )), encoding="utf-8")
+    with pytest.raises(BundleError, match="available boundary steps"):
+        RunBundle(url).import_oracle_directory(source)
+    assert RunBundleInspector(url).list_runs()["data"] == []
