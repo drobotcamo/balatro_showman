@@ -1,11 +1,11 @@
 # Work Checkpoint
 Updated: 2026-10-03
 Issue: #79
-PR: pending publication
+PR: #111
 Branch: issue-79-pilot-review-preparation
 Worktree: C:\Users\camgr\.t3\worktrees\balatro_showman\t3code-c89ef700
 Objective: Review the first-slice development pilot and freeze user-approved evaluation criteria.
-Validation: Base 4d5d541; merged v1 from PR #97 inspected. Current worksheet checks and review pending.
+Validation: Base 4d5d541; merged v1 from PR #97 inspected. Worksheet at fc3838c: python planning/check_contracts.py -> planning contracts OK; git diff --cached --check passed. Final review and CI evidence belong on PR #111.
 Risks: No #82 pilot manifest/report or independent annotation QA pointer was found in tracked branch/GitHub evidence. No recoverability measurements, thresholds, support, uncertainty or held-out context are approved. Existing V0 comment is not proof of a merged protocol. No unrelated changes were present.
 Next: #82 annotation lead supplies the v1 development manifest, external evidence hashes, independent frame QA and stratified pilot report. #79 lead then recomputes metrics, reviews visibility/recoverability and requests explicit scoped criteria approval before frozen held-out collection/scoring.
 
@@ -25,7 +25,8 @@ Next: #82 annotation lead supplies the v1 development manifest, external evidenc
   require pilot evidence and applicable predictions. Broader scopes remain staged.
 - Scoped Q03/Q04 decision record: pending explicit approval; neither question is
   closed globally.
-- Planning/diff checks and independent review: pending current worksheet revision.
+- Planning/diff checks: passed for worksheet preparation. Independent current-head
+  review and required CI are recorded on PR #111 before integration.
 
 This is unfinished #79 work, not a completion claim. No live recording action is
 requested: the immediate dependency is #82's existing annotation/pilot outcome.
