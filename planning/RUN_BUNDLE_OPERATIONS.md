@@ -153,8 +153,8 @@ confirmed.
 
 ## Boundaries
 
-The bundle lifecycle remains `active`, `interrupted`, `completed`, `endless`,
-`won`, `lost`, or `aborted`. Evidence remains append-only at the application
-boundary and terminal outcomes remain immutable. Compatibility adapters remain
-read-only. This guide does not define Phase 9 export storage or deterministic
-replay.
+The bundle lifecycle includes `active`, `interrupted`, `incomplete`,
+`completed`, `endless`, `won`, `lost`, and `aborted`. Evidence remains append-only
+at the application boundary, and terminal outcomes remain immutable.
+Compatibility adapters remain read-only. This guide does not define Phase 9
+export storage or deterministic replay.
