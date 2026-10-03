@@ -28,8 +28,10 @@ other work. Winning plays are not a special objective at this stage.
 - `ROADMAP.md`: phased development plan, phase gates, and component ownership.
 - `ARCHITECTURE.md`: system boundaries and data flow.
 - `PHASE0_INVENTORY.md`: Phase 0 artifact inventory, provenance, and boundary.
-- `FIRST_SLICE_PROTOCOL_V1.md`: development protocol for the initial Small Blind
-  and first-shop evaluation slice; held-out criteria remain pending approval.
+- `FIRST_SLICE_PROTOCOL_V1.md`: original development protocol for the initial
+  Small Blind and first-shop slice.
+- `FIRST_SLICE_PROTOCOL_V2.md`: user-approved criteria frozen for prospective
+  first-slice held-out evaluation; it does not claim evaluation results.
 - `FIRST_SLICE_PILOT_REVIEW.md`: proposed pilot reporting formulas, initial
   unmeasured recoverability matrix, and preparation for criteria approval.
 - `BRIDGE_SPIKE.md`: file-IPC oracle contract and the Lua producer spike.
@@ -75,9 +77,9 @@ protocol before held-out evaluation (Q03).
 Use one of: `planned`, `designing`, `building`, `validated`, `blocked`, or
 `retired`.
 
-Current status: `building`. Capture/storage/inspection components exist and a
-historical pinned run has alignment metadata. Recorder reliability, current
-rendered correspondence, semantic suitability and evaluation acceptance remain
-open. Next delivery is reliable recorded-run inspection (#81), then reviewed
-evaluation slice (#79/#82), then measured video-only reconstruction. See
+Current status: `building`. Capture/storage/inspection components exist. The
+first-slice development protocol, annotation exporter, user-reviewed seven-frame
+pilot and frozen prospective criteria are available through #79/#82. The pilot
+has no predictions and its seven frame alignments remain unverified; accuracy,
+generalization, held-out results and broad Phase 0 acceptance remain open. See
 `PHASE0_INVENTORY.md`; live ownership/blockers belong on GitHub, not this index.

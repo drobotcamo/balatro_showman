@@ -411,6 +411,50 @@ resumability. Source: user clarification and approval during Issue #107 on
 2026-10-03, recorded at
 `https://github.com/drobotcamo/balatro_showman/issues/107#issuecomment-5965862714`.
 
+### D034 — accepted — First-slice held-out evaluation criteria are frozen before collection
+
+For the selected Small Blind/first-shop slice, exact categorical and numeric
+accuracy must have a lower 95% confidence bound clustered by source recording of
+at least 0.95. Normalized OCR exact-field accuracy has the same lower bound and
+normalized character error rate has an upper bound of 0.02. When boxes are scored,
+match one-to-one by class/zone at IoU 0.50, with per-family precision and recall
+lower bounds of 0.90. Prediction coverage has a lower bound of 0.90 and abstention
+an upper bound of 0.10, reported separately by field/stratum.
+
+Held-out support requires 20 independent recordings overall and, for each scored
+stratum, at least five contributing recordings and 100 eligible opportunities.
+Under-support results are descriptive/inconclusive, never a pass. A state label
+uses its target frame only; transition labels may use same-run context up to 2.5
+seconds on either side with frame IDs recorded, without future-frame rewriting or
+carry-forward. The first-shop slice requires at least one affordable completed
+purchase with a visible result; if none is possible, record the constraint and
+mark the stage incomplete.
+
+This decision applies only to the first slice. It does not authorize a particular
+held-out source set, claim any system meets a threshold, or resolve future phase
+criteria. Alternative considered: one aggregate score and frame-level support;
+rejected because it hides family failures and overstates evidence from correlated
+frames. Source: explicit user approval in Issue #79 comment
+https://github.com/drobotcamo/balatro_showman/issues/79#issuecomment-5971771156;
+frozen protocol `planning/FIRST_SLICE_PROTOCOL_V2.md`.
+
+### D035 — accepted — First-slice recoverability remains field- and condition-specific
+
+The reviewed seven-frame pilot supports conditional recoverability only for the
+named clear page/control/OCR samples and the Juggler identity in the reviewed
+purchase sequence. Shop-entry page identity, the full shop inventory, cropped
+hand-card identity/attributes and rendered timestamp alignment remain unmeasured.
+No field is declared globally unrecoverable, and no reducer/oracle boundary
+changes. Unknowns remain unknown; a future unsupported field or unreviewed
+condition cannot inherit a positive result.
+
+Alternative considered: resolve Q04 globally from this recording; rejected because
+one correlated recording, seven frames and unverified alignment do not establish
+general recoverability. Source: user approval in Issue #79 comment
+https://github.com/drobotcamo/balatro_showman/issues/79#issuecomment-5971771156;
+external pilot report and manifest referenced by the issue. Q04 remains open for
+other conditions and phases.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the
@@ -422,7 +466,11 @@ resumability. Source: user clarification and approval during Issue #107 on
   compatibility review remain required for every consuming slice.
 - **Q03** — Which criteria, thresholds, minimum support and uncertainty rules
   does each applicable phase/slice protocol require before held-out evaluation?
+  The selected first slice is frozen by D034; all other applicable scopes remain
+  open.
 - **Q04** — Which visible state cannot be recovered reliably from video alone?
+  D035 records first-slice field/condition findings only; the global and other
+  phase question remains open.
 - **Q05** — Which event labels can be inferred confidently without
   player-input logs, and what oracle agreement rate is required before they
   are trusted?
