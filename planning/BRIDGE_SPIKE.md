@@ -159,6 +159,15 @@ Before pressing OBS Record, write a start request so the Lua producer samples
 its own monotonic clock. The bridge persists the resulting marker in
 `session.json`:
 
+The client-side `usage` object in `session.json` and `_recorded_at` on new
+`steps.ndjson` records are optional additive metadata under the existing
+`producer/1.0.0` session/step contract. They record consumer persistence time
+in UTC, not a producer game-event timestamp. Readers must preserve compatibility
+with older records: legacy steps still contribute action counts, while runs
+containing only legacy steps retain null usage timestamps. `action_counts` must
+sum to `n_steps`, and duplicate request replays (including after finalization)
+must only re-acknowledge the original action.
+
 ```powershell
 @{schema_version='producer/1.0.0'; recording_id='obs-2026-09-30-001'; fps=60} |
   ConvertTo-Json -Compress |

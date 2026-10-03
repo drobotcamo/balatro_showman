@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 from ground_truth.file_ipc_bridge import FileIpcBridge
@@ -48,6 +49,12 @@ class FileIpcBridgeTests(unittest.TestCase):
             session = json.loads((out_dir / "smoke-1" / "session.json").read_text())
             self.assertEqual(session["outcome"], "win")
             self.assertEqual(session["n_steps"], 1)
+            self.assertEqual(session["usage"]["action_counts"], {"SelectBlind": 1})
+            self.assertEqual(session["usage"]["unique_action_count"], 1)
+            self.assertIsNotNone(session["usage"]["first_recorded_at"])
+            self.assertEqual(session["usage"]["first_recorded_at"], session["usage"]["last_recorded_at"])
+            step_record = json.loads((root / "runs" / "smoke-1" / "steps.ndjson").read_text())
+            self.assertIsNotNone(datetime.fromisoformat(step_record["_recorded_at"]))
             diagnostics = [json.loads(line) for line in
                            (out_dir / "smoke-1" / "capture_diagnostics.ndjson").read_text().splitlines()]
             self.assertTrue(any(item["code"] == "terminal_watermark_missing" for item in diagnostics))
@@ -138,6 +145,76 @@ class FileIpcBridgeTests(unittest.TestCase):
                 len((root / "runs" / "smoke-3" / "steps.ndjson").read_text().splitlines()),
                 1,
             )
+            session = json.loads((root / "runs" / "smoke-3" / "session.json").read_text())
+            self.assertEqual(session["usage"]["action_counts"], {"SkipBlind": 1})
+
+    def test_usage_metadata_counts_commands_and_survives_restart(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            bridge = FileIpcBridge(io_dir, out_dir)
+            for request_id, action in ((1, "SkipBlind"), (2, "SelectBlind"), (3, "SkipBlind")):
+                (io_dir / "snapshot.json").write_text(json.dumps({
+                    "request_id": request_id,
+                    "meta": {"run_id": "usage-run"},
+                    "action_taken": action,
+                }), encoding="utf-8")
+                self.assertTrue(bridge.step_once())
+            original_usage = json.loads((out_dir / "usage-run" / "session.json").read_text())["usage"]
+            recovered = FileIpcBridge(io_dir, out_dir)
+            usage = recovered.open_sessions()["usage-run"]["usage"]
+            self.assertEqual(usage, original_usage)
+            self.assertEqual(usage["action_counts"], {"SkipBlind": 2, "SelectBlind": 1})
+            self.assertEqual(usage["unique_action_count"], 2)
+            self.assertLessEqual(usage["first_recorded_at"], usage["last_recorded_at"])
+            persisted = json.loads((out_dir / "usage-run" / "session.json").read_text())["usage"]
+            self.assertEqual(persisted, usage)
+
+    def test_duplicate_replay_after_finalization_reacks_without_counting(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            request = {"request_id": 1, "meta": {"run_id": "final-replay"},
+                       "action_taken": "SkipBlind"}
+            bridge = FileIpcBridge(io_dir, out_dir)
+            (io_dir / "snapshot.json").write_text(json.dumps(request), encoding="utf-8")
+            self.assertTrue(bridge.step_once())
+            (io_dir / "run_end.json").write_text(
+                json.dumps({"run_id": "final-replay", "outcome": "loss"}), encoding="utf-8")
+            self.assertTrue(bridge.step_once())
+            (io_dir / "snapshot.json").write_text(json.dumps(request), encoding="utf-8")
+            self.assertTrue(bridge.step_once())
+            recovered = FileIpcBridge(io_dir, out_dir)
+            (io_dir / "snapshot.json").write_text(json.dumps(request), encoding="utf-8")
+            self.assertTrue(recovered.step_once())
+            session = json.loads((out_dir / "final-replay" / "session.json").read_text())
+            self.assertEqual(session["n_steps"], 1)
+            self.assertEqual(session["usage"]["action_counts"], {"SkipBlind": 1})
+            self.assertEqual((io_dir / "action.txt").read_text(), "1\tSkipBlind\n")
+
+    def test_legacy_steps_count_without_inventing_timestamps(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            run_dir = out_dir / "legacy"
+            run_dir.mkdir(parents=True)
+            (run_dir / "session.json").write_text(json.dumps({
+                "run_id": "legacy", "schema_version": "producer/1.0.0",
+                "started_at": "2026-01-01T00:00:00+00:00", "ended_at": None,
+                "outcome": "loss", "n_steps": 2,
+            }), encoding="utf-8")
+            (run_dir / "steps.ndjson").write_text("".join(json.dumps({
+                "request_id": i, "_recorded_action": action,
+            }) + "\n" for i, action in ((1, "SkipBlind"), (2, "SelectBlind"))), encoding="utf-8")
+            bridge = FileIpcBridge(io_dir, out_dir)
+            usage = bridge._finalized_session_data["legacy"]["usage"]
+            self.assertEqual(usage["action_counts"], {"SkipBlind": 1, "SelectBlind": 1})
+            self.assertEqual(usage["unique_action_count"], 2)
+            self.assertIsNone(usage["first_recorded_at"])
+            self.assertIsNone(usage["last_recorded_at"])
 
     def test_request_ids_can_restart_after_run_end(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
