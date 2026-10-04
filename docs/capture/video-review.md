@@ -23,11 +23,14 @@ marker remains visible and disables seeking/clip export unless an explicit
 diagnostic timing basis is supplied. This operation does not associate a recording
 in the Run Store and does not replace the required human-confirmed checkpoint.
 
-The server binds only to localhost and prints its URL. It checks video packet
-presentation timestamps for monotonicity and constant cadence, then creates a
-video-only MP4 remux under `<export-root>/.media` for browser playback and
-verifies its timeline. Packet inspection avoids decoding every frame during
-startup; large media remuxing can still take time. Original MKVs are retained.
+The server binds only to localhost and prints its URL. Eligibility frame mapping
+currently supports H.264 constant-cadence video. It checks video-packet
+presentation timestamps for monotonicity and cadence, then creates a video-only
+MP4 remux under `<export-root>/.media` and verifies one-to-one packet count and
+timestamps before enabling frame review. Packet inspection avoids decoding every
+frame during startup; large media remuxing can still take time. Original MKVs
+are retained. Other codecs and variable-cadence video are rejected for this
+review mode rather than assigned guessed frame indices.
 Subsequent launches reuse the derivative only after checking its stored hashes.
 Incomplete or changed cache entries are preserved and rejected rather than overwritten.
 Stop with Ctrl+C when finished. The viewer does not start/stop OBS or Balatro.

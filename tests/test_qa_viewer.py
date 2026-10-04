@@ -37,7 +37,7 @@ class ViewerTests(unittest.TestCase):
         self.runs = [source(self.root, "a"), source(self.root, "b", 7, marker=False)]
         self.export_root = self.root / "exports"
         self.probe = patch("ground_truth.qa_viewer.probe", return_value={
-            "duration": 10.0, "fps": 10, "constant_fps": True, "frame_count": 100,
+            "duration": 10.0, "fps": 10, "codec_name": "h264", "constant_fps": True, "frame_count": 100,
             "presentation_origin": 0.0, "frame_timestamps": [i / 10 for i in range(100)]})
         self.probe.start()
         self.addCleanup(self.probe.stop)
@@ -121,12 +121,13 @@ class ViewerTests(unittest.TestCase):
 
     def test_viewer_rejects_variable_frame_rate_metadata(self):
         self.probe.stop()
-        with patch("ground_truth.qa_viewer.probe", return_value={"duration": 10.0, "fps": 10, "constant_fps": False}):
+        with patch("ground_truth.qa_viewer.probe", return_value={"duration": 10.0, "fps": 10,
+                                                                 "codec_name": "h264", "constant_fps": False}):
             with self.assertRaisesRegex(ValueError, "constant-FPS"):
                 Review(self.video, self.runs, self.export_root)
 
     def test_probe_checks_all_video_packet_presentation_timestamps(self):
-        stream = {"streams": [{"avg_frame_rate": "10/1", "r_frame_rate": "10/1"}],
+        stream = {"streams": [{"codec_name": "h264", "avg_frame_rate": "10/1", "r_frame_rate": "10/1"}],
                   "format": {"duration": "0.3"}}
         def result(packet_times):
             return [type("Result", (), {"stdout": json.dumps(stream)})(),

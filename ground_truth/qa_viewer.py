@@ -42,6 +42,7 @@ def probe(path):
     ], check=True, capture_output=True, text=True, timeout=60)
     data = json.loads(result.stdout)
     stream = data["streams"][0]
+    data["codec_name"] = stream.get("codec_name")
     numerator, denominator = map(float, stream["avg_frame_rate"].split("/"))
     data["fps"] = numerator / denominator
     data["duration"] = float(data["format"]["duration"])
@@ -126,6 +127,8 @@ class Review:
             raise ValueError("export parent must already exist")
         self.video_hash = digest(self.video)
         self.video_probe = probe(self.video)
+        if self.video_probe.get("codec_name") != "h264":
+            raise ValueError("eligibility frame mapping currently supports H.264 video only")
         if not self.video_probe.get("constant_fps"):
             raise ValueError("eligibility review requires constant-FPS video")
         self.times = []
