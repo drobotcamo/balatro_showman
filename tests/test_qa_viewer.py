@@ -75,6 +75,28 @@ class ViewerTests(unittest.TestCase):
             self.review().export(1, 0, 10, "")
         self.assertEqual(before, digest(self.runs[1] / "session.json"))
 
+    def test_eligibility_review_preserves_sources_and_rejects_unmeasured_confirmation(self):
+        review = self.review()
+        original = digest(self.runs[0] / "steps.ndjson")
+        payload = {"source": 0, "index": 0, "stage": "start", "frame": 1,
+                   "frame_seconds": 0.1, "alignment": "confirmed", "offset_frames": None,
+                   "evidence": "rendered button visible at candidate", "visual_observation": "New Run",
+                   "missingness": "", "registry_audit": "external registry not yet checked",
+                   "reviewer": "human"}
+        with self.assertRaisesRegex(ValueError, "measured offset"):
+            review.save_eligibility(payload)
+        with self.assertRaisesRegex(ValueError, "measured offset"):
+            review.save_eligibility({**payload, "offset_frames": 4})
+        with self.assertRaisesRegex(ValueError, "in-range candidate"):
+            review.save_eligibility({**payload, "source": 1, "offset_frames": 0})
+        saved = review.save_eligibility({**payload, "offset_frames": -2})
+        packet = json.loads(Path(saved["file"]).read_text())
+        self.assertEqual((packet["status"], packet["offset_frames"], packet["source_run_id"]),
+                         ("unscored", -2, "a"))
+        self.assertEqual(packet["video_sha256"], digest(self.video))
+        self.assertEqual(original, digest(self.runs[0] / "steps.ndjson"))
+        self.assertNotEqual(saved["file"], review.save_eligibility({**payload, "offset_frames": 0})["file"])
+
     def test_export_rejects_changed_sources_and_overlapping_destinations(self):
         with self.assertRaises(ValueError):
             Review(self.video, self.runs, self.runs[0] / "exports")
@@ -189,7 +211,7 @@ class ViewerTests(unittest.TestCase):
         for name, expected in packet["files"].items():
             self.assertEqual(digest(folder / name), expected)
         self.assertEqual(before, {path: digest(path) for path in before})
-        self.assertNotIn('literal </script> note', (folder / "index.html").read_text())
+        self.assertNotIn('literal </script> note', (folder / "index.html").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

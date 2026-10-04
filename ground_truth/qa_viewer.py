@@ -255,6 +255,63 @@ class Review:
                 if digest(Path(original["source"]["directory"]) / name) != metadata["sha256"]:
                     raise ValueError("oracle source changed; reload viewer")
 
+    def save_eligibility(self, data):
+        """Preserve one human review observation outside the repository; never score it."""
+        source = data.get("source")
+        index = data.get("index")
+        if type(source) is not int or not 0 <= source < len(self.sources):
+            raise ValueError("invalid source index")
+        if type(index) is not int or not 0 <= index < len(self.sources[source]["steps"]):
+            raise ValueError("invalid step index")
+        stage = data.get("stage")
+        if stage not in ("start", "small_blind_select", "small_blind_play", "cash_out", "first_shop"):
+            raise ValueError("invalid stage")
+        state = data.get("alignment")
+        if state not in ("confirmed", "unverified", "failed", "disputed"):
+            raise ValueError("invalid alignment disposition")
+        frame = data.get("frame")
+        if type(frame) is not int or frame < 0:
+            raise ValueError("frame must be a nonnegative integer")
+        offset = data.get("offset_frames")
+        if offset is not None and (type(offset) is not int or abs(offset) > 100000):
+            raise ValueError("invalid measured offset")
+        if state == "confirmed" and (offset is None or abs(offset) > 3 or self.times[source][index] is None):
+            raise ValueError("confirmation requires an in-range candidate and measured offset within ±3 frames")
+        fields = ("evidence", "visual_observation", "missingness", "reviewer", "registry_audit")
+        for field in fields:
+            if not isinstance(data.get(field), str) or len(data[field]) > 10000:
+                raise ValueError(f"{field} must be text of at most 10000 characters")
+        if not data["evidence"].strip() or not data["reviewer"].strip():
+            raise ValueError("reviewer and rendered-correspondence evidence are required")
+        if self.export_root.resolve() != self.export_root:
+            raise ValueError("export root was redirected")
+        self.check_sources()
+        if digest(self.video) != self.video_hash:
+            raise ValueError("source video changed; reload viewer")
+        folder = self.export_root / "eligibility-reviews"
+        folder.mkdir(parents=True, exist_ok=True)
+        if folder.resolve() != folder:
+            raise ValueError("review folder was redirected")
+        row = self.sources[source]["steps"][index]
+        packet = {"schema": "first-slice-eligibility-review/1", "protocol": "FIRST_SLICE_PROTOCOL_V2",
+                  "status": "unscored", "video_sha256": self.video_hash, "video": str(self.video),
+                  "source_run_id": self.sources[source]["run_id"],
+                  "oracle_files": self.sources[source]["source"]["files"],
+                  "step_id": row.get("step_id"), "step_index": index,
+                  "candidate_seconds": self.times[source][index], "fps": self.video_probe["fps"],
+                  "marker": self.timing[source]["original_marker"],
+                  "timing_evidence": self.timing[source]["evidence"],
+                  "frame": frame, "frame_seconds": data.get("frame_seconds"),
+                  "stage": stage, "alignment": state, "offset_frames": offset,
+                  **{key: data[key] for key in fields}}
+        if type(packet["frame_seconds"]) not in (int, float) or not math.isfinite(packet["frame_seconds"]) or not 0 <= packet["frame_seconds"] <= self.video_probe["duration"]:
+            raise ValueError("invalid video time")
+        destination = folder / (datetime.now(timezone.utc).strftime("review-%Y%m%dT%H%M%SZ-") + secrets.token_hex(8) + ".json")
+        with destination.open("x", encoding="utf-8") as stream:
+            json.dump(packet, stream, indent=2, sort_keys=True, allow_nan=False)
+            stream.write("\n")
+        return {"file": str(destination), "status": "unscored"}
+
 
 def byte_range(header, size):
     if not header:
@@ -371,6 +428,8 @@ def make_server(review, port=0, steps=10):
                     elif self.path == "/api/export":
                         result = review.export(data["source"], data["start"], data["count"], data.get("notes", ""),
                                                data["selection_id"])
+                    elif self.path == "/api/eligibility":
+                        result = review.save_eligibility(data)
                     else:
                         return self.send(404, {"error": "not found"})
                 return self.send(200, result)

@@ -77,3 +77,22 @@ After restarting the server, reload the browser page to obtain its new session t
 
 Narrow checks: `py -3 -m unittest tests.test_qa_viewer` and
 `py -3 planning/check_contracts.py`, followed by browser playback/seek/export QA.
+# First-slice eligibility review
+
+Open **Open eligibility review ↗** in the local viewer to review the same video
+and action windows in a separate browser tab. Select a step, inspect the
+rendered pre-action frame with the frame-step buttons, and record its actual
+source-frame index, measured offset from the candidate, evidence, stage, visual
+observation, missingness and external source-registry audit status. A confirmed
+correspondence requires a measured offset within ±3 frames; otherwise choose
+unverified, failed or disputed. Oracle snapshots are navigation aids, not visual
+labels. The reviewer field identifies the person who inspected the pixels.
+
+**Save unscored observation** writes a new JSON file under the selected external
+export root's `eligibility-reviews` directory. It records source hashes and the
+original step identity. Saves never replace a previous observation, edit source
+video/oracle files, certify source overlap, or produce a held-out manifest/score.
+For recordings with multiple recorder IDs, pass every associated `--run` for the
+same video and count that video only once. Review each stage and record missing
+stages explicitly; audit external training and synthetic registries independently.
+The frozen rules are in `planning/FIRST_SLICE_PROTOCOL_V2.md`.
