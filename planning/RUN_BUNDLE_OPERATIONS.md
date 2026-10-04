@@ -6,6 +6,12 @@ does not call recording association and does not pause for user input.
 
 ## Entrypoint
 
+Showman Capture provides the task-oriented entrypoint `python -m showman`.
+See `docs/capture/README.md` and `docs/capture/reference.md` for onboarding,
+capture/import/inspection commands, and the terminal association surface.
+`python -m showman inspect ...` delegates to the same read-only inspector;
+`store init`, `store import`, `record`, and confirmed `associate` are mutating.
+
 Use the package module rather than a second standalone launcher:
 
 ```text

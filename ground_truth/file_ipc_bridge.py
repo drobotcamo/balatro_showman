@@ -676,15 +676,19 @@ def _default_io_dir() -> Path:
     return Path.home() / ".local" / "share" / "love" / "Balatro" / "agent_io"
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
+def build_parser(*, add_help=True):
+    parser = argparse.ArgumentParser(description=__doc__, add_help=add_help)
     parser.add_argument("--io-dir", type=Path, default=_default_io_dir())
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--bundle-db", help="migrated SQLite RunBundle database for automatic import")
     parser.add_argument("--action", help="Safe smoke-test action when the snapshot has no action_taken")
     parser.add_argument("--timeout", type=float)
     parser.add_argument("--once", action="store_true")
-    args = parser.parse_args()
+    return parser
+
+
+def main(argv=None) -> None:
+    args = build_parser().parse_args(argv)
     bridge = FileIpcBridge(args.io_dir, args.out_dir, args.action, args.bundle_db)
     if args.once:
         bridge.io_dir.mkdir(parents=True, exist_ok=True)
