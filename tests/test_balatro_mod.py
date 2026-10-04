@@ -1,6 +1,12 @@
 import json
+import os
+import shutil
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
+
+from ground_truth.file_ipc_bridge import FileIpcBridge
 
 MOD_DIR = Path(__file__).resolve().parent.parent / "ground_truth" / "balatro_mod"
 REQUIRED_JSON_FIELDS = ("id", "author", "name", "description", "prefix", "main_file")
@@ -46,6 +52,43 @@ class BalatroModManifestTests(unittest.TestCase):
         self.assertIn('"last_request_id":', text)
         self.assertIn('"producer_write_failures":', text)
         self.assertIn("request_", text)
+
+    @unittest.skipUnless(os.name == "nt" and shutil.which("lovec"), "Windows LÖVE runtime required")
+    def test_producer_lifecycle_in_love(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            io_dir = Path(directory) / "Balatro" / "agent_io"
+            io_dir.mkdir(parents=True)
+            result = subprocess.run(
+                ["lovec", "tests/lua_file_ipc_fixture"],
+                cwd=MOD_DIR.parent.parent, env={**os.environ, "APPDATA": directory},
+                text=True, capture_output=True, timeout=30,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("Continue 109->110->111", result.stdout)
+            requests = [json.loads(path.read_text()) for path in io_dir.glob("request_*.json")]
+            resumed = next(item["meta"]["run_id"] for item in requests if item["request_id"] == 111)
+            consumer_io = Path(directory) / "consumer_io"
+            consumer_io.mkdir()
+            for path in io_dir.glob("*.json"):
+                payload = json.loads(path.read_text())
+                if payload.get("meta", {}).get("run_id", payload.get("run_id")) == resumed:
+                    shutil.copyfile(path, consumer_io / path.name)
+            (consumer_io / "recording_start_marker.json").write_text(json.dumps({
+                "schema_version": "producer/1.0.0", "recording_id": "resume-fixture",
+                "fps": 60, "capture_timestamp_ns": 123,
+            }))
+            output = Path(directory) / "runs"
+            consumer = FileIpcBridge(consumer_io, output)
+            for _ in range(115):
+                if not consumer.step_once():
+                    break
+            self.assertEqual([path.name for path in output.iterdir()], [resumed])
+            session = json.loads((output / resumed / "session.json").read_text())
+            self.assertEqual(session["n_steps"], 111)
+            self.assertEqual(session["outcome"], "win")
+            self.assertEqual(session["recording"]["recording_id"], "resume-fixture")
+            steps = [json.loads(line) for line in (output / resumed / "steps.ndjson").read_text().splitlines()]
+            self.assertEqual([step["request_id"] for step in steps], list(range(1, 112)))
 
 
 if __name__ == "__main__":
