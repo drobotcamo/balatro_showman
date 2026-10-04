@@ -1,6 +1,7 @@
 """Local video/oracle debugging viewer. Sources are never modified."""
 
 import argparse
+import bisect
 import hashlib
 import json
 import math
@@ -26,6 +27,11 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def paths_overlap(left, right):
+    left, right = Path(left).resolve(), Path(right).resolve()
+    return left == right or left.is_relative_to(right) or right.is_relative_to(left)
+
+
 def probe(path):
     result = subprocess.run([
         "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
@@ -39,23 +45,32 @@ def probe(path):
     data["duration"] = float(data["format"]["duration"])
     if not all(math.isfinite(data[key]) and data[key] > 0 for key in ("fps", "duration")):
         raise ValueError("video duration and FPS must be finite and positive")
-    frames = subprocess.run([
-        "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_frames",
-        "-show_entries", "frame=best_effort_timestamp_time", "-of", "csv=p=0", str(path),
-    ], check=True, capture_output=True, text=True, timeout=600)
+    packets = subprocess.run([
+        "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_packets",
+        "-show_entries", "packet=pts_time", "-of", "json", str(path),
+    ], check=True, capture_output=True, text=True, timeout=120)
+    recorded = json.loads(packets.stdout).get("packets")
+    if not isinstance(recorded, list) or not recorded:
+        raise ValueError("video contains no packets with presentation timestamps")
     timestamps = []
-    for line in frames.stdout.splitlines():
+    for packet in recorded:
+        raw = packet.get("pts_time") if isinstance(packet, dict) else None
+        if raw is None:
+            raise ValueError("video packet lacks a presentation timestamp")
         try:
-            timestamp = float(line.strip())
-        except ValueError:
-            continue
+            timestamp = float(raw)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("video packet has an invalid presentation timestamp") from exc
         if not math.isfinite(timestamp):
             raise ValueError("video has non-finite presentation timestamps")
         timestamps.append(timestamp)
-    if not timestamps or any(right <= left for left, right in zip(timestamps, timestamps[1:])):
-        raise ValueError("video has missing or non-monotonic frame presentation timestamps")
+    timestamps.sort()
+    if any(right <= left for left, right in zip(timestamps, timestamps[1:])):
+        raise ValueError("video has duplicate presentation timestamps")
     period = 1 / data["fps"]
     data["frame_count"] = len(timestamps)
+    data["presentation_origin"] = timestamps[0]
+    data["frame_timestamps"] = [timestamp - timestamps[0] for timestamp in timestamps]
     data["constant_fps"] = all(abs((right - left) - period) <= period * 0.05
                                for left, right in zip(timestamps, timestamps[1:]))
     return data
@@ -140,6 +155,7 @@ class Review:
             self.timing.append(timing)
         self.media = None
         self.media_hash = None
+        self.media_probe = None
         self.exports = {}
         self.selections = {}
 
@@ -209,8 +225,12 @@ class Review:
                 "clip_end": ending, "timing": self.timing[source], "diagnostics": original["diagnostics"],
                 "seed": self.seed, "draw": self.draw, "sampling": "uniform-source-local-windows/v1"}
 
-    def catalog(self):
-        return {"video": str(self.video), "video_sha256": self.video_hash, "probe": self.video_probe,
+    def catalog(self, include_frame_timestamps=True):
+        video_probe = dict(self.video_probe)
+        if not include_frame_timestamps:
+            video_probe.pop("frame_timestamps", None)
+        return {"video": str(self.video), "video_sha256": self.video_hash, "probe": video_probe,
+                "media_presentation_origin": self.media_probe.get("presentation_origin", 0) if self.media_probe else 0,
                 "media": "/media", "seed": self.seed, "export_root": str(self.export_root),
                 "sources": [{"id": source["run_id"], "steps": len(source["steps"]),
                              "source": source["source"], "timing": self.timing[i]}
@@ -252,7 +272,7 @@ class Review:
         (folder / "actions.ndjson").write_bytes(b"".join(lines[window["start"]:window["stop"]]))
         (folder / "notes.txt").write_text(notes, encoding="utf-8")
         packet = {"schema_version": "oracle-video-qa-debug/1", "status": "unscored",
-                  "window": window, "catalog": self.catalog(), "notes": notes,
+                   "window": window, "catalog": self.catalog(include_frame_timestamps=False), "notes": notes,
                   "clip_probe": probe(clip), "extraction": {"mode": "reencoded-video-only",
                   "timeline_note": "Clip seeks use requested clip_start as origin; frame quantization and rendered correspondence are unverified.",
                   "command": ["ffmpeg", "-nostdin", "-v", "error", "-n", *arguments],
@@ -334,9 +354,19 @@ class Review:
                   **{key: data[key] for key in fields}}
         if type(packet["frame_seconds"]) not in (int, float) or not math.isfinite(packet["frame_seconds"]) or not 0 <= packet["frame_seconds"] <= self.video_probe["duration"]:
             raise ValueError("invalid video time")
-        expected_seconds = frame / self.video_probe["fps"]
+        frame_timestamps = self.video_probe["frame_timestamps"]
+        expected_seconds = frame_timestamps[frame]
         if abs(packet["frame_seconds"] - expected_seconds) > 0.5 / self.video_probe["fps"]:
-            raise ValueError("frame index and video time disagree with the declared FPS")
+            raise ValueError("frame index and presented video time disagree with decoded frame timestamps")
+        if state == "confirmed":
+            candidate_index = bisect.bisect_left(frame_timestamps, packet["candidate_seconds"] or 0)
+            if candidate_index and (candidate_index == len(frame_timestamps) or
+                    abs(frame_timestamps[candidate_index - 1] - (packet["candidate_seconds"] or 0)) <
+                    abs(frame_timestamps[candidate_index] - (packet["candidate_seconds"] or 0))):
+                candidate_index -= 1
+            expected_offset = frame - candidate_index
+            if offset != expected_offset:
+                raise ValueError("confirmed frame offset disagrees with the candidate and presented frame")
         packet["frame_index_basis"] = "zero-based presentation-frame index; timestamp checked against decoded constant-FPS cadence"
         destination = folder / (datetime.now(timezone.utc).strftime("review-%Y%m%dT%H%M%SZ-") + secrets.token_hex(8) + ".json")
         with destination.open("x", encoding="utf-8") as stream:
@@ -564,7 +594,7 @@ def launch_group():
             name = names[ordinal - 1]
             resolved_video = (base / video if args.config and not video.is_absolute() else video).resolve(strict=True)
             resolved_runs = [(base / run if args.config and not run.is_absolute() else run).resolve(strict=True) for run in runs]
-            if (resolved_video.is_relative_to(export_root) or
+            if (paths_overlap(resolved_video, export_root) or
                     any(export_root == root or export_root.is_relative_to(root) or root.is_relative_to(export_root)
                         for root in resolved_runs)):
                 raise ValueError("export root overlaps source video or oracle evidence")
@@ -573,7 +603,7 @@ def launch_group():
         for ordinal, (video, resolved_runs, name) in enumerate(resolved_groups, 1):
             child_name = name
             child_export = export_root / child_name
-            if (video.is_relative_to(child_export) or
+            if (paths_overlap(video, child_export) or
                     any(child_export == root or child_export.is_relative_to(root) or root.is_relative_to(child_export)
                         for root in resolved_runs)):
                 raise ValueError("child export folder overlaps source video or oracle evidence")
@@ -607,9 +637,14 @@ def launch_group():
             for proc, _, _, name, log_base in children:
                 out = log_base.with_suffix(log_base.suffix + ".out.txt")
                 text_out = out.read_text(encoding="utf-8", errors="replace") if out.exists() else ""
-                match = re.search(r'\{"url":\s*"([^"]+)",\s*"export_root":\s*"([^"]+)",\s*"seed":\s*"([^"]+)"\}', text_out)
-                if match:
-                    ready.append({"name": name, "url": match.group(1), "export_root": match.group(2), "seed": match.group(3), "pid": proc.pid})
+                for line in text_out.splitlines():
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if all(isinstance(record.get(key), str) for key in ("url", "export_root", "seed")):
+                        ready.append({"name": name, **record, "pid": proc.pid})
+                        break
             if len(ready) == len(children):
                 print(json.dumps({"viewers": ready}, indent=2))
                 for child in children:

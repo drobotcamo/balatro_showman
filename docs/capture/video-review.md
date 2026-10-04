@@ -23,9 +23,11 @@ marker remains visible and disables seeking/clip export unless an explicit
 diagnostic timing basis is supplied. This operation does not associate a recording
 in the Run Store and does not replace the required human-confirmed checkpoint.
 
-The server binds only to localhost and prints its URL. It creates a video-only
-MP4 remux under `<export-root>/.media` for browser playback and verifies its
-timeline. Startup can take time for large recordings. Original MKVs are retained.
+The server binds only to localhost and prints its URL. It checks video packet
+presentation timestamps for monotonicity and constant cadence, then creates a
+video-only MP4 remux under `<export-root>/.media` for browser playback and
+verifies its timeline. Packet inspection avoids decoding every frame during
+startup; large media remuxing can still take time. Original MKVs are retained.
 Subsequent launches reuse the derivative only after checking its stored hashes.
 Incomplete or changed cache entries are preserved and rejected rather than overwritten.
 Stop with Ctrl+C when finished. The viewer does not start/stop OBS or Balatro.
@@ -89,8 +91,13 @@ unverified, failed or disputed. Oracle snapshots are navigation aids, not visual
 labels. The reviewer field identifies the person who inspected the pixels.
 
 **Save unscored observation** writes a new JSON file under the selected external
-export root's `eligibility-reviews` directory. It records source hashes and the
-original step identity. Saves never replace a previous observation, edit source
+export root's `eligibility-reviews` directory. The browser's decoded-frame
+callback supplies the presented frame's timestamp; its index is mapped against
+decoded source timestamps. The server binds the oracle step to the displayed
+window and checks frame bounds, timestamp correspondence, constant-FPS cadence,
+and candidate/offset agreement. The callback and reviewer notes are evidence,
+not a cryptographic attestation of the display. Saves record source hashes and the
+original step identity. They never replace a previous observation, edit source
 video/oracle files, certify source overlap, or produce a held-out manifest/score.
 For recordings with multiple recorder IDs, pass every associated `--run` for the
 same video and count that video only once. Review each stage and record missing
@@ -140,3 +147,9 @@ do not accept average-FPS frame numbers as rendered-frame evidence.
 - A real independent pilot still needs human frame inspection. Server readiness,
   matching hashes, and successful media playback do not confirm rendered
   correspondence or source-registry eligibility.
+- The revised timestamp inventory was run on both candidate recordings: the
+  17-25-24 video measured 7,949 frames at 60 FPS over 132.484 seconds; the
+  17-56-28 video measured 80,419 frames at 60 FPS over 1,340.317 seconds.
+  Both packet timestamp sequences were monotonic and within the viewer's 5%
+  constant-cadence tolerance, with presentation origin 0.0. This validates the
+  viewer's frame-index mapping basis, not the oracle-to-rendered correspondence.

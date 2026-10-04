@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from ground_truth.qa_viewer import Review, byte_range, digest, launch_group, make_server, run_ffmpeg
+from ground_truth.qa_viewer import Review, byte_range, digest, launch_group, make_server, probe, run_ffmpeg
 
 
 def source(root, name, n=23, marker=True):
@@ -36,7 +36,9 @@ class ViewerTests(unittest.TestCase):
         self.video.write_bytes(b"original video fixture")
         self.runs = [source(self.root, "a"), source(self.root, "b", 7, marker=False)]
         self.export_root = self.root / "exports"
-        self.probe = patch("ground_truth.qa_viewer.probe", return_value={"duration": 10.0, "fps": 10, "constant_fps": True})
+        self.probe = patch("ground_truth.qa_viewer.probe", return_value={
+            "duration": 10.0, "fps": 10, "constant_fps": True, "frame_count": 100,
+            "presentation_origin": 0.0, "frame_timestamps": [i / 10 for i in range(100)]})
         self.probe.start()
         self.addCleanup(self.probe.stop)
 
@@ -94,10 +96,12 @@ class ViewerTests(unittest.TestCase):
             review.save_eligibility({**payload, "source": 1, "offset_frames": 0})
         with self.assertRaisesRegex(ValueError, "server-issued"):
             review.save_eligibility({**payload, "index": 2, "offset_frames": 0})
-        saved = review.save_eligibility({**payload, "offset_frames": -2})
+        with self.assertRaisesRegex(ValueError, "disagrees with the candidate"):
+            review.save_eligibility({**payload, "offset_frames": -2})
+        saved = review.save_eligibility({**payload, "offset_frames": 0})
         packet = json.loads(Path(saved["file"]).read_text())
         self.assertEqual((packet["status"], packet["offset_frames"], packet["source_run_id"]),
-                         ("unscored", -2, "a"))
+                         ("unscored", 0, "a"))
         self.assertEqual(packet["video_sha256"], digest(self.video))
         self.assertEqual(original, digest(self.runs[0] / "steps.ndjson"))
         self.assertNotEqual(saved["file"], review.save_eligibility({**payload, "offset_frames": 0})["file"])
@@ -120,6 +124,26 @@ class ViewerTests(unittest.TestCase):
         with patch("ground_truth.qa_viewer.probe", return_value={"duration": 10.0, "fps": 10, "constant_fps": False}):
             with self.assertRaisesRegex(ValueError, "constant-FPS"):
                 Review(self.video, self.runs, self.export_root)
+
+    def test_probe_checks_all_video_packet_presentation_timestamps(self):
+        stream = {"streams": [{"avg_frame_rate": "10/1", "r_frame_rate": "10/1"}],
+                  "format": {"duration": "0.3"}}
+        def result(packet_times):
+            return [type("Result", (), {"stdout": json.dumps(stream)})(),
+                    type("Result", (), {"stdout": json.dumps({"packets": packet_times})})()]
+        with patch("ground_truth.qa_viewer.subprocess.run", side_effect=result([
+                {"pts_time": "0.000"}, {"pts_time": "0.100"}, {"pts_time": "0.200"}])):
+            measured = probe(self.video)
+        self.assertTrue(measured["constant_fps"])
+        self.assertEqual(measured["frame_timestamps"], [0.0, 0.1, 0.2])
+        with patch("ground_truth.qa_viewer.subprocess.run", side_effect=result([
+                {"pts_time": "0.000"}, {"pts_time": "0.100"}, {"pts_time": "0.220"}])):
+            measured = probe(self.video)
+        self.assertFalse(measured["constant_fps"])
+        with patch("ground_truth.qa_viewer.subprocess.run", side_effect=result([
+                {"pts_time": "0.000"}, {}, {"pts_time": "0.200"}])):
+            with self.assertRaisesRegex(ValueError, "lacks a presentation timestamp"):
+                probe(self.video)
 
     def test_group_launcher_preserves_spaced_paths_and_run_grouping(self):
         output_parent = self.root / "external output"
