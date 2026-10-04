@@ -38,10 +38,6 @@ Verified on 2026-10-03: the archive contains 47 Lua files, including `main.lua`,
 python -c "import zipfile; p=r'C:\Program Files (x86)\Steam\steamapps\common\Balatro\Balatro.exe'; z=zipfile.ZipFile(p); print(z.read('game.lua').decode('utf-8'))"
 ```
 
-This is a machine-local reference, not a repository dependency. Recheck the path
-and archive contents on another machine or after a game update. Keep source
-inspection read-only and do not commit extracted game source or binaries.
-
 ## Tenets
 
 - Correctness and provenance come before throughput or demos.
