@@ -165,15 +165,23 @@ def test_mechanics_reference_import_and_read_are_separate_from_steps(tmp_path):
         "jokers": [{"role": "joker", "position": 0,
             "center_key": "j_dagger", "instance_token": "engine-7", "mult": 62, "sell_cost": 8}],
     }
-    (source / "mechanics_reference.ndjson").write_text(json.dumps(reference) + "\n", encoding="utf-8")
+    resolved = {
+        **reference, "capture_phase": "resolved", "capture_timestamp_ns": 456,
+        "resolved_effects": [{"trigger": "setting_blind", "dagger_instance_token": "engine-7",
+            "victim_instance_token": "engine-8", "victim_sell_cost_pre": 4,
+            "mult_before": 62, "mult_after": 70, "mult_delta": 8,
+            "pre_capture_timestamp_ns": 123, "resolved_capture_timestamp_ns": 456}],
+    }
+    (source / "mechanics_reference.ndjson").write_text(
+        json.dumps(reference) + "\n" + json.dumps(resolved) + "\n", encoding="utf-8")
 
-    assert RunBundle(url).import_oracle_directory(source)["record_count"] == 2
+    assert RunBundle(url).import_oracle_directory(source)["record_count"] == 3
     inspector = RunBundleInspector(url)
     assert inspector.find_records("dagger", kind="step")["data"][0]["payload"] == step
     assert all(item["kind"] != "mechanics_reference" for item in inspector.find_records("dagger")["data"])
     assert all(item["kind"] != "mechanics_reference" for item in inspector.evidence("dagger")["data"])
     result = inspector.mechanics_reference("dagger", step_id="dagger:1")
-    assert result["data"][0]["payload"] == reference
+    assert [item["payload"] for item in result["data"]] == [reference, resolved]
     assert inspector.mechanics_reference("dagger", step_id="dagger:missing")["status"] == "missing"
     (source / "mechanics_reference.ndjson").write_text(
         json.dumps({**reference, "capture_timestamp_ns": 124}) + "\n", encoding="utf-8")

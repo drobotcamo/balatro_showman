@@ -39,6 +39,25 @@
           "sell_cost": { "type": ["number", "null"] }
         }
       }
+    },
+    "resolved_effects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["trigger", "dagger_instance_token", "victim_instance_token", "victim_sell_cost_pre", "mult_before", "mult_after", "mult_delta", "pre_capture_timestamp_ns", "resolved_capture_timestamp_ns"],
+        "additionalProperties": false,
+        "properties": {
+          "trigger": { "const": "setting_blind" },
+          "dagger_instance_token": { "type": ["string", "null"] },
+          "victim_instance_token": { "type": ["string", "null"] },
+          "victim_sell_cost_pre": { "type": ["number", "null"] },
+          "mult_before": { "type": ["number", "null"] },
+          "mult_after": { "type": ["number", "null"] },
+          "mult_delta": { "type": ["number", "null"] },
+          "pre_capture_timestamp_ns": { "type": "number", "minimum": 0 },
+          "resolved_capture_timestamp_ns": { "type": "number", "minimum": 0 }
+        }
+      }
     }
   }
 }

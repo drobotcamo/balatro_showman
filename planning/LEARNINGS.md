@@ -38,6 +38,36 @@ under its Decisions section. This file is a knowledge base, not a task log.
   32-55, 187-219; external QA manifest at the path above. No source bundle or
   video was modified.
 
+## 2026-10-04: Poll the installed Dagger mutation after the game update
+
+- Context: Issue #123 resolved-reference instrumentation for the installed
+  Balatro runtime documented in `planning/BALATRO_RUNTIME.md`.
+- Observation: Installed `Balatro.exe` SHA-256 is
+  `0d75fe164accf3312734d4b37ac98788dd15f0b8e4f9bb8b7f90c4e59de93f47`.
+  The generated dump's `card.lua` hash is
+  `5073d834e08119da9516f1795a8c3d93110669aeb409c29ad1b308e0eb0be453`, matching
+  the embedded game source; `functions/state_events.lua` hashes to
+  `6c86aefb42d0323d737f87aaa84f53e42b755e72cd0bfd163b7d9cca5c0a99a9`.
+  At `card.lua:2566-2576`, Dagger marks the right neighbor sliced, queues an
+  Event, then that callback updates Mult from the victim's `sell_cost`. Blind
+  setup iterates Jokers at `state_events.lua:335-337`. The generated
+  `engine/event.lua` adds default events to the queue tail and executes callbacks
+  in queue order; `game.lua:2509` runs the event manager inside `Game.update`.
+  The producer wraps `Game.update` and polls only after the original update
+  returns, so observing changed Mult and the victim's `getting_sliced` flag
+  records callback-resolved state rather than a guessed timer.
+- Implication: Record the pre-action baseline with the blind-selection step,
+  then write a separate resolved reference record on the first post-update
+  observation of the mutation on the same Dagger instance. Tie both records by
+  run/step and retain runtime, instance tokens, victim price, observed Mult
+  delta, and both monotonic timestamps. This trace is
+  specific to the installed binary/runtime; other source stacks require a new
+  trace before exact timing claims.
+- Verification/source: Read-only source inspection and SHA-256 of the installed
+  executable/generated dump; focused LÖVE producer fixture simulates an event
+  resolution and verifies pre/resolved fields. This does not replace the live
+  capture check.
+
 ## 2026-10-03: Continue can restore earlier counters without changing logical run identity
 
 - Context: Issue #115's fixed-build live smoke preserved source ID

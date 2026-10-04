@@ -15,7 +15,9 @@ lifecycle/outcome and provenance; ordered typed records carry their source-
 specific payloads. Source adapters own validation and call this API. The
 file-IPC oracle adapter is `RunBundle.import_oracle_directory`; it stores
 canonical step JSON and retains SHA-256 values for `session.json` and
-`steps.ndjson`, usage metadata and recording metadata as provenance. Repeating
+`steps.ndjson`, usage metadata and recording metadata as provenance. When
+`mechanics_reference.ndjson` exists, its SHA-256 is also part of source identity
+and provenance; its typed records remain distinct from step evidence. Repeating
 an import with the same run ID and source identity is a no-op success; a
 different source identity under that run ID is a conflict. Import never
 modifies source evidence. See `planning/RUN_BUNDLE_OPERATIONS.md` for automatic

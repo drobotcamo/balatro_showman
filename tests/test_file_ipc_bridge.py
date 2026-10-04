@@ -37,6 +37,20 @@ class FileIpcBridgeTests(unittest.TestCase):
             }
             request = io_dir / "request_dagger-reference_000000000001.json"
             request.write_text(json.dumps(snapshot), encoding="utf-8")
+            resolved_reference = {
+                "schema_version": "dagger-reference/1.0", "run_id": "dagger-reference",
+                "step_id": "dagger-reference:1", "capture_phase": "resolved",
+                "capture_timestamp_ns": 456, "producer_revision": "test",
+                "runtime": {"balatro": "1.0.1", "steamodded": "test", "lovely": "test"},
+                "jokers": [{"role": "joker", "position": 0, "center_key": "j_dagger",
+                    "instance_token": "engine-17", "mult": 70, "sell_cost": 8}],
+                "resolved_effects": [{"trigger": "setting_blind", "dagger_instance_token": "engine-17",
+                    "victim_instance_token": "engine-18", "victim_sell_cost_pre": 4,
+                    "mult_before": 62, "mult_after": 70, "mult_delta": 8,
+                    "pre_capture_timestamp_ns": 123, "resolved_capture_timestamp_ns": 456}],
+            }
+            resolved_path = io_dir / "mechanics_reference_dagger-reference_000000000001_resolved.json"
+            resolved_path.write_text(json.dumps(resolved_reference), encoding="utf-8")
             bridge = FileIpcBridge(io_dir, out_dir)
             self.assertTrue(bridge.step_once())
 
@@ -45,6 +59,9 @@ class FileIpcBridgeTests(unittest.TestCase):
             references = read_mechanics_reference(out_dir / "dagger-reference")
             self.assertEqual(references[0]["jokers"][0]["mult"], 62)
             self.assertEqual(references[0]["step_id"], "dagger-reference:1")
+            self.assertEqual(references[1]["capture_phase"], "resolved")
+            self.assertEqual(references[1]["resolved_effects"][0]["victim_sell_cost_pre"], 4)
+            self.assertFalse(resolved_path.exists())
 
     def test_mechanics_reference_rejects_nonfinite_values(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

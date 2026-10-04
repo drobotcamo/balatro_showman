@@ -64,8 +64,10 @@ available. Invalid step timestamps alongside usage metadata are rejected;
 legacy records without session usage keep the original step payload and receive
 null summary timestamps if timestamp coverage is missing or malformed.
 It maps `win`/`loss` to `won`/`lost`, preserves usage and recording metadata, and
-stores source type, source identity and SHA-256 hashes of both source files as
-provenance. Evidence records are canonicalized JSON objects. Import is one
+stores source type, source identity and SHA-256 hashes of `session.json`,
+`steps.ndjson`, and optional `mechanics_reference.ndjson` as provenance. Reference
+records are separate from steps and only appear through
+`mechanics-reference`. Evidence records are canonicalized JSON objects. Import is one
 database transaction, and it never deletes or rewrites source run files. If the
 database is unavailable or import validation fails, the bridge reports a pending
 import and retries while running or after restart. Re-running the manual

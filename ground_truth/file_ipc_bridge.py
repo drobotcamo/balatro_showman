@@ -69,6 +69,18 @@ def _validate_mechanics_reference(snapshot: dict[str, Any]) -> dict[str, Any] | 
                 raise ValueError(f"mechanics_reference.jokers[{index}].{field} must be finite number or null")
         if joker.get("center_key") is not None and not isinstance(joker["center_key"], str):
             raise ValueError(f"mechanics_reference.jokers[{index}].center_key must be string or null")
+    effects = value.get("resolved_effects", [])
+    if not isinstance(effects, list):
+        raise ValueError("mechanics_reference.resolved_effects must be a list")
+    for index, effect in enumerate(effects):
+        if not isinstance(effect, dict) or effect.get("trigger") != "setting_blind":
+            raise ValueError(f"mechanics_reference.resolved_effects[{index}] has invalid trigger")
+        for field in ("victim_sell_cost_pre", "mult_before", "mult_after", "mult_delta",
+                      "pre_capture_timestamp_ns", "resolved_capture_timestamp_ns"):
+            number = effect.get(field)
+            if number is not None and (isinstance(number, bool) or not isinstance(number, (int, float))
+                                       or not math.isfinite(number)):
+                raise ValueError(f"mechanics_reference.resolved_effects[{index}].{field} must be finite number or null")
     return value
 
 
@@ -536,23 +548,59 @@ class FileIpcBridge:
     def _append_mechanics_reference(self, run_id: str, request_id: int,
                                     reference: dict[str, Any]) -> None:
         """Persist reference-channel values outside reconstruction step payloads."""
-        path = self._sessions[run_id]["session_dir"] / "mechanics_reference.ndjson"
+        session = self._sessions.get(run_id) or self._finalized_session_data.get(run_id)
+        if session is None:
+            raise ValueError(f"mechanics reference arrived before run session {run_id!r}")
+        path = session["session_dir"] / "mechanics_reference.ndjson"
         record = {
             "schema_version": MECHANICS_REFERENCE_VERSION,
             "run_id": run_id,
             "step_id": f"{run_id}:{request_id}",
             **reference,
         }
+        _validate_mechanics_reference({"mechanics_reference": record})
         for existing in read_mechanics_reference(path.parent):
-            if existing.get("step_id") == record["step_id"]:
+            if (existing.get("step_id"), existing.get("capture_phase")) == (
+                    record["step_id"], record["capture_phase"]):
                 if existing != record:
-                    raise ValueError(f"conflicting mechanics reference for {record['step_id']}")
+                    raise ValueError(f"conflicting {record['capture_phase']} mechanics reference for {record['step_id']}")
                 return
         line = json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         with path.open("a", encoding="utf-8", newline="") as stream:
             stream.write(line + "\n")
             stream.flush()
             os.fsync(stream.fileno())
+
+    def _handle_mechanics_reference(self) -> bool:
+        did_work = False
+        for path in sorted(self.io_dir.glob("mechanics_reference_*.json")):
+            try:
+                record = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                continue
+            if not isinstance(record, dict):
+                continue
+            run_id = record.get("run_id")
+            step_id = record.get("step_id")
+            if not isinstance(run_id, str) or not isinstance(step_id, str):
+                continue
+            prefix = run_id + ":"
+            if not step_id.startswith(prefix) or not step_id[len(prefix):].isdigit():
+                continue
+            request_id = int(step_id[len(prefix):])
+            if f"{run_id}\x00{request_id}" not in self._seen_requests:
+                continue
+            if record.get("capture_phase") != "resolved":
+                continue
+            try:
+                _validate_mechanics_reference({"mechanics_reference": record})
+                self._append_mechanics_reference(run_id, request_id, record)
+            except ValueError as error:
+                print(f"[file_ipc_bridge] invalid mechanics reference {path.name}: {error}", file=sys.stderr)
+                continue
+            path.unlink(missing_ok=True)
+            did_work = True
+        return did_work
 
     def _has_complete_requests(self, run_id: str, last_request_id: int) -> bool:
         request_ids = {
@@ -665,6 +713,7 @@ class FileIpcBridge:
     def step_once(self) -> bool:
         self._attach_recording_marker()
         did_work = self._handle_snapshot()
+        did_work = self._handle_mechanics_reference() or did_work
         did_work = self._handle_run_end() or did_work
         return self._retry_pending_imports() or did_work
 

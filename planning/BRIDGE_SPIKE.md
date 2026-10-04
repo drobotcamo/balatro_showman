@@ -7,6 +7,7 @@ Lua producer (game)                 Python client (repo)
 request_<run>_<id>.json ──────────▶  record aligned step
                        ◀──────────  remove request after durable persistence (ack)
 run_end_<run>.json ──────────────▶  drain through last_request_id, finalize outcome
+mechanics_reference_<run>_<id>_resolved.json ─▶ isolated Dagger answer-key record
 ```
 
 ## Contract
@@ -26,6 +27,14 @@ run_end_<run>.json ──────────────▶  drain through 
   is not evidence that the producer is drained. Legacy `snapshot.json` and
   `run_end.json` remain readable but have no terminal watermark and are not
   proof of complete delivery.
+- Mechanics reference: the producer includes a pre-action Dagger snapshot in the
+  queued request and may later emit a separate
+  `mechanics_reference_<run_id>_<request_id>_resolved.json` after the game update
+  observes queued Dagger Mult growth. The client stores both phases in
+  `mechanics_reference.ndjson`, outside `steps.ndjson`; the generic observation
+  adapters never receive these records. The reference file is retained until the
+  matching step is durable, then acknowledged. It is keyed by the original step
+  and phase, so resolved aftermath requires no intervening player action.
 
 ## Lua producer
 
@@ -60,6 +69,14 @@ contract only; it is never the granularized step schema `3.0.0`):
   counts). `persistent_state` stays `{}` — the canonical shape is owned by
   the pipeline reducer (D021). Unavailable engine reads are emitted as
   explicit nulls, never guessed.
+- `producer/1.0.0` with `issue123-dagger-reference-1`: appends a separate
+  `mechanics_reference` object to each action request. Dagger `SelectBlind`
+  requests also begin a pre-state watch; after the original `Game.update` runs,
+  observed Mult growth and the queued victim's `getting_sliced` flag emit a
+  resolved-phase queue file. Fields include Joker position/center, available
+  engine identity, Mult, sell cost, runtime revision, and source step/timing.
+  The consumer removes this object from step payloads and stores it in the
+  isolated reference sidecar. Missing identity or values remain null.
 
 ## Repository check
 

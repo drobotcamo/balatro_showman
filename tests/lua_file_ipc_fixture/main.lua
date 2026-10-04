@@ -151,9 +151,29 @@ function love.load()
   fixture_time = fixture_time + 1
   local next_id = tostring(math.floor(fixture_time * 1e9)) .. "-1234"
   Game:start_run({})
+  G.jokers = {cards = {
+    {config = {center = {key = "j_ceremonial"}}, ability = {mult = 62}, unique_val = 7001},
+    {config = {center = {key = "j_joker"}}, ability = {}, unique_val = 7002, sell_cost = 4},
+  }}
   _G.fixture_clock = 128
-  bridge.emit("PlayHand")
+  bridge.emit("SelectBlind")
   if not read_file(path_for(next_id, 1)) then return fail("New Run retained old identity") end
+  G.jokers.cards[1].ability.mult = 70
+  G.jokers.cards[2].getting_sliced = true
+  bridge.tick()
+  local resolved_path = io_root .. "\\mechanics_reference_" .. next_id:gsub("[^%w_-]", "_")
+    .. "_000000000001_resolved.json"
+  local resolved = read_file(resolved_path)
+  if not resolved or not resolved:find('"capture_phase":"resolved"', 1, true)
+      or not resolved:find('"victim_sell_cost_pre":4', 1, true)
+      or not resolved:find('"mult_before":62', 1, true)
+      or not resolved:find('"mult_after":70', 1, true)
+      or not resolved:find('"mult_delta":8', 1, true)
+      or not resolved:find('"dagger_instance_token":"7001"', 1, true)
+      or not resolved:find('"victim_instance_token":"7002"', 1, true) then
+    return fail("resolved Dagger reference did not preserve price, values, identity and timing")
+  end
   print("producer lifecycle fixture: cold Continue; New Run; menu; Continue 109->110->111; win; no resurrection")
+  print("producer Dagger fixture: pre and resolved references retain sell value, mult, identity and timing")
   love.event.quit(0)
 end

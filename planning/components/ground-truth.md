@@ -70,7 +70,10 @@ The mechanics evidence/reference boundary is in `planning/RUN_MECHANICS_DESIGN.m
   pre-Mult, actual victim sell value, resolved post-Mult and identity; demonstrate
   answer-key isolation. Resumed scenarios reuse #115, not a competing lifecycle fix.
 - Dagger capture must retain missing identity, timing, and pricing as null/unknown;
-  pre-action snapshots alone do not establish queued resolved aftermath.
+  pre-action snapshots alone do not establish queued resolved aftermath. When
+  source-verified post-update sampling observes a Dagger mutation, write a
+  separate `resolved` reference record tied to the initiating step; do not infer
+  resolution from a fixed delay.
 - Producer/reader structural acceptance does not pass the authorized live-capture
   requirement; publish capture evidence and source revisions before claiming it.
 - This bounded acceptance does not add registry coverage to Phase 0 or pass the

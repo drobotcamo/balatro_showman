@@ -30,6 +30,9 @@
 --     canonical zoned labels are Issue #13; neither is attempted here.
 --   * Every engine read is failure-isolated: an unavailable field is emitted
 --     as null, never guessed.
+--   * Dagger mechanics values are carried in an isolated answer-key field,
+--     stored separately by the Python consumer. Resolved Mult references are
+--     sampled after the game's update has executed queued Dagger events.
 --   * No game assets, saves, or logs are copied anywhere; only JSON state is
 --     written to the shared agent_io directory.
 
@@ -61,6 +64,7 @@ local hooks_installed = false
 local last_emit_clock = -math.huge
 local last_emit_seconds = -math.huge
 local recording_poll_diagnosed = false
+local pending_dagger_references = {}
 
 -- Monotonic producer timestamp with sub-second precision.  Recording-start
 -- capture must use this same clock (see planning/align_oracle_video.py); it
@@ -750,8 +754,8 @@ end
 -- decision snapshot. Engine object references/instance ids never enter the
 -- observation payload consumed by reconstruction.
 local function mechanics_card_identity(card)
-  local id = try(function() return card.unique_val end)
-  if id == nil then id = try(function() return card.ID end) end
+  local id = try(function() return card.ID end)
+  if id == nil then id = try(function() return card.unique_val end) end
   if id == nil then return nil end
   return tostring(id)
 end
@@ -1210,20 +1214,29 @@ local function encode_meta(page)
   return "{" .. table.concat(parts, ",") .. "}"
 end
 
-local function encode_mechanics_reference(step_id, timestamp_ns)
+local function encode_mechanics_reference(step_id, timestamp_ns, phase, resolved_effects)
   local jokers = {}
   if G and G.jokers and G.jokers.cards then
     for i, card in ipairs(G.jokers.cards) do
       jokers[#jokers + 1] = encode_mechanics_card(card, i - 1, "joker")
     end
   end
-  local runtime = '{"balatro":' .. j_str((G and G.VERSION) or "unknown")
-    .. ',"steamodded":' .. j_str(steamodded_version())
-    .. ',"lovely":' .. j_str(lovely_version()) .. "}"
-  return '{"schema_version":"dagger-reference/1.0","step_id":' .. j_str(step_id)
-    .. ',"capture_phase":"pre_action","capture_timestamp_ns":' .. j_num(timestamp_ns)
-    .. ',"producer_revision":"issue123-dagger-reference-1","runtime":' .. runtime
-    .. ',"jokers":[' .. table.concat(jokers, ",") .. ']}'
+  local parts = {
+    '"schema_version":"dagger-reference/1.0"',
+    '"run_id":' .. j_str(run_id),
+    '"step_id":' .. j_str(step_id),
+    '"capture_phase":' .. j_str(phase or "pre_action"),
+    '"capture_timestamp_ns":' .. j_num(timestamp_ns),
+    '"producer_revision":"issue123-dagger-reference-1"',
+    '"runtime":{"balatro":' .. j_str((G and G.VERSION) or "unknown")
+      .. ',"steamodded":' .. j_str(steamodded_version())
+      .. ',"lovely":' .. j_str(lovely_version()) .. '}',
+    '"jokers":[' .. table.concat(jokers, ",") .. "]",
+  }
+  if resolved_effects then
+    parts[#parts + 1] = '"resolved_effects":[' .. table.concat(resolved_effects, ",") .. "]"
+  end
+  return "{" .. table.concat(parts, ",") .. "}"
 end
 
 -- ---------------------------------------------------------------------------
@@ -1263,6 +1276,11 @@ local function run_end_path(target_run_id)
   return IO_DIR .. "\\run_end_" .. filename_token(target_run_id) .. ".json"
 end
 
+local function mechanics_reference_path(target_run_id, request_id, phase)
+  return IO_DIR .. "\\mechanics_reference_" .. filename_token(target_run_id) .. "_"
+    .. string.format("%012d", request_id) .. "_" .. filename_token(phase) .. ".json"
+end
+
 local function file_exists(path)
   local handle = io.open(path, "rb")
   if not handle then return false end
@@ -1293,6 +1311,62 @@ local function write_new_atomic(path, text)
     return false, rename_error
   end
   return true
+end
+
+local function begin_dagger_reference(step_id, request_id, timestamp_ns)
+  if not (G and G.jokers and G.jokers.cards) then return end
+  for index, dagger in ipairs(G.jokers.cards) do
+    if center_key(dagger) == "j_ceremonial" then
+      local victim = G.jokers.cards[index + 1]
+      if victim and not (dagger.getting_sliced or (victim.ability and victim.ability.eternal)
+          or victim.getting_sliced) then
+        pending_dagger_references[#pending_dagger_references + 1] = {
+          step_id = step_id,
+          request_id = request_id,
+          pre_timestamp_ns = timestamp_ns,
+          dagger = dagger,
+          dagger_token = mechanics_card_identity(dagger),
+          mult_before = try(function() return dagger.ability.mult end),
+          victim_token = mechanics_card_identity(victim),
+          victim_sell_cost = try(function() return victim.sell_cost end),
+        }
+      end
+    end
+  end
+end
+
+local function poll_dagger_references()
+  if #pending_dagger_references == 0 then return end
+  local remaining = {}
+  for _, pending in ipairs(pending_dagger_references) do
+    local mult_after = try(function() return pending.dagger.ability.mult end)
+    if type(mult_after) == "number" and type(pending.mult_before) == "number"
+        and mult_after > pending.mult_before then
+      local resolved_timestamp_ns = capture_timestamp_ns()
+      local effect = '{"trigger":"setting_blind","dagger_instance_token":'
+        .. (pending.dagger_token and j_str(pending.dagger_token) or "null")
+        .. ',"victim_instance_token":'
+        .. (pending.victim_token and j_str(pending.victim_token) or "null")
+        .. ',"victim_sell_cost_pre":'
+        .. (type(pending.victim_sell_cost) == "number" and j_num(pending.victim_sell_cost) or "null")
+        .. ',"mult_before":' .. j_num(pending.mult_before)
+        .. ',"mult_after":' .. j_num(mult_after)
+        .. ',"mult_delta":' .. j_num(mult_after - pending.mult_before)
+        .. ',"pre_capture_timestamp_ns":' .. j_num(pending.pre_timestamp_ns)
+        .. ',"resolved_capture_timestamp_ns":' .. j_num(resolved_timestamp_ns) .. '} '
+      local body = encode_mechanics_reference(pending.step_id, resolved_timestamp_ns,
+        "resolved", {effect})
+      local path = mechanics_reference_path(run_id, pending.request_id, "resolved")
+      local wrote = write_new_atomic(path, body)
+      if not wrote then
+        print("[balatro_showman_bridge] could not enqueue resolved Dagger reference at " .. path)
+        remaining[#remaining + 1] = pending
+      end
+    else
+      remaining[#remaining + 1] = pending
+    end
+  end
+  pending_dagger_references = remaining
 end
 
 local function poll_recording_start()
@@ -1330,9 +1404,7 @@ local function poll_recording_start()
   end
 end
 
-local function build_snapshot(rid, page, action_label)
-  poll_recording_start()
-  local timestamp_ns = capture_timestamp_ns()
+local function build_snapshot(rid, page, action_label, timestamp_ns)
   local objects, pending_cards = build_objects()
   local action, source_kind, source_action, source_subtype, target_zone, target_position, selected =
     action_details(action_label, page)
@@ -1390,6 +1462,7 @@ function Bridge.emit(action_label)
     run_id = tostring(math.floor(love.timer.getTime() * 1e9)) .. "-" .. tostring(math.random(1000, 9999))
     request_counter = 0
     producer_write_failures = 0
+    pending_dagger_references = {}
     run_ending = false
     run_finalized = false
   end
@@ -1401,13 +1474,17 @@ function Bridge.emit(action_label)
   last_emit_seconds = now
   local next_request_id = request_counter + 1
   local page = current_page()
+  local timestamp_ns = capture_timestamp_ns()
   local path = request_path(run_id, next_request_id)
-  local wrote = write_new_atomic(path, build_snapshot(next_request_id, page, action_label))
+  local wrote = write_new_atomic(path, build_snapshot(next_request_id, page, action_label, timestamp_ns))
   if not wrote then
     producer_write_failures = producer_write_failures + 1
     print("[balatro_showman_bridge] could not enqueue request " .. tostring(next_request_id) .. " at " .. path)
   else
     request_counter = next_request_id
+    if action_label == "SelectBlind" then
+      begin_dagger_reference(run_id .. ":" .. tostring(next_request_id), next_request_id, timestamp_ns)
+    end
   end
 end
 
@@ -1494,6 +1571,7 @@ end
 function Bridge.tick()
   install_action_hooks()
   poll_recording_start()
+  poll_dagger_references()
   if run_id and not run_finalized and G and G.STATE == G.STATES.GAME_OVER then
     finalize((G.GAME and G.GAME.won) and "win" or "loss")
   end
@@ -1522,6 +1600,7 @@ local function install_game_hooks()
         run_id = tostring(math.floor(love.timer.getTime() * 1e9)) .. "-" .. tostring(math.random(1000, 9999))
         request_counter = 0
         producer_write_failures = 0
+        pending_dagger_references = {}
         run_ending = false
         run_finalized = false
         finalization_failure_logged = false
