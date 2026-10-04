@@ -15,6 +15,21 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-03: Installed Balatro Lua source is readable from the executable
+
+- Context: Locate the installed game's source for agent reference on Cam's
+  Windows machine.
+- Observation: `C:\Program Files (x86)\Steam\steamapps\common\Balatro\Balatro.exe`
+  contains an embedded ZIP archive readable with Python's `zipfile`. It contains
+  47 Lua files, including `main.lua`, `game.lua`, `card.lua`, `blind.lua`, and
+  `globals.lua`.
+- Implication: Agents can inspect the installed Lua source without extracting
+  files or modifying the installation. The path and contents are machine- and
+  version-specific; `AGENTS.md` includes a read-only inspection command.
+- Verification/source: Read the installation directory and enumerated the
+  executable's archive with `zipfile.ZipFile`; counted 47 `.lua` entries and
+  verified `game.lua` can be read and decoded as UTF-8 on 2026-10-03.
+
 ## 2026-10-03: Debug exports need the same source bytes as the displayed records
 
 - Context: Issue #118's video/action viewer exports original oracle lines beside

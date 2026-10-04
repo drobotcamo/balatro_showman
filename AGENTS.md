@@ -24,6 +24,20 @@ against a Lua ground-truth oracle. `planning/README.md` is the planning index.
   terminal checkpoint before recording association and request user input when
   the summary is incomplete or disputed.
 
+## Local Balatro Source
+
+On Cam's Windows machine, the Steam installation is at
+`C:\Program Files (x86)\Steam\steamapps\common\Balatro`. The game's Lua source
+is inside `Balatro.exe` as an embedded ZIP archive; Python's `zipfile` can read
+it directly without extracting files or changing the installation.
+
+Verified on 2026-10-03: the archive contains 47 Lua files, including `main.lua`,
+`game.lua`, `card.lua`, `blind.lua`, and `globals.lua`. To inspect a source file:
+
+```powershell
+python -c "import zipfile; p=r'C:\Program Files (x86)\Steam\steamapps\common\Balatro\Balatro.exe'; z=zipfile.ZipFile(p); print(z.read('game.lua').decode('utf-8'))"
+```
+
 ## Tenets
 
 - Correctness and provenance come before throughput or demos.
