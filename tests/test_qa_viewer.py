@@ -34,7 +34,7 @@ class ViewerTests(unittest.TestCase):
         self.video.write_bytes(b"original video fixture")
         self.runs = [source(self.root, "a"), source(self.root, "b", 7, marker=False)]
         self.export_root = self.root / "exports"
-        self.probe = patch("ground_truth.qa_viewer.probe", return_value={"duration": 10.0, "fps": 10})
+        self.probe = patch("ground_truth.qa_viewer.probe", return_value={"duration": 10.0, "fps": 10, "constant_fps": True})
         self.probe.start()
         self.addCleanup(self.probe.stop)
 

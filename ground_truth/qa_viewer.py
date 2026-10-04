@@ -29,13 +29,14 @@ def digest(path):
 def probe(path):
     result = subprocess.run([
         "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
-        "stream=codec_name,width,height,avg_frame_rate,start_time:format=duration,start_time",
+        "stream=codec_name,width,height,avg_frame_rate,r_frame_rate,start_time:format=duration,start_time",
         "-of", "json", str(path),
     ], check=True, capture_output=True, text=True, timeout=60)
     data = json.loads(result.stdout)
     stream = data["streams"][0]
     numerator, denominator = map(float, stream["avg_frame_rate"].split("/"))
     data["fps"] = numerator / denominator
+    data["constant_fps"] = stream.get("r_frame_rate") == stream.get("avg_frame_rate")
     data["duration"] = float(data["format"]["duration"])
     if not all(math.isfinite(data[key]) and data[key] > 0 for key in ("fps", "duration")):
         raise ValueError("video duration and FPS must be finite and positive")
@@ -90,6 +91,8 @@ class Review:
             raise ValueError("export parent must already exist")
         self.video_hash = digest(self.video)
         self.video_probe = probe(self.video)
+        if not self.video_probe.get("constant_fps"):
+            raise ValueError("eligibility review requires constant-FPS video")
         self.times = []
         self.timing = []
         for source in self.sources:
@@ -272,6 +275,8 @@ class Review:
         frame = data.get("frame")
         if type(frame) is not int or frame < 0:
             raise ValueError("frame must be a nonnegative integer")
+        if frame >= math.ceil(self.video_probe["duration"] * self.video_probe["fps"]):
+            raise ValueError("frame is outside the video duration")
         offset = data.get("offset_frames")
         if offset is not None and (type(offset) is not int or abs(offset) > 100000):
             raise ValueError("invalid measured offset")
