@@ -189,6 +189,36 @@ def test_missing_marker_and_video_cannot_be_confirmed(association_args, monkeypa
     assert "marker_missing" in result["data"]["diagnostic"]
 
 
+def test_required_association_storage_failure_is_blocked_and_preserves_evidence(
+        association_args, monkeypatch, capsys, example):
+    from sqlalchemy.exc import OperationalError
+    from run_bundle import RunBundle
+    database = example / "bundle.sqlite"
+    before = database.read_bytes()
+    def fail_write(*args, **kwargs):
+        raise OperationalError("INSERT provenance", {}, Exception("database is locked"))
+    monkeypatch.setattr("builtins.input", lambda: "confirm")
+    monkeypatch.setattr(RunBundle, "add_provenance", fail_write)
+    assert main(association_args + ["--required"]) == 2
+    result = json.loads(capsys.readouterr().out)["data"]
+    assert result["status"] == "blocked"
+    assert result["code"] == "recording_required"
+    assert "database is locked" in result["diagnostic"]
+    assert database.read_bytes() == before
+    assert main(query(example, "validate", "--strict")) == 0
+
+
+def test_required_association_missing_bundle_is_blocked_without_creation(tmp_path, capsys):
+    database = tmp_path / "missing.sqlite"
+    assert main(["associate", "--db", str(database), "--run", "unknown", "--marker", str(tmp_path / "marker.json"),
+                 "--confirmed-by", "human", "--required"]) == 2
+    result = json.loads(capsys.readouterr().out)["data"]
+    assert result["status"] == "blocked"
+    assert result["code"] == "recording_required"
+    assert "storage_not_found" in result["diagnostic"]
+    assert not database.exists()
+
+
 def test_annotations_export_delegates_and_does_not_overwrite_source(tmp_path, capsys):
     from test_eval_manifest import sample
     source = tmp_path / "annotations.json"

@@ -48,6 +48,22 @@ def check_bundle(database):
         inspector.close()
 
 
+def finish_association(result, required):
+    if required and result.status != "confirmed":
+        result = AssociationResult("blocked", "recording_required",
+                                   f"required recording coordination failed: {result.code}: {result.diagnostic}",
+                                   result.recording_id, result.video_status)
+    emit(result.as_dict(), status="observed" if result.status == "confirmed" else "unknown")
+    return 0 if result.status in {"confirmed", "declined"} else 2
+
+
+def report_error(args, code, message):
+    if args.surface == "associate":
+        return finish_association(AssociationResult("interrupted", code, message), args.required)
+    emit(None, status="unknown", diagnostics=[{"code": code, "message": message}])
+    return 2
+
+
 def associate(args):
     inspector = RunBundleInspector(args.db)
     try:
@@ -99,12 +115,7 @@ def associate(args):
                                          video_ref=str(args.video.resolve()) if args.video else None)
         finally:
             bundle.close()
-    if args.required and result.status != "confirmed":
-        result = AssociationResult("blocked", "recording_required",
-                                   f"required recording coordination failed: {result.code}",
-                                   result.recording_id, result.video_status)
-    emit(result.as_dict(), status="observed" if result.status == "confirmed" else "unknown")
-    return 0 if result.status in {"confirmed", "declined"} else 2
+    return finish_association(result, args.required)
 
 
 def demo(destination):
@@ -225,13 +236,12 @@ def main(argv=None):
             return 0
         return demo(args.output_dir)
     except InspectionError as error:
-        emit(None, status="unknown", diagnostics=[{"code": error.code, "message": error.message}])
+        return report_error(args, error.code, error.message)
     except (BundleError, SQLAlchemyError, OSError, ValueError, KeyError, TypeError) as error:
-        emit(None, status="unknown", diagnostics=[{"code": "operation_failed", "message": str(error)}])
+        return report_error(args, "operation_failed", str(error))
     except SystemExit as error:
         # The legacy alignment utility exits with a text diagnostic when its marker is absent.
-        emit(None, status="unknown", diagnostics=[{"code": "operation_failed", "message": str(error)}])
-    return 2
+        return report_error(args, "operation_failed", str(error))
 
 
 if __name__ == "__main__":
