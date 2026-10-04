@@ -1,0 +1,66 @@
+{
+  "schema_version": "0.1",
+  "run_id": "example-run-dagger-positive",
+  "definitions": [
+    {"id": "def-dagger", "family": "joker", "class_key": "j_ceremonial", "revision": "base-game-rule-unverified"},
+    {"id": "def-victim", "family": "joker", "class_key": "example-victim", "revision": "example-only"}
+  ],
+  "instances": [
+    {
+      "id": "inst-dagger",
+      "definition_id": "def-dagger",
+      "identity_status": "inferred",
+      "track_ids": ["video-track-dagger-1"],
+      "lifecycle": [
+        {"kind": "acquired", "step_id": "step-before", "status": "observed", "evidence_ids": ["ev-dagger-visible"]}
+      ]
+    },
+    {
+      "id": "inst-victim",
+      "definition_id": "def-victim",
+      "identity_status": "inferred",
+      "track_ids": ["video-track-victim-1"],
+      "lifecycle": [
+        {"kind": "acquired", "step_id": "step-before", "status": "observed", "evidence_ids": ["ev-victim-visible"]},
+        {"kind": "removed", "step_id": "step-after", "status": "inferred", "evidence_ids": ["ev-victim-removed"]}
+      ]
+    }
+  ],
+  "facts": [
+    {"id": "fact-dagger-mult-before", "subject_id": "inst-dagger", "property": "ability.mult", "value": 6, "valid_from": "step-before", "valid_until": "step-after", "status": "observed", "channel": "observation", "visibility": "visual", "evidence_ids": ["ev-dagger-visible"], "rule_revision": "video-annotation-v1", "confidence_basis": "annotated example frame"},
+    {"id": "fact-victim-sell-value", "subject_id": "inst-victim", "property": "sell_cost", "value": 4, "valid_from": "step-before", "status": "observed", "channel": "observation", "visibility": "visual", "evidence_ids": ["ev-victim-price"], "rule_revision": "video-annotation-v1", "confidence_basis": "hypothetical clearly visible sell value; replace with actual evidence for a real run"},
+    {"id": "fact-dagger-mult-after", "subject_id": "inst-dagger", "property": "ability.mult", "value": 14, "valid_from": "step-after", "status": "inferred", "channel": "derived", "visibility": "historically_inferable", "evidence_ids": ["ev-dagger-after"], "rule_revision": "example-rule-dagger-scale-2", "confidence_basis": "example arithmetic: 6 + (2 x 4); not a measured run result"}
+  ],
+  "effects": [
+    {
+      "id": "effect-dagger-growth-1",
+      "kind": "persistent_mutation",
+      "context": "destruction",
+      "source_instance_id": "inst-dagger",
+      "target_ids": ["inst-victim"],
+      "status": "inferred",
+      "interval": {"start_step_id": "step-before", "end_step_id": "step-after"},
+      "order": {"ordinal": null, "ambiguous": false, "requires_exact_order": false},
+      "condition": "met",
+      "dependency_fact_ids": ["fact-victim-sell-value", "fact-dagger-mult-before"],
+      "contributions": [
+        {"kind": "persistent_mutation", "value": 8, "unit": "mult", "occurrence_key": "effect-dagger-growth-1:mult-increment"}
+      ],
+      "participation": [
+        {"instance_id": "inst-dagger", "role": "effect-source", "contributed": true},
+        {"instance_id": "inst-victim", "role": "destroyed-target", "contributed": true}
+      ],
+      "evidence_ids": ["ev-trigger", "ev-dagger-visible", "ev-victim-price", "ev-dagger-after"],
+      "rule_revision": "example-rule-dagger-scale-2"
+    }
+  ],
+  "evidence": [
+    {"id": "ev-dagger-visible", "channel": "observation", "kind": "video_observation", "step_id": "step-before", "visibility": "visual", "source_ref": "example-annotation"},
+    {"id": "ev-victim-visible", "channel": "observation", "kind": "video_observation", "step_id": "step-before", "visibility": "visual", "source_ref": "example-annotation"},
+    {"id": "ev-victim-price", "channel": "observation", "kind": "video_observation", "step_id": "step-before", "visibility": "visual", "source_ref": "example-annotation"},
+    {"id": "ev-trigger", "channel": "observation", "kind": "video_observation", "step_id": "step-after", "visibility": "visual", "source_ref": "example-annotation"},
+    {"id": "ev-victim-removed", "channel": "observation", "kind": "video_observation", "step_id": "step-after", "visibility": "visual", "source_ref": "example-annotation"},
+    {"id": "ev-dagger-after", "channel": "observation", "kind": "video_observation", "step_id": "step-after", "visibility": "visual", "source_ref": "example-annotation"}
+  ],
+  "source_revisions": []
+}

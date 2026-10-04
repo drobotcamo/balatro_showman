@@ -29,11 +29,12 @@ distinct. Analysis is a product now; learning is an optional downstream consumer
 | Run-bundle operations/storage | `RUN_BUNDLE_OPERATIONS.md`, `RUN_BUNDLE_STORAGE.md` |
 | Provenance and reducer boundary | `PHASE0_INVENTORY.md`, `PERSISTENT_STATE_OWNERSHIP.md` |
 | Decisions, findings and commands | `DECISIONS.md`, `LEARNINGS.md`, `TOOLING.md` |
+| Mechanics interface and checks | `RUN_MECHANICS_DESIGN.md`, `schemas/run_mechanics_v0_1.schema.json`, `mechanics_contract_check.py` |
 
 Component contracts cover vocabulary/geometry, visual generation/inference,
-composition/reduction/events, evidence/storage and analytics. #122 will publish
-the concrete mechanics design linked here before its interfaces are implemented.
-The architecture's semantic boundaries are approved; exact schemas remain reviewable.
+composition/reduction/events, evidence/storage and analytics. #122 publishes the
+approved initial mechanics interface and examples in `RUN_MECHANICS_DESIGN.md`.
+Source-order verification and staged extensions remain open as recorded there.
 Workflow migration and retrospective documents are historical references, not a
 second current execution plan.
 

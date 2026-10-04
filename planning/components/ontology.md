@@ -27,8 +27,9 @@ typography needed for synthetic OCR.
   debuffed, highlighted) needed by synthetic OCR.
 - Versioned class map usable by training and inference.
 - Mechanics definitions keyed to this vocabulary, distinct from run instances and
-  visual tracks. #122 versions the slice semantics; #125 owns exhaustive Joker
-  inventory and authored/user-approved/engine-validated statuses separately.
+  visual tracks. #122 versions the slice semantics in
+  `planning/RUN_MECHANICS_DESIGN.md`; #125 owns exhaustive Joker inventory and
+  authored/user-approved/engine-validated statuses separately.
 
 ## Invariants
 

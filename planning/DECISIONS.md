@@ -497,6 +497,28 @@ requirements. D028's progressive-gate and publication rules remain; this decisio
 supersedes only its now-obsolete next-delivery sequence. Source: explicit user
 direction in the two-track planning revision session, 2026-10-04.
 
+### D038 — accepted — Initial run-mechanics interface keeps state and effects distinct
+
+The owner-approved initial v0.1 mechanics interface uses separate definition,
+run-instance, derived-state, derived-effect, participation and evidence records.
+Visual tracking identity is not gameplay-instance identity. Observation and
+engine-reference evidence remain separate; unknown/ambiguous/unsupported values
+are first-class. Effects record deterministic occurrences, conditions,
+dependencies, timing, participants and contributions. Persistent mutations,
+scoring contributions and interval net deltas are distinct. The structural
+schema and runnable synthetic Dagger positive/zero/missing-dependency, scoring
+and reset examples are versioned in `planning/RUN_MECHANICS_DESIGN.md` and
+`planning/schemas/run_mechanics_v0_1.schema.json`.
+
+This approval does not validate a production reducer or game-rule implementation.
+Exact Dagger trigger order still requires verification against the intended
+game/mod source; Hermit/Mail-In Rebate and Certificate/Death/Gold Seal remain
+staged for #129/#130. Held-out evaluation requires its applicable frozen protocol.
+Alternative: combine state and effects or treat STEP as a complete trigger
+stream; rejected because persistent state, causal effect occurrences and queued
+engine order have different semantics. Source: owner approval in the #122
+conversation, 2026-10-04.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the

@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://balatro-showman.invalid/schemas/run_mechanics_v0_1.schema.json",
+  "title": "Run Mechanics Evidence Envelope v0.1",
+  "description": "Owner-approved initial envelope for mechanics evidence and derived records. This schema validates provenance and references, not game-rule truth.",
+  "type": "object",
+  "required": ["schema_version", "run_id", "definitions", "instances", "facts", "effects", "evidence"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "run_id": { "$ref": "#/$defs/id" },
+    "definitions": { "type": "array", "items": { "$ref": "#/$defs/definition" } },
+    "instances": { "type": "array", "items": { "$ref": "#/$defs/instance" } },
+    "facts": { "type": "array", "items": { "$ref": "#/$defs/fact" } },
+    "effects": { "type": "array", "items": { "$ref": "#/$defs/effect" } },
+    "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+    "source_revisions": { "type": "array", "items": { "$ref": "#/$defs/sourceRevision" } }
+  },
+  "$defs": {
+    "id": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["observed", "inferred", "unknown", "ambiguous", "unsupported"] },
+    "visibility": { "enum": ["visual", "tooltip_only", "historically_inferable", "hidden"] },
+    "channel": { "enum": ["observation", "derived", "reference"] },
+    "definition": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "family", "class_key", "revision"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" }, "family": { "$ref": "#/$defs/id" },
+        "class_key": { "$ref": "#/$defs/id" }, "revision": { "$ref": "#/$defs/id" }
+      }
+    },
+    "instance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "definition_id", "identity_status", "track_ids", "lifecycle"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" }, "definition_id": { "$ref": "#/$defs/id" },
+        "identity_status": { "$ref": "#/$defs/status" },
+        "track_ids": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+        "lifecycle": { "type": "array", "items": { "$ref": "#/$defs/lifecycle" } }
+      }
+    },
+    "lifecycle": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "step_id", "status", "evidence_ids"],
+      "properties": {
+        "kind": { "enum": ["acquired", "created", "copied_onto", "moved", "replaced", "removed", "resumed"] },
+        "step_id": { "$ref": "#/$defs/id" }, "target_instance_id": { "$ref": "#/$defs/id" },
+        "status": { "$ref": "#/$defs/status" }, "evidence_ids": { "type": "array", "items": { "$ref": "#/$defs/id" } }
+      }
+    },
+    "fact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "subject_id", "property", "value", "valid_from", "status", "channel", "visibility", "evidence_ids", "rule_revision"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" }, "subject_id": { "$ref": "#/$defs/id" },
+        "property": { "$ref": "#/$defs/id" }, "value": {}, "valid_from": { "$ref": "#/$defs/id" },
+        "valid_until": { "$ref": "#/$defs/id" }, "status": { "$ref": "#/$defs/status" },
+        "channel": { "$ref": "#/$defs/channel" },
+        "visibility": { "$ref": "#/$defs/visibility" }, "evidence_ids": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+        "rule_revision": { "$ref": "#/$defs/id" }, "confidence_basis": { "type": "string" }
+      }
+    },
+    "effect": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "kind", "context", "source_instance_id", "target_ids", "status", "interval", "order", "condition", "dependency_fact_ids", "contributions", "participation", "evidence_ids", "rule_revision"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" }, "kind": { "$ref": "#/$defs/id" },
+        "context": { "enum": ["action", "scoring", "retrigger", "destruction", "consumable_use", "round_completion", "reset"] },
+        "source_instance_id": { "$ref": "#/$defs/id" }, "target_ids": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+        "status": { "$ref": "#/$defs/status" }, "interval": { "$ref": "#/$defs/interval" },
+        "order": { "$ref": "#/$defs/order" }, "condition": { "enum": ["met", "not_met", "unknown", "ambiguous"] },
+        "dependency_fact_ids": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+        "contributions": { "type": "array", "items": { "$ref": "#/$defs/contribution" } },
+        "participation": { "type": "array", "items": { "$ref": "#/$defs/participation" } },
+        "evidence_ids": { "type": "array", "items": { "$ref": "#/$defs/id" } },
+        "rule_revision": { "$ref": "#/$defs/id" }, "supersedes_effect_id": { "$ref": "#/$defs/id" }
+      }
+    },
+    "interval": {
+      "type": "object", "additionalProperties": false, "required": ["start_step_id", "end_step_id"],
+      "properties": { "start_step_id": { "$ref": "#/$defs/id" }, "end_step_id": { "$ref": "#/$defs/id" } }
+    },
+    "order": {
+      "type": "object", "additionalProperties": false,
+      "required": ["ordinal", "ambiguous", "requires_exact_order"],
+      "properties": {
+        "ordinal": { "type": ["integer", "null"], "minimum": 0 }, "ambiguous": { "type": "boolean" },
+        "requires_exact_order": { "type": "boolean" }, "source_revision_id": { "$ref": "#/$defs/id" },
+        "order_evidence_ids": { "type": "array", "items": { "$ref": "#/$defs/id" } }
+      }
+    },
+    "contribution": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "value", "unit", "occurrence_key"],
+      "properties": {
+        "kind": { "enum": ["chips", "mult", "xmult", "money", "persistent_mutation"] },
+        "value": {}, "unit": { "type": "string", "minLength": 1 }, "occurrence_key": { "$ref": "#/$defs/id" }
+      }
+    },
+    "participation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["instance_id", "role", "contributed"],
+      "properties": {
+        "instance_id": { "$ref": "#/$defs/id" }, "role": { "$ref": "#/$defs/id" },
+        "contributed": { "type": "boolean" }
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "channel", "kind", "step_id", "visibility", "source_ref"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" }, "channel": { "$ref": "#/$defs/channel" },
+        "kind": { "enum": ["video_observation", "oracle_reference", "source_code", "human_annotation"] },
+        "step_id": { "$ref": "#/$defs/id" }, "visibility": { "$ref": "#/$defs/visibility" },
+        "source_ref": { "$ref": "#/$defs/id" }
+      }
+    },
+    "sourceRevision": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "repository", "revision", "path"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" }, "repository": { "type": "string", "minLength": 1 },
+        "revision": { "type": "string", "minLength": 1 }, "path": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
