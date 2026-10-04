@@ -15,6 +15,23 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-03: Debug exports need the same source bytes as the displayed records
+
+- Context: Issue #118's video/action viewer exports original oracle lines beside
+  a derived clip. Independent review identified a race between hash checks and
+  reading the selected lines after a potentially long ffmpeg extraction.
+- Observation: Checking a file before extraction does not establish that a later
+  read has the same bytes. The viewer now freezes bytes matching the displayed
+  parsed records and source hashes, exports those lines, and rechecks inputs after
+  extraction. A mutation-during-extraction fixture rejects the package and retains
+  its incomplete marker.
+- Implication: Keep payloads, copied evidence and their hashes tied to one source
+  snapshot; clip production must not silently switch the version of source lines.
+- Verification/source: `tests/test_qa_viewer.py` (7 tests passed, including real
+  ffmpeg export and mutation-during-extraction); `docs/capture/video-review.md`.
+  Browser QA exported five original steps with verified input/output hashes;
+  candidate rendered alignment and frame-exact clip timing remain unverified.
+
 ## 2026-10-03: One OBS recording can span multiple oracle run IDs
 
 - Context: The Issue #79 development capture contained an Ante 1 run segment,

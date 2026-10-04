@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Showman · Video review</title><style>
+:root{color-scheme:dark;font-family:Inter,Segoe UI,sans-serif;background:#11151b;color:#e7edf5}
+*{box-sizing:border-box}body{margin:0}header{padding:22px 28px;border-bottom:1px solid #303845;display:flex;align-items:center;gap:16px}
+header h1{font-size:22px;margin:0}header span{color:#8a9aaf;font-size:13px}.tag{margin-left:auto;color:#ffd98a;border:1px solid #705a2a;padding:6px 10px;border-radius:20px}
+main{display:grid;grid-template-columns:minmax(0,7fr) minmax(340px,3fr);gap:22px;padding:24px;height:calc(100vh - 77px)}
+.video-pane{min-width:0;overflow:auto}video{width:100%;max-height:68vh;background:black;border-radius:12px;display:block}
+.path{font:12px Consolas,monospace;color:#9daec3;overflow-wrap:anywhere;margin:14px 0}.panel{background:#1a2029;border:1px solid #303845;border-radius:12px;padding:16px;margin:14px 0}
+h2{font-size:15px;margin:0 0 12px}.muted{color:#99a8bb;font-size:13px;line-height:1.55}.sidebar{display:flex;flex-direction:column;min-height:0}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}button,select,input,textarea{font:inherit;background:#222c3a;color:#e7edf5;border:1px solid #43536a;border-radius:7px;padding:9px}
+button{cursor:pointer}button:hover{background:#344259}button:disabled{opacity:.4;cursor:default}.primary{background:#456aee;border-color:#456aee}input{width:72px}select{width:100%;margin:12px 0}
+#actions{overflow:auto;flex:1;margin-top:14px}article{border:1px solid #354152;background:#1a2029;border-radius:9px;margin-bottom:9px;padding:12px}article.active{border-color:#7e9bff;background:#222f49}
+.action{width:100%;border:0;background:transparent;padding:0;display:flex;justify-content:space-between;text-align:left;gap:8px;font-weight:600}.step{font:11px Consolas,monospace;color:#96a8c1;margin:7px 0;overflow-wrap:anywhere}
+.state{font-size:12px;color:#b2c2d6;line-height:1.6}details{font-size:12px;margin-top:8px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;max-height:300px;overflow:auto}textarea{width:100%;min-height:100px;resize:vertical}
+#status{font-size:13px;margin:12px 0;color:#b5c6ed;overflow-wrap:anywhere}#timing{color:#ffd98a;font-size:12px;line-height:1.6}.video-controls{display:flex;gap:8px;margin:12px 0}
+@media(max-width:1000px){main{grid-template-columns:1fr;height:auto}.sidebar{height:80vh}.tag{display:none}video{max-height:60vh}}
+</style></head><body><!--PACKET-->
+<header><h1>♠ Showman <span>/ Video review</span></h1><span class="tag">Oracle timing · unverified</span></header>
+<main><section class="video-pane"><video id="video" controls preload="metadata"></video><div class="video-controls"><button id="play">Play this segment</button><button id="restart">Back to first action</button></div>
+<div id="path" class="path"></div><div class="panel"><h2>Review notes</h2><textarea id="notes" placeholder="What did you observe? Note incorrect targets, missing actions, timing, or unexpected transitions."></textarea><div class="muted">Human observations stay separate from the pre-callback oracle snapshots. Export saves these notes with the clip and original actions.</div></div>
+<div class="panel"><h2>Timing & provenance</h2><div id="timing"></div><div id="source" class="path"></div><div class="muted">Candidate timestamps are navigation aids, not confirmed frame correspondence. A callback can be part of Buy & Use, rather than a separate player input.</div></div></section>
+<aside class="sidebar"><h2>Action window</h2><div class="toolbar"><label>Steps <input id="count" type="number" min="1" max="200" value="10"></label><button id="random" class="primary">Start random session</button><button id="next">Next window →</button><button id="export">Export debug folder</button></div>
+<select id="sources" aria-label="Source session"></select><div id="status" role="status"></div><div id="actions"></div></aside></main>
+<script>
+const $=id=>document.getElementById(id);let token,catalog,current,offline=false,clipOrigin=0,busy=false;
+const stamp=t=>t===null?'No timestamp':`${Math.floor(t/60)}:${(t%60).toFixed(3).padStart(6,'0')}`;
+function text(tag,value,cls){const e=document.createElement(tag);e.textContent=value;if(cls)e.className=cls;return e;}
+function setBusy(value){busy=value;for(const id of ['random','next','export','sources','count'])$(id).disabled=value||offline;}
+async function request(path,data){const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','X-Review-Token':token},body:JSON.stringify(data)});const result=await r.json();if(!r.ok)throw Error(result.error);return result;}
+function seek(time){if(time!==null)$('video').currentTime=Math.max(0,time-clipOrigin);}
+function render(window){current=window;$('count').value=window.count;$('sources').value=window.source;$('actions').replaceChildren();
+ $('status').textContent=`${window.rows.length} steps · ${window.start+1}–${window.stop} · seed ${window.seed} · draw ${window.draw}`;
+ $('timing').textContent=`Alignment: ${window.timing.alignment_status}. ${window.timing.diagnostics.join(' ')} Timing basis: ${window.timing.interpreted_start_ns??'missing'} ns. Evidence: ${window.timing.evidence??'none'}. Source diagnostics: ${window.diagnostics.map(d=>d.code+': '+d.message).join('; ')||'none'}.`;
+ $('source').textContent=`${window.source_id}\n${catalog.sources[window.source].source.directory}`;
+ const next=window.next;$('next').textContent=next&&next.source!==window.source?`Continue → ${catalog.sources[next.source].id}`:'Next window →';$('next').disabled=!next||offline;
+ $('export').disabled=offline||window.clip_start===null;
+ for(const row of window.rows){const o=row.original,card=document.createElement('article');card.dataset.seconds=row.seconds??'';
+ const button=document.createElement('button');button.className='action';button.append(text('span',o._recorded_action??o.source_action??o.action_taken??'Unknown action'),text('span',stamp(row.seconds)));button.disabled=row.seconds===null;button.onclick=()=>seek(row.seconds);card.append(button,text('div',o.step_id??`${window.source_id} · original request ${o.request_id??'unknown'}`, 'step'));
+ const s=o.state??{};card.append(text('div',`${o.page_name??'Unknown page'} · Ante ${s.ante??'?'} / Round ${s.round??'?'} · $${s.dollars??'?'}\nScore ${s.round_score??'?'} · ${s.hands_left??'?'} hands · ${s.discards_left??'?'} discards`, 'state'));
+ const selected=o.selected_object?.object?.center_key??o.selected_object?.center_key;
+ card.append(text('div',selected?`Target: ${selected}`:o.target_zone?`Target: ${o.target_zone} [${o.target_position}]`:'Target: not resolved / not applicable','state'));
+ if(Array.isArray(o.pending_cards)&&o.pending_cards.length)card.append(text('div','Selected: '+o.pending_cards.map(c=>`${c?.card?.rank??'?'} ${c?.card?.suit??'?'}${c?.modifier?' ('+c.modifier+')':''}`).join(', '),'state'));
+ const detail=document.createElement('details');detail.append(text('summary','Original engine snapshot'),text('pre',JSON.stringify(o,null,2)));card.append(detail);$('actions').append(card);}
+ seek(window.clip_start??window.rows.find(r=>r.seconds!==null)?.seconds??null);
+}
+async function loadWindow(data){if(busy||offline)return;setBusy(true);try{render(await request('/api/window',data));}catch(e){$('status').textContent=e.message;}finally{setBusy(false);$('next').disabled=!current?.next;$('export').disabled=current?.clip_start===null;}}
+$('random').onclick=()=>loadWindow({count:Number($('count').value),random:true});
+$('next').onclick=()=>current?.next&&loadWindow({...current.next,count:Number($('count').value)});
+$('count').onchange=()=>loadWindow({source:current.source,start:current.start,count:Number($('count').value)});
+$('sources').onchange=()=>loadWindow({source:Number($('sources').value),start:0,count:Number($('count').value)});
+$('restart').onclick=()=>seek(current?.rows[0]?.seconds??null);
+$('play').onclick=()=>{if(current){seek(current.clip_start??current.rows[0].seconds);$('video').play().catch(e=>$('status').textContent=e.message);}};
+$('video').ontimeupdate=()=>{const actual=$('video').currentTime+clipOrigin;if(current?.clip_end!==null&&actual>=current.clip_end&&!$('video').paused)$('video').pause();const rows=[...$('actions').children];let chosen=-1;current?.rows.forEach((r,i)=>{if(r.seconds!==null&&r.seconds<=actual)chosen=i;});rows.forEach((e,i)=>e.classList.toggle('active',i===chosen));};
+$('export').onclick=async()=>{if(busy||offline)return;setBusy(true);$('status').textContent='Exporting clip and verifying source hashes…';try{const r=await request('/api/export',{source:current.source,start:current.start,count:current.count,selection_id:current.selection_id,notes:$('notes').value});$('status').textContent=`Saved ${r.steps} original steps + clip + notes: ${r.folder} `;const a=text('a','Open saved review');a.href=r.url;a.target='_blank';a.style.color='#9db5ff';$('status').append(a);}catch(e){$('status').textContent=e.message;}finally{setBusy(false);$('next').disabled=!current?.next;}};
+(async()=>{try{const packet=$('packet');let initial;if(packet){offline=true;const p=JSON.parse(packet.textContent);catalog=p.catalog;initial=p.window;clipOrigin=initial.clip_start;$('video').src='./clip.mp4';$('notes').value=p.notes;$('notes').readOnly=true;setBusy(false);}else{const r=await fetch('/api/init');if(!r.ok)throw Error('Viewer initialization failed');const init=await r.json();token=init.token;catalog=init.catalog;initial=init.window;$('video').src=catalog.media;}
+ $('path').textContent=`${catalog.video}\nSHA-256 ${catalog.video_sha256}\nExports: ${catalog.export_root}`;
+ catalog.sources.forEach((s,i)=>{const option=text('option',`${s.id} · ${s.steps} steps`);option.value=i;$('sources').append(option);});render(initial);
+ $('video').onerror=()=>{$('status').textContent='Browser could not play the MP4 derivative. Original media is unchanged.';};
+ }catch(e){$('status').textContent=e.message;}})();
+</script></body></html>
