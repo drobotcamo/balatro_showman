@@ -27,6 +27,7 @@ def test_dagger_without_right_neighbor_is_known_no_destruction_no_growth():
 def test_dagger_with_ineligible_right_neighbor_is_known_no_destruction_no_growth():
     example = initial_examples()["dagger-ineligible-right"]
 
+    assert next(f for f in example["facts"] if f["property"] == "right_neighbor_destructible")["value"] is False
     assert example["effects"] == []
     assert next(f for f in example["facts"] if f["id"] == "fact-dagger-mult-after")["value"] == 14
 

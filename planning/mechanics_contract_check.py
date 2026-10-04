@@ -290,6 +290,19 @@ def initial_examples() -> dict[str, dict[str, Any]]:
     ineligible["instances"] = [ineligible["instances"][0]]
     ineligible["facts"] = [fact for fact in ineligible["facts"] if fact["id"] != "fact-victim-sell-value"]
     ineligible["evidence"] = [e for e in ineligible["evidence"] if e["id"] not in {"ev-victim-visible", "ev-victim-price", "ev-victim-removed"}]
+    ineligible["facts"].append({
+        "id": "fact-right-joker-ineligible",
+        "subject_id": "inst-dagger",
+        "property": "right_neighbor_destructible",
+        "value": False,
+        "valid_from": "step-before",
+        "status": "observed",
+        "channel": "observation",
+        "visibility": "visual",
+        "evidence_ids": ["ev-dagger-visible"],
+        "rule_revision": "video-annotation-v1",
+        "confidence_basis": "right-hand Joker is visibly present but not destructible",
+    })
 
     missing = copy.deepcopy(positive)
     missing["run_id"] = "example-run-dagger-unknown"
