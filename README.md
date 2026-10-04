@@ -40,6 +40,8 @@ python -m showman demo --output-dir "C:\external\showman-demo"
 ```
 
 Choose a **new** output directory under an existing parent, outside Git. The
+agent guide includes separate [PowerShell and Git Bash examples](docs/capture/README.md#try-the-complete-storage-path-without-a-game).
+Do not use the existing project/worktree folder as `--output-dir`. The
 demo sends two synthetic actions through the real queue consumer and automatic
 SQLite import, validates the stored records, and prints the next inspection
 command. It needs neither Balatro nor OBS. Synthetic evidence is labeled and

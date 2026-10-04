@@ -123,7 +123,13 @@ def demo(destination):
     root = destination.resolve()
     if not root.parent.is_dir():
         raise ValueError("demo parent does not exist")
-    root.mkdir()  # Refuse existing destinations, even empty ones.
+    try:
+        root.mkdir()  # Refuse existing destinations, even empty ones.
+    except FileExistsError as error:
+        raise FileExistsError(
+            f"Demo output already exists: {root}. Choose a NEW output directory, "
+            "not the project/worktree folder. See docs/capture/README.md for shell-specific examples."
+        ) from error
     io_dir = root / "synthetic_io"
     io_dir.mkdir()
     database = initialize(root / "bundle.sqlite")

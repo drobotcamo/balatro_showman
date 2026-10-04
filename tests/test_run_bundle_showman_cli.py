@@ -69,7 +69,11 @@ def test_initialization_and_demo_refuse_existing_destinations(example, capsys):
     assert main(["store", "init", "--db", str(database)]) == 2
     assert main(["demo", "--output-dir", str(example)]) == 2
     assert database.read_bytes() == before
-    assert len(capsys.readouterr().out.splitlines()) == 2
+    outputs = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert len(outputs) == 2
+    message = outputs[1]["diagnostics"][0]["message"]
+    assert "Choose a NEW output directory" in message
+    assert "not the project/worktree folder" in message
 
 
 def test_nested_help_and_module_execution(example):

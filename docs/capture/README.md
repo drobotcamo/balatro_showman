@@ -27,7 +27,12 @@ this change does not define a distributable wheel or global executable.
 
 ## Try the complete storage path without a game
 
-Choose an existing external parent. In PowerShell on Windows:
+Choose a **new output directory** under an existing external parent, not the
+project/worktree folder. Select the example for your terminal: PowerShell and
+Bash use different variable syntax. A `bash: syntax error ... '('` from the
+PowerShell example means to use the Bash example below.
+
+### PowerShell on Windows
 
 ```powershell
 $demo = Join-Path $env:TEMP ("showman-demo-" + [guid]::NewGuid().ToString("N"))
@@ -37,6 +42,25 @@ py -3 -m showman inspect step --db "$demo\bundle.sqlite" --run demo-synthetic --
 py -3 -m showman inspect provenance --db "$demo\bundle.sqlite" --run demo-synthetic
 py -3 -m showman inspect validate --db "$demo\bundle.sqlite" --run demo-synthetic --strict
 ```
+
+### Git Bash on Windows
+
+Run from the project/worktree root. This creates a uniquely named sibling
+directory outside the repository; `..` must be an appropriate writable parent.
+
+```bash
+demo="../showman-demo-$(date +%s)-$RANDOM"
+py -3 -m showman demo --output-dir "$demo"
+py -3 -m showman inspect summary --db "$demo/bundle.sqlite" --run demo-synthetic
+py -3 -m showman inspect step --db "$demo/bundle.sqlite" --run demo-synthetic --sequence 0
+py -3 -m showman inspect provenance --db "$demo/bundle.sqlite" --run demo-synthetic
+py -3 -m showman inspect validate --db "$demo/bundle.sqlite" --run demo-synthetic --strict
+```
+
+On Linux/macOS Bash, use the same syntax with `python` (or `python3`) in place
+of `py -3`. Never create the final output directory beforehand: the demo creates
+it and refuses to reuse existing directories. If an earlier attempt created
+that directory, choose a fresh name rather than pointing the demo at it again.
 
 Expected: two stored records, lifecycle `lost`, and validation `valid` with
 no bad sequences. The first payload is explicitly synthetic and records
