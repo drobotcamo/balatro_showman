@@ -15,6 +15,23 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-03: A quarantined recording marker can contain valid bytes
+
+- Context: A subsequent #115 capture had 135 valid source steps but no attached
+  recording object. Its preserved `recording_start_marker.json.invalid` contained
+  a marker accepted by the current consumer in an isolated temporary fixture.
+- Observation: `_attach_recording_marker` groups OSError with JSON decode errors
+  and attempts quarantine for either. Injecting FileNotFoundError during a fixture
+  read moved the otherwise valid marker to `.invalid`. The actual read exception
+  responsible for the real capture is unknown.
+- Implication: A quarantine suffix alone does not establish malformed bytes;
+  preserve and validate the evidence separately, without repairing source files
+  or inferring confirmation. Transient read failure and invalid content need
+  distinct handling in any future reader fix.
+- Verification/source: `planning/ISSUE115_RECORDING_AUDIT.md`, subsequent-capture
+  section; isolated diagnostic `issue115_new_capture.py` under the approved temp
+  directory; `ground_truth/file_ipc_bridge.py` recording-marker read exception path.
+
 ## 2026-10-03: Equal resume boundary counters are not duplicate action records
 
 - Context: Issue #115 inspected 15 persisted oracle sessions (1,543 steps),

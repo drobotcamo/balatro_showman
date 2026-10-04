@@ -261,3 +261,54 @@ other MKVs with no established session relationship. File naming alone was not
 used to invent associations. Future acceptance still requires the fixed build
 loaded in a restarted game, an authorized exit-to-menu/Continue smoke capture,
 neighboring-frame inspection and explicit post-capture association confirmation.
+
+## Subsequent capture: old loaded build, valid source, association pending
+
+After the user reported another recording, read-only inspection found
+`F:\OBS_RECORDINGS\2026-10-03 22-48-30.mkv` and source
+`F:\OBS_RECORDINGS\oracle_runs_issue79\19422262766400-7843`.
+The source contains 135 contiguous requests/step IDs, starts with SelectBlind at
+Ante 1 / Round 0 and ends in a loss at Ante 4 / Round 12. The focused oracle audit
+returned `oracle run integrity OK`. Video is 1920×1080, H.264, 60 FPS,
+655.184 seconds and 769,734,730 bytes.
+
+| Evidence | SHA-256 |
+| --- | --- |
+| video | `9ed1671afc770ea5b2e2775476f3bb82d5b6dbb62ad0af255e87680c56c95095` |
+| session.json | `10ee79e4cdd4f3aec03d80eb8323947a3d09bcdb19f5418e2ab0f71ddc2541fa` |
+| steps.ndjson | `827312efd0ab34e833eef9223471cc176a7e6b096768d1375acd2667058d1b8f` |
+| quarantined marker | `ddd08c2faf8d313230465da552ef6f3ee658cfdbcee5cae36416f5b7f66c7512` |
+
+The source has no recording object. The preserved IPC file
+`recording_start_marker.json.invalid` contains marker
+`issue81-20261004T054834Z`, FPS 60, timestamp `19418049042600` ns.
+An isolated temporary FileIpcBridge accepted an exact byte copy under the normal
+marker filename. No real IPC file was renamed/restored, and no source metadata,
+bundle import or recording association was changed.
+
+Using the quarantined marker only as a diagnostic timing basis, decoded candidate
+frames at 6.5544449 and 649.9490485 seconds match the first/last action-state
+resources. The last action shows The Plant, target 18,000, score 9,232, one hand,
+zero discards and $11; a frame at 654.5 seconds shows Game Over, Ante 4 / Round
+12, final score 9,688 and defeat by The Plant. A 15-second contact sheet inspected
+the recording broadly; it does not prove that a short menu visit was absent or
+establish event-edge correspondence within ±3 frames.
+
+This is not fixed-build smoke acceptance. Balatro PID 22576 still has its original
+17:24:54 process start, and its Lovely log reports loaded build
+`issue81-file-queue-1`, not `issue115-continue-identity-1`. Later API reinjection in
+the same log is not evidence that the new bridge loaded. One source ID/no observed
+fragmentation cannot establish the corrected Continue path without that provenance.
+
+The current consumer's `_attach_recording_marker` also quarantines on OSError,
+not only malformed JSON. A temporary fixture injecting FileNotFoundError during
+read moved a valid marker to `.invalid`. That demonstrates a reader defect; it
+does not establish which exception caused this real quarantine. The diagnostic
+script is `C:\Users\camgr\AppData\Local\Temp\opencode\issue115_new_capture.py`.
+The discovery is recorded without broadening #115's implementation scope.
+
+Current source lifecycle is lost; it is not imported into the inspected bundle.
+Proposed video/source/quarantined-marker membership awaits explicit human
+confirmation. This capture can be preserved as debugging evidence, but the next
+#115 action remains a full game restart, loaded-build verification and then an
+authorized menu/Continue smoke recording. No additional held-out runs requested.
