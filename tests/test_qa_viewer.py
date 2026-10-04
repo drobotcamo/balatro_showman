@@ -79,8 +79,9 @@ class ViewerTests(unittest.TestCase):
 
     def test_eligibility_review_preserves_sources_and_rejects_unmeasured_confirmation(self):
         review = self.review()
+        selection = review.window(source=0, start=0, count=2)
         original = digest(self.runs[0] / "steps.ndjson")
-        payload = {"source": 0, "index": 0, "stage": "start", "frame": 1,
+        payload = {"selection_id": selection["selection_id"], "source": 0, "index": 0, "stage": "start", "frame": 1,
                    "frame_seconds": 0.1, "alignment": "confirmed", "offset_frames": None,
                    "evidence": "rendered button visible at candidate", "visual_observation": "New Run",
                    "missingness": "", "registry_audit": "external registry not yet checked",
@@ -89,8 +90,10 @@ class ViewerTests(unittest.TestCase):
             review.save_eligibility(payload)
         with self.assertRaisesRegex(ValueError, "measured offset"):
             review.save_eligibility({**payload, "offset_frames": 4})
-        with self.assertRaisesRegex(ValueError, "in-range candidate"):
+        with self.assertRaisesRegex(ValueError, "server-issued"):
             review.save_eligibility({**payload, "source": 1, "offset_frames": 0})
+        with self.assertRaisesRegex(ValueError, "server-issued"):
+            review.save_eligibility({**payload, "index": 2, "offset_frames": 0})
         saved = review.save_eligibility({**payload, "offset_frames": -2})
         packet = json.loads(Path(saved["file"]).read_text())
         self.assertEqual((packet["status"], packet["offset_frames"], packet["source_run_id"]),
@@ -101,7 +104,9 @@ class ViewerTests(unittest.TestCase):
 
     def test_eligibility_review_rejects_frame_time_mismatch_and_out_of_range(self):
         review = self.review()
+        selection = review.window(source=0, start=0, count=1)
         payload = {"source": 0, "index": 0, "stage": "start", "frame": 100,
+                   "selection_id": selection["selection_id"],
                    "frame_seconds": 1.0, "alignment": "unverified", "offset_frames": None,
                    "evidence": "candidate state inspected", "visual_observation": "",
                    "missingness": "", "registry_audit": "not checked", "reviewer": "human"}

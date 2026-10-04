@@ -284,6 +284,11 @@ class Review:
             raise ValueError("invalid source index")
         if type(index) is not int or not 0 <= index < len(self.sources[source]["steps"]):
             raise ValueError("invalid step index")
+        selection = self.selections.get(data.get("selection_id"))
+        if (selection is None or selection["source"] != source or
+                not selection["start"] <= index < min(selection["start"] + selection["count"],
+                                                        len(self.sources[source]["steps"]))):
+            raise ValueError("step is not part of a server-issued review window")
         stage = data.get("stage")
         if stage not in ("start", "small_blind_select", "small_blind_play", "cash_out", "first_shop"):
             raise ValueError("invalid stage")
@@ -330,9 +335,9 @@ class Review:
         if type(packet["frame_seconds"]) not in (int, float) or not math.isfinite(packet["frame_seconds"]) or not 0 <= packet["frame_seconds"] <= self.video_probe["duration"]:
             raise ValueError("invalid video time")
         expected_seconds = frame / self.video_probe["fps"]
-        if abs(packet["frame_seconds"] - expected_seconds) > 1 / self.video_probe["fps"]:
+        if abs(packet["frame_seconds"] - expected_seconds) > 0.5 / self.video_probe["fps"]:
             raise ValueError("frame index and video time disagree with the declared FPS")
-        packet["frame_index_basis"] = "zero-based frame index; timestamp checked against declared constant FPS"
+        packet["frame_index_basis"] = "zero-based presentation-frame index; timestamp checked against decoded constant-FPS cadence"
         destination = folder / (datetime.now(timezone.utc).strftime("review-%Y%m%dT%H%M%SZ-") + secrets.token_hex(8) + ".json")
         with destination.open("x", encoding="utf-8") as stream:
             json.dump(packet, stream, indent=2, sort_keys=True, allow_nan=False)
@@ -568,6 +573,10 @@ def launch_group():
         for ordinal, (video, resolved_runs, name) in enumerate(resolved_groups, 1):
             child_name = name
             child_export = export_root / child_name
+            if (video.is_relative_to(child_export) or
+                    any(child_export == root or child_export.is_relative_to(root) or root.is_relative_to(child_export)
+                        for root in resolved_runs)):
+                raise ValueError("child export folder overlaps source video or oracle evidence")
             child_export.mkdir(parents=True, exist_ok=True)
             command = [sys.executable, "-m", "ground_truth.qa_viewer", "--video", str(video),
                        "--export-root", str(child_export), "--steps", str(args.steps)]
