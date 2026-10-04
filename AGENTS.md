@@ -8,6 +8,8 @@ against a Lua ground-truth oracle. `planning/README.md` is the planning index.
 
 ## Read First
 
+- Using capture/storage/inspection: start with `docs/capture/README.md` for
+  Showman Capture's vocabulary, task commands, and API/result meanings.
 - Resuming work: read the relevant
   `planning/agent-state/threads/<issue-number-or-tag>-<short-name>.md`.
 - Changing a component: read its contract in `planning/components/` first.

@@ -455,6 +455,23 @@ https://github.com/drobotcamo/balatro_showman/issues/79#issuecomment-5971771156;
 external pilot report and manifest referenced by the issue. Q04 remains open for
 other conditions and phases.
 
+### D036 — accepted — Present operational evidence tooling as Showman Capture
+
+Balatro Showman remains the video-reconstruction project. Its operational
+recording/storage/inspection capability is presented as Showman Capture, with
+Recorder, Run Store and Inspector surfaces. A task-oriented `python -m showman`
+entrypoint delegates to existing interfaces, retains their package/schema names,
+and provides a labeled synthetic onboarding path. Documentation prioritizes
+future agents: vocabulary, task instructions, exact API/result meanings, and
+verification come before implementation history.
+
+The user selected this name, documentation plus runnable onboarding plus a
+unified CLI, and an agent-first audience on 2026-10-03 in this branding session.
+Alternatives were one project name without a sub-brand, deferred naming, and
+documentation alone. This is presentation and additive access, not a change to
+storage, lifecycle, reconstruction semantics, evaluation thresholds, or phase
+acceptance. Canonical product documentation: `docs/capture/README.md`.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the

@@ -3,8 +3,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from .inspection import InspectionError, RunBundleInspector
 from .repository import BundleError, ImportConflict, RunBundle
 
-def main(argv=None):
-    p = argparse.ArgumentParser(); sub = p.add_subparsers(dest="command", required=True)
+def build_parser(*, add_help=True, include_import=True, prog=None):
+    p = argparse.ArgumentParser(add_help=add_help, prog=prog); sub = p.add_subparsers(dest="command", required=True)
     for name in ("list", "capabilities"):
         x = sub.add_parser(name); x.add_argument("--db", required=True); x.add_argument("--run")
     for name in ("summary", "step", "find", "provenance", "evidence", "validate", "outcome", "transitions", "diff"):
@@ -13,8 +13,13 @@ def main(argv=None):
         if name in ("find", "evidence"): x.add_argument("--kind"); x.add_argument("--from", dest="sequence_from", type=int); x.add_argument("--to", dest="sequence_to", type=int)
         if name == "validate": x.add_argument("--strict", action="store_true")
         if name == "diff": x.add_argument("--from-sequence", type=int, required=True); x.add_argument("--to-sequence", type=int, required=True)
-    x = sub.add_parser("import-oracle", help="import one file-IPC run directory into the SQLite bundle")
-    x.add_argument("--db", required=True); x.add_argument("--source", required=True)
+    if include_import:
+        x = sub.add_parser("import-oracle", help="import one file-IPC run directory into the SQLite bundle")
+        x.add_argument("--db", required=True); x.add_argument("--source", required=True)
+    return p
+
+def main(argv=None):
+    p = build_parser()
     try:
         a = p.parse_args(argv)
         if a.command == "import-oracle":
