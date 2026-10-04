@@ -69,6 +69,10 @@ an existing destination and has no video, recording marker, or reviewed labels.
 
 ## Inspect an existing artifact
 
+To inspect a recording beside its original action sequence, use the local
+[video/action review viewer](video-review.md). It supports sequential or seeded
+random windows and external debugging exports; it does not export scored labels.
+
 For a SQLite bundle:
 
 ```text
