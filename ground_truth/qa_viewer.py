@@ -1,6 +1,7 @@
 """Local video/oracle debugging viewer. Sources are never modified."""
 
 import argparse
+import bisect
 import hashlib
 import json
 import math
@@ -10,6 +11,8 @@ import secrets
 import shutil
 import subprocess
 import threading
+import urllib.error
+import urllib.request
 import webbrowser
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -26,19 +29,53 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def paths_overlap(left, right):
+    left, right = Path(left).resolve(), Path(right).resolve()
+    return left == right or left.is_relative_to(right) or right.is_relative_to(left)
+
+
 def probe(path):
     result = subprocess.run([
         "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
-        "stream=codec_name,width,height,avg_frame_rate,start_time:format=duration,start_time",
+        "stream=codec_name,width,height,avg_frame_rate,r_frame_rate,start_time:format=duration,start_time",
         "-of", "json", str(path),
     ], check=True, capture_output=True, text=True, timeout=60)
     data = json.loads(result.stdout)
     stream = data["streams"][0]
+    data["codec_name"] = stream.get("codec_name")
     numerator, denominator = map(float, stream["avg_frame_rate"].split("/"))
     data["fps"] = numerator / denominator
     data["duration"] = float(data["format"]["duration"])
     if not all(math.isfinite(data[key]) and data[key] > 0 for key in ("fps", "duration")):
         raise ValueError("video duration and FPS must be finite and positive")
+    packets = subprocess.run([
+        "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_packets",
+        "-show_entries", "packet=pts_time", "-of", "json", str(path),
+    ], check=True, capture_output=True, text=True, timeout=120)
+    recorded = json.loads(packets.stdout).get("packets")
+    if not isinstance(recorded, list) or not recorded:
+        raise ValueError("video contains no packets with presentation timestamps")
+    timestamps = []
+    for packet in recorded:
+        raw = packet.get("pts_time") if isinstance(packet, dict) else None
+        if raw is None:
+            raise ValueError("video packet lacks a presentation timestamp")
+        try:
+            timestamp = float(raw)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("video packet has an invalid presentation timestamp") from exc
+        if not math.isfinite(timestamp):
+            raise ValueError("video has non-finite presentation timestamps")
+        timestamps.append(timestamp)
+    timestamps.sort()
+    if any(right <= left for left, right in zip(timestamps, timestamps[1:])):
+        raise ValueError("video has duplicate presentation timestamps")
+    period = 1 / data["fps"]
+    data["frame_count"] = len(timestamps)
+    data["presentation_origin"] = timestamps[0]
+    data["frame_timestamps"] = [timestamp - timestamps[0] for timestamp in timestamps]
+    data["constant_fps"] = all(abs((right - left) - period) <= period * 0.05
+                               for left, right in zip(timestamps, timestamps[1:]))
     return data
 
 
@@ -75,14 +112,14 @@ class Review:
                 raise ValueError("oracle payload and hashed bytes disagree")
             # Restrict output to a separate tree: never beneath a source directory
             # or an ancestor containing source files or the original video.
-            if self.export_root == root or self.export_root.is_relative_to(root) or root.is_relative_to(self.export_root):
+            if paths_overlap(self.export_root, root):
                 raise ValueError("export root overlaps an oracle source")
             self.sources.append(record)
             self.source_bytes.append(frozen)
         if not self.sources or len({r["run_id"] for r in self.sources}) != len(self.sources):
             raise ValueError("sources must be nonempty and have distinct run IDs")
-        if self.video.is_relative_to(self.export_root):
-            raise ValueError("export root contains the source video")
+        if paths_overlap(self.video, self.export_root):
+            raise ValueError("export root overlaps the source video")
         repository = Path(__file__).resolve().parent.parent
         if self.export_root.is_relative_to(repository):
             raise ValueError("generated exports must be outside the repository")
@@ -90,6 +127,10 @@ class Review:
             raise ValueError("export parent must already exist")
         self.video_hash = digest(self.video)
         self.video_probe = probe(self.video)
+        if self.video_probe.get("codec_name") != "h264":
+            raise ValueError("eligibility frame mapping currently supports H.264 video only")
+        if not self.video_probe.get("constant_fps"):
+            raise ValueError("eligibility review requires constant-FPS video")
         self.times = []
         self.timing = []
         for source in self.sources:
@@ -119,6 +160,7 @@ class Review:
             self.timing.append(timing)
         self.media = None
         self.media_hash = None
+        self.media_probe = None
         self.exports = {}
         self.selections = {}
 
@@ -147,6 +189,15 @@ class Review:
         origin = float(self.media_probe["streams"][0].get("start_time", 0))
         if abs(origin) > 1 / self.video_probe["fps"] or abs(self.media_probe["duration"] - self.video_probe["duration"]) > 0.1:
             raise ValueError("remux timeline differs from source; inspect media before using candidate times")
+        source_times = self.video_probe["frame_timestamps"]
+        media_times = self.media_probe["frame_timestamps"]
+        if len(source_times) != len(media_times):
+            raise ValueError("browser remux frame count differs from source; frame review is unavailable")
+        maximum_frame_delta = max((abs(source - media) for source, media in zip(source_times, media_times)), default=0)
+        if maximum_frame_delta > 0.5 / self.video_probe["fps"]:
+            raise ValueError("browser remux frame timestamps do not map one-to-one to source frames")
+        self.frame_mapping = {"status": "one_to_one_timestamps_confirmed", "frame_count": len(source_times),
+                              "maximum_timestamp_delta_seconds": maximum_frame_delta}
         self.media, self.media_hash = destination, digest(destination)
         if not metadata.exists():
             with metadata.open("x", encoding="utf-8") as stream:
@@ -188,8 +239,13 @@ class Review:
                 "clip_end": ending, "timing": self.timing[source], "diagnostics": original["diagnostics"],
                 "seed": self.seed, "draw": self.draw, "sampling": "uniform-source-local-windows/v1"}
 
-    def catalog(self):
-        return {"video": str(self.video), "video_sha256": self.video_hash, "probe": self.video_probe,
+    def catalog(self, include_frame_timestamps=True):
+        video_probe = dict(self.video_probe)
+        if not include_frame_timestamps:
+            video_probe.pop("frame_timestamps", None)
+        return {"video": str(self.video), "video_sha256": self.video_hash, "probe": video_probe,
+                "media_presentation_origin": self.media_probe.get("presentation_origin", 0) if self.media_probe else 0,
+                "frame_mapping": self.frame_mapping if self.media_probe else {"status": "not_prepared"},
                 "media": "/media", "seed": self.seed, "export_root": str(self.export_root),
                 "sources": [{"id": source["run_id"], "steps": len(source["steps"]),
                              "source": source["source"], "timing": self.timing[i]}
@@ -231,7 +287,7 @@ class Review:
         (folder / "actions.ndjson").write_bytes(b"".join(lines[window["start"]:window["stop"]]))
         (folder / "notes.txt").write_text(notes, encoding="utf-8")
         packet = {"schema_version": "oracle-video-qa-debug/1", "status": "unscored",
-                  "window": window, "catalog": self.catalog(), "notes": notes,
+                   "window": window, "catalog": self.catalog(include_frame_timestamps=False), "notes": notes,
                   "clip_probe": probe(clip), "extraction": {"mode": "reencoded-video-only",
                   "timeline_note": "Clip seeks use requested clip_start as origin; frame quantization and rendered correspondence are unverified.",
                   "command": ["ffmpeg", "-nostdin", "-v", "error", "-n", *arguments],
@@ -254,6 +310,84 @@ class Review:
             for name, metadata in original["source"]["files"].items():
                 if digest(Path(original["source"]["directory"]) / name) != metadata["sha256"]:
                     raise ValueError("oracle source changed; reload viewer")
+
+    def save_eligibility(self, data):
+        """Preserve one human review observation outside the repository; never score it."""
+        source = data.get("source")
+        index = data.get("index")
+        if type(source) is not int or not 0 <= source < len(self.sources):
+            raise ValueError("invalid source index")
+        if type(index) is not int or not 0 <= index < len(self.sources[source]["steps"]):
+            raise ValueError("invalid step index")
+        selection = self.selections.get(data.get("selection_id"))
+        if (selection is None or selection["source"] != source or
+                not selection["start"] <= index < min(selection["start"] + selection["count"],
+                                                        len(self.sources[source]["steps"]))):
+            raise ValueError("step is not part of a server-issued review window")
+        stage = data.get("stage")
+        if stage not in ("start", "small_blind_select", "small_blind_play", "cash_out", "first_shop"):
+            raise ValueError("invalid stage")
+        state = data.get("alignment")
+        if state not in ("confirmed", "unverified", "failed", "disputed"):
+            raise ValueError("invalid alignment disposition")
+        frame = data.get("frame")
+        if type(frame) is not int or frame < 0:
+            raise ValueError("frame must be a nonnegative integer")
+        if frame >= self.video_probe.get("frame_count", math.ceil(self.video_probe["duration"] * self.video_probe["fps"])):
+            raise ValueError("frame is outside the video duration")
+        offset = data.get("offset_frames")
+        if offset is not None and (type(offset) is not int or abs(offset) > 100000):
+            raise ValueError("invalid measured offset")
+        if state == "confirmed" and (offset is None or abs(offset) > 3 or self.times[source][index] is None):
+            raise ValueError("confirmation requires an in-range candidate and measured offset within ±3 frames")
+        fields = ("evidence", "visual_observation", "missingness", "reviewer", "registry_audit")
+        for field in fields:
+            if not isinstance(data.get(field), str) or len(data[field]) > 10000:
+                raise ValueError(f"{field} must be text of at most 10000 characters")
+        if not data["evidence"].strip() or not data["reviewer"].strip():
+            raise ValueError("reviewer and rendered-correspondence evidence are required")
+        if self.export_root.resolve() != self.export_root:
+            raise ValueError("export root was redirected")
+        self.check_sources()
+        if digest(self.video) != self.video_hash:
+            raise ValueError("source video changed; reload viewer")
+        folder = self.export_root / "eligibility-reviews"
+        folder.mkdir(parents=True, exist_ok=True)
+        if folder.resolve() != folder:
+            raise ValueError("review folder was redirected")
+        row = self.sources[source]["steps"][index]
+        packet = {"schema": "first-slice-eligibility-review/1", "protocol": "FIRST_SLICE_PROTOCOL_V2",
+                  "status": "unscored", "video_sha256": self.video_hash, "video": str(self.video),
+                  "source_run_id": self.sources[source]["run_id"],
+                  "oracle_files": self.sources[source]["source"]["files"],
+                  "step_id": row.get("step_id"), "step_index": index,
+                  "candidate_seconds": self.times[source][index], "fps": self.video_probe["fps"],
+                  "marker": self.timing[source]["original_marker"],
+                  "timing_evidence": self.timing[source]["evidence"],
+                  "frame": frame, "frame_seconds": data.get("frame_seconds"),
+                  "stage": stage, "alignment": state, "offset_frames": offset,
+                  **{key: data[key] for key in fields}}
+        if type(packet["frame_seconds"]) not in (int, float) or not math.isfinite(packet["frame_seconds"]) or not 0 <= packet["frame_seconds"] <= self.video_probe["duration"]:
+            raise ValueError("invalid video time")
+        frame_timestamps = self.video_probe["frame_timestamps"]
+        expected_seconds = frame_timestamps[frame]
+        if abs(packet["frame_seconds"] - expected_seconds) > 0.5 / self.video_probe["fps"]:
+            raise ValueError("frame index and presented video time disagree with decoded frame timestamps")
+        if state == "confirmed":
+            candidate_index = bisect.bisect_left(frame_timestamps, packet["candidate_seconds"] or 0)
+            if candidate_index and (candidate_index == len(frame_timestamps) or
+                    abs(frame_timestamps[candidate_index - 1] - (packet["candidate_seconds"] or 0)) <
+                    abs(frame_timestamps[candidate_index] - (packet["candidate_seconds"] or 0))):
+                candidate_index -= 1
+            expected_offset = frame - candidate_index
+            if offset != expected_offset:
+                raise ValueError("confirmed frame offset disagrees with the candidate and presented frame")
+        packet["frame_index_basis"] = "zero-based presentation-frame index; timestamp checked against decoded constant-FPS cadence"
+        destination = folder / (datetime.now(timezone.utc).strftime("review-%Y%m%dT%H%M%SZ-") + secrets.token_hex(8) + ".json")
+        with destination.open("x", encoding="utf-8") as stream:
+            json.dump(packet, stream, indent=2, sort_keys=True, allow_nan=False)
+            stream.write("\n")
+        return {"file": str(destination), "status": "unscored"}
 
 
 def byte_range(header, size):
@@ -371,6 +505,8 @@ def make_server(review, port=0, steps=10):
                     elif self.path == "/api/export":
                         result = review.export(data["source"], data["start"], data["count"], data.get("notes", ""),
                                                data["selection_id"])
+                    elif self.path == "/api/eligibility":
+                        result = review.save_eligibility(data)
                     else:
                         return self.send(404, {"error": "not found"})
                 return self.send(200, result)
@@ -414,6 +550,146 @@ def main():
         pass
     finally:
         server.server_close()
+
+
+def launch_group():
+    """Launch explicitly grouped videos from a UTF-8 JSON file or command line."""
+    parser = argparse.ArgumentParser(description="Launch one local QA viewer per explicitly declared video/run group.")
+    parser.add_argument("--config", type=Path, help="UTF-8 JSON configuration containing a viewers array")
+    parser.add_argument("--video", action="append", type=Path, help="single video path (use --config for multiple videos)")
+    parser.add_argument("--run", action="append", type=Path, help="ordered run directory for the single command-line video")
+    parser.add_argument("--export-root", type=Path, help="base external export directory; each video gets a child")
+    parser.add_argument("--seed", help="optional seed prefix for repeatable navigation")
+    parser.add_argument("--steps", type=int, default=10)
+    parser.add_argument("--open", action="store_true", help="open every viewer in the default browser")
+    args = parser.parse_args()
+    try:
+        if args.config:
+            if args.video or args.run or args.export_root:
+                raise ValueError("--config cannot be combined with command-line video/run/export arguments")
+            config_path = args.config.resolve(strict=True)
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            viewers = config.get("viewers") if isinstance(config, dict) else None
+            if not isinstance(viewers, list) or not viewers:
+                raise ValueError("config must contain a nonempty viewers array")
+            base = config_path.parent
+            groups = []
+            for item in viewers:
+                if not isinstance(item, dict) or not item.get("video") or not item.get("runs"):
+                    raise ValueError("each viewer requires video and a nonempty runs array")
+                groups.append((Path(item["video"]), [Path(run) for run in item["runs"]], item.get("export_name")))
+            if not config.get("export_root"):
+                raise ValueError("config requires export_root")
+            export_root = Path(config["export_root"])
+            if not export_root.is_absolute():
+                export_root = base / export_root
+            export_root = export_root.resolve()
+        else:
+            if not args.video or not args.run or not args.export_root:
+                raise ValueError("provide --config or --video/--run/--export-root")
+            if len(args.video) != 1:
+                raise ValueError("command-line launch accepts one --video; use --config to group multiple videos")
+            groups = [(args.video[0], args.run, None)]
+            export_root = args.export_root.resolve()
+        if not export_root.parent.is_dir():
+            raise ValueError("export root must be absolute or have an existing parent")
+        if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+            raise ValueError("ffmpeg and ffprobe must already be installed on PATH")
+        import sys
+        import time
+        repository = Path(__file__).resolve().parent.parent
+        if export_root == repository or repository in export_root.parents or export_root in repository.parents:
+            raise ValueError("launcher export root must remain outside the repository")
+        names = [name or f"{ordinal:02d}-{re.sub(r'[^A-Za-z0-9._-]+', '-', Path(video).stem).strip('-')}"
+                 for ordinal, (video, _, name) in enumerate(groups, 1)]
+        if len(set(names)) != len(names) or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}", name) for name in names):
+            raise ValueError("export names must be unique, filesystem-safe single path components")
+        resolved_groups = []
+        for ordinal, (video, runs, _) in enumerate(groups, 1):
+            name = names[ordinal - 1]
+            resolved_video = (base / video if args.config and not video.is_absolute() else video).resolve(strict=True)
+            resolved_runs = [(base / run if args.config and not run.is_absolute() else run).resolve(strict=True) for run in runs]
+            if (paths_overlap(resolved_video, export_root) or
+                    any(paths_overlap(export_root, root) for root in resolved_runs)):
+                raise ValueError("export root overlaps source video or oracle evidence")
+            resolved_groups.append((resolved_video, resolved_runs, name))
+        children = []
+        for ordinal, (video, resolved_runs, name) in enumerate(resolved_groups, 1):
+            child_name = name
+            child_export = export_root / child_name
+            if (paths_overlap(video, child_export) or
+                    any(paths_overlap(child_export, root) for root in resolved_runs)):
+                raise ValueError("child export folder overlaps source video or oracle evidence")
+            child_export.mkdir(parents=True, exist_ok=True)
+            command = [sys.executable, "-m", "ground_truth.qa_viewer", "--video", str(video),
+                       "--export-root", str(child_export), "--steps", str(args.steps)]
+            for run in resolved_runs:
+                command.extend(("--run", str(run)))
+            if args.seed:
+                command.extend(("--seed", f"{args.seed}-{ordinal}"))
+            if args.open:
+                command.append("--open")
+            log_base = export_root / (child_name + "-" + secrets.token_hex(4) + ".log")
+            stdout = log_base.with_suffix(log_base.suffix + ".out.txt").open("x", encoding="utf-8")
+            stderr = log_base.with_suffix(log_base.suffix + ".err.txt").open("x", encoding="utf-8")
+            try:
+                proc = subprocess.Popen(command, cwd=Path(__file__).resolve().parent.parent,
+                                        stdout=stdout, stderr=stderr, text=True)
+            except Exception:
+                stdout.close()
+                stderr.close()
+                raise
+            children.append((proc, stdout, stderr, child_name, log_base))
+        deadline = time.monotonic() + 120
+        while time.monotonic() < deadline:
+            failed = [child for child in children if child[0].poll() is not None]
+            if failed:
+                details = "; ".join(f"{name}: {err.with_suffix(err.suffix + '.err.txt').read_text(encoding='utf-8', errors='replace')}"
+                                     for _, _, _, name, err in failed)
+                raise ValueError("viewer startup failed: " + details)
+            ready = []
+            for proc, _, _, name, log_base in children:
+                out = log_base.with_suffix(log_base.suffix + ".out.txt")
+                text_out = out.read_text(encoding="utf-8", errors="replace") if out.exists() else ""
+                for line in text_out.splitlines():
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if all(isinstance(record.get(key), str) for key in ("url", "export_root", "seed")):
+                        if proc.poll() is not None:
+                            continue
+                        try:
+                            with urllib.request.urlopen(record["url"] + "/", timeout=1) as response:
+                                if response.status == 200:
+                                    if proc.poll() is None:
+                                        ready.append({"name": name, **record, "pid": proc.pid})
+                                        break
+                                    raise ValueError(f"{name} viewer exited during readiness probe")
+                        except (OSError, urllib.error.URLError, TimeoutError):
+                            continue
+            if len(ready) == len(children):
+                if all(child[0].poll() is None for child in children):
+                    print(json.dumps({"viewers": ready}, indent=2))
+                    for child in children:
+                        child[1].close()
+                        child[2].close()
+                    return
+            time.sleep(0.25)
+        raise ValueError("viewer startup timed out; inspect per-viewer .err.txt logs")
+    except (ValueError, OSError, json.JSONDecodeError, subprocess.SubprocessError) as exc:
+        for child in locals().get("children", []):
+            proc = child[0]
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+            child[1].close()
+            child[2].close()
+        parser.error(str(exc))
 
 
 if __name__ == "__main__":

@@ -68,6 +68,25 @@ under its Decisions section. This file is a knowledge base, not a task log.
   resolution and verifies pre/resolved fields. This does not replace the live
   capture check.
 
+## 2026-10-04: Launch grouped video reviews from a quoted JSON manifest
+
+- Context: Two external Issue #82 videos had to be launched with associated
+  oracle directories, including a single play split across two recorder IDs.
+- Observation: PowerShell `Start-Process -ArgumentList` with an array split a
+  space-containing MKV path and the viewer rejected its trailing filename. A
+  single quoted argument string worked. Each viewer also needs an independent
+  external export root and its own local URL; two recorder fragments of one
+  video must be passed to one viewer process.
+- Implication: Use `ground_truth.qa_viewer_launch` with a UTF-8 JSON manifest to
+  anchor relative paths, retain explicit video/run grouping, allocate separate
+  external output folders, and collect startup logs. Do not infer group identity
+  from filenames or recorder ID count.
+- Verification/source: Launched both 2026-10-03 Issue #82 videos from their
+  actual external paths on 2026-10-04; both servers printed ready URLs, loaded
+  their listed runs without diagnostics, and left source video/run files intact.
+  PowerShell argument failure and corrected launch output are documented in
+  `docs/capture/video-review.md`. This verifies startup only, not frame alignment.
+
 ## 2026-10-03: Continue can restore earlier counters without changing logical run identity
 
 - Context: Issue #115's fixed-build live smoke preserved source ID
