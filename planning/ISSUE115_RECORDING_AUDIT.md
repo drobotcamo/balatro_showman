@@ -312,3 +312,78 @@ Proposed video/source/quarantined-marker membership awaits explicit human
 confirmation. This capture can be preserved as debugging evidence, but the next
 #115 action remains a full game restart, loaded-build verification and then an
 authorized menu/Continue smoke recording. No additional held-out runs requested.
+
+## Fixed-build live smoke: identity continuity verified
+
+After the full user-owned restart, Balatro PID 25004 (started 23:30:32 local)
+loaded `issue115-continue-identity-1`, reported in
+`lovely-2026.10.03-23.30.33.log:84`. Checked-in/installed producer SHA-256
+remained `e3d89671e5234dbdeceaa81566396bf67920460089a411c6319280fd2c29728d`.
+The user then recorded the requested menu/Continue smoke and requested inspection.
+
+Video: `F:\OBS_RECORDINGS\2026-10-03 23-34-52.mkv`.
+Source: `F:\OBS_RECORDINGS\oracle_runs_issue79\269979952000-1630`.
+The source has 32 contiguous request IDs and original step IDs, one recording
+marker and a loss outcome. Video is 1920×1080 at 60 FPS, 174.850 seconds,
+186,316,696 bytes. `planning/audit_oracle_runs.py` returned
+`oracle run integrity OK`; all 32 actions appear in their recorded legal labels.
+Three unresolved canonical actions and 11 unmapped inventory-class observations
+remain conformance limits, not silently inferred targets or classes.
+
+| Evidence | SHA-256 |
+| --- | --- |
+| video | `256d35fe84cae9f886da790b90bf0517a508e833302208de6d197cf3ab19efa3` |
+| session.json | `81f0cf50e96f8fcdb6f2e215d86a6dc29250480eb0f120208c5a9a3335b26871` |
+| steps.ndjson | `f983c3a9cef9585ddd305ec36a413079c038f49fbc4afe4434507658e8dccba6` |
+
+Producer marker `issue81-20261004T063455Z` is present in the session and the normal
+IPC marker file, FPS 60, timestamp `260775530399` ns. Its schema, ID, FPS and
+integer timestamp are valid; no quarantine recovery or copying into source
+metadata was needed. This is one source recording/play, with no renumbering or
+replacement session.
+
+### Menu boundary and lifecycle
+
+The adjacent actions surrounding the menu visit are
+`269979952000-1630:11` and `269979952000-1630:12`, both PlayHand,
+16.4117167 seconds apart. The ID is unchanged and request numbering advances
+11→12. Their scalar states, object arrays and pending-card arrays are equal:
+Ante 1 / Round 2, Big Blind, zero score, four hands, zero discards, $1,
+35 cards remaining, three jokers and Hex held. Only raw tracked-deck array
+ordering differs. The records are distinct callbacks, not duplicate IPC replays.
+
+Decoded neighboring frames at 58.763910 and 75.175626 seconds match those
+pre-action resources and objects. The 61.5-second Options frame shows the Main
+Menu control, the 63.5-second frame shows the main-menu/resume transition, and
+the recording returns to the same blind. A three-second contact sheet inspected
+the full 175-second recording. These observations verify the bounded lifecycle
+case; event-edge alignment within ±3 frames remains unmeasured and no evaluation
+or reconstruction-quality gate is claimed.
+
+The source remains one 32-step session through the menu interval and finalizes
+at the actual loss. The source ended at `2026-10-04T06:37:27.276149+00:00`, after
+its last recorded action at `06:37:25.107774+00:00`. A frame at 154.5 seconds shows
+Game Over, The Goad, Ante 1 / Round 3, final score 495 against 600, and $5.
+No source lifecycle/terminal outcome was repaired or fabricated.
+
+### Save-restoration anomaly retained
+
+Identity continuity does not imply continuous counters across save restoration.
+The intervening Options frame at 61.5 seconds shows the first hand resolved to
+score 13 and three hands left. After Continue, the scene and request 12 restore
+zero score and four hands. Thus the game visibly restores an earlier state;
+the underlying save timing/cause is not established here. The producer fix only
+preserves identity/sequence, not save contents. Both attempted actions remain in
+the source even though their pre-action snapshots match. Do not deduplicate them
+by state equality or claim that every field remained unchanged through the menu.
+
+### Association checkpoint still separate
+
+At this inspection the bundle's read-only list still contains the earlier three
+runs only. This source has not been imported or formally associated. Required
+smoke recording is present; proposed association is source run
+`269979952000-1630`, source lifecycle lost, its validated marker and the observed
+video above. Await explicit `confirm`, `decline` or `interrupt` before the planned
+import/additive association. Current inspection did not mutate video, source,
+IPC evidence or bundle provenance. Live identity verification passes; formal
+association, current-head approval and integration remain separate acceptance.

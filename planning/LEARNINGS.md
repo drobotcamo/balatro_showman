@@ -15,6 +15,23 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-03: Continue can restore earlier counters without changing logical run identity
+
+- Context: Issue #115's fixed-build live smoke preserved source ID
+  `269979952000-1630` and requests 11→12 across a Main Menu/Continue visit.
+- Observation: Both pre-action snapshots have zero score and four hands. The
+  intervening Options frame shows the first hand resolved to score 13 and three
+  hands; Continue visibly restores the earlier state. Source identity and marker
+  remain continuous through all 32 records and final loss. The save timing/cause
+  of the restored state was not established.
+- Implication: Identity continuity is distinct from state continuity. Preserve
+  repeated attempted actions across save restoration rather than deduplicating
+  equal state/action payloads or assuming counters must remain monotonic.
+- Verification/source: `planning/ISSUE115_RECORDING_AUDIT.md`, fixed-build smoke;
+  oracle integrity audit passed; decoded frames at 58.763910, 61.5, 63.5 and
+  75.175626 seconds. This is lifecycle verification, not measured reconstruction
+  quality or confirmed event-edge alignment within ±3 frames.
+
 ## 2026-10-03: A quarantined recording marker can contain valid bytes
 
 - Context: A subsequent #115 capture had 135 valid source steps but no attached
