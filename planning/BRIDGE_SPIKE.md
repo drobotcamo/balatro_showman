@@ -76,8 +76,10 @@ New-Item -ItemType Directory -Path "$env:APPDATA\Balatro\agent_io" -Force | Out-
 lovec tests/lua_file_ipc_fixture
 ```
 
-It validates queued request files and the terminal watermark with stub game
-state. It does not execute the Balatro runtime or validate game hooks.
+It validates queued requests, terminal watermarks and wrapped New Run/Continue
+callbacks with stub game state. The Python producer test also ingests the resumed
+queue and checks one contiguous session and recording association. These checks
+do not execute Balatro's actual save restoration or menu callbacks.
 
 ## Installation (reversible)
 
@@ -125,14 +127,14 @@ state. It does not execute the Balatro runtime or validate game hooks.
    ```
 
    Restart Balatro completely and verify the latest Lovely log reports build
-   `issue81-file-queue-1`. The producer hash and loaded build are separate
+   `issue115-continue-identity-1`. The producer hash and loaded build are separate
    checks. To roll back, close Balatro, move the new active directory out of
    `Mods`, and move the timestamped backup back to the active target. Keep the
    backup; do not delete it as part of an update.
 
 3. Launch Balatro and confirm the Lovely log reports the mod loaded:
    search `$env:APPDATA\Balatro\Mods\lovely\log\` for
-   `[balatro_showman_bridge] loaded; build=issue81-file-queue-1; io_dir=...`.
+   `[balatro_showman_bridge] loaded; build=issue115-continue-identity-1; io_dir=...`.
    Before recording, trigger one action and inspect its queued
    `request_<run>_<id>.json`. It must contain
    `"schema_version":"producer/1.0.0"`,

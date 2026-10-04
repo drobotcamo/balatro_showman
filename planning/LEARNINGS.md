@@ -15,6 +15,58 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-03: Continue can restore earlier counters without changing logical run identity
+
+- Context: Issue #115's fixed-build live smoke preserved source ID
+  `269979952000-1630` and requests 11→12 across a Main Menu/Continue visit.
+- Observation: Both pre-action snapshots have zero score and four hands. The
+  intervening Options frame shows the first hand resolved to score 13 and three
+  hands; Continue visibly restores the earlier state. Source identity and marker
+  remain continuous through all 32 records and final loss. The save timing/cause
+  of the restored state was not established.
+- Implication: Identity continuity is distinct from state continuity. Preserve
+  repeated attempted actions across save restoration rather than deduplicating
+  equal state/action payloads or assuming counters must remain monotonic.
+- Verification/source: `planning/ISSUE115_RECORDING_AUDIT.md`, fixed-build smoke;
+  oracle integrity audit passed; decoded frames at 58.763910, 61.5, 63.5 and
+  75.175626 seconds. This is lifecycle verification, not measured reconstruction
+  quality or confirmed event-edge alignment within ±3 frames.
+
+## 2026-10-03: A quarantined recording marker can contain valid bytes
+
+- Context: A subsequent #115 capture had 135 valid source steps but no attached
+  recording object. Its preserved `recording_start_marker.json.invalid` contained
+  a marker accepted by the current consumer in an isolated temporary fixture.
+- Observation: `_attach_recording_marker` groups OSError with JSON decode errors
+  and attempts quarantine for either. Injecting FileNotFoundError during a fixture
+  read moved the otherwise valid marker to `.invalid`. The actual read exception
+  responsible for the real capture is unknown.
+- Implication: A quarantine suffix alone does not establish malformed bytes;
+  preserve and validate the evidence separately, without repairing source files
+  or inferring confirmation. Transient read failure and invalid content need
+  distinct handling in any future reader fix.
+- Verification/source: `planning/ISSUE115_RECORDING_AUDIT.md`, subsequent-capture
+  section; isolated diagnostic `issue115_new_capture.py` under the approved temp
+  directory; `ground_truth/file_ipc_bridge.py` recording-marker read exception path.
+
+## 2026-10-03: Equal resume boundary counters are not duplicate action records
+
+- Context: Issue #115 inspected 15 persisted oracle sessions (1,543 steps),
+  including the user-confirmed menu/Continue split in the latest recording.
+- Observation: `1898258342000-5384:109` and `2317688862100-2663:1` have equal
+  scalar state 12.8777339 seconds apart, but select different cards. Decoded
+  frames show the same Big Blind, score, resources and jokers with those distinct
+  selections. Raw tracked-deck array ordering changes after reload. The existing
+  auditor also crashed on absent legacy timestamps and falsely reported missing
+  raw fields for populated `producer/1.0.0` snapshots.
+- Implication: Group confirmed fragments by source recording/play while retaining
+  every original source step; counter equality alone does not justify deduplication.
+  Inspect actual payload coverage independently of schema-name assumptions.
+- Verification/source: `planning/ISSUE115_RECORDING_AUDIT.md`; archive audit,
+  decoded candidate frames at 412.6541974 / 425.5319313 seconds, and focused
+  audit/producer/consumer tests (55 passed). Event-edge alignment and fresh live
+  Continue verification remain pending.
+
 ## 2026-10-03: Installed Balatro Lua source is readable from the executable
 
 - Context: Locate the installed game's source for agent reference on Cam's

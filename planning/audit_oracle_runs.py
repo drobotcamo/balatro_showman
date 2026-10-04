@@ -178,13 +178,16 @@ def conformance_findings(summary: dict) -> list[str]:
             f"{summary['run']}: pending_cards.{column} is null/empty on all "
             f"{summary.get('pending_cards_total', 0)} pending card(s)"
         )
-    if not summary.get("raw_field_schema"):
+    if not summary.get("raw_field_schema") and not summary.get("raw_persistent_nonempty"):
         findings.append(
             f"{summary['run']}: no raw persistent fields "
             f"(schema {summary.get('schema_versions', {}) or 'unknown'} predates "
             f"{sorted(RAW_FIELD_SCHEMA_VERSIONS)})"
         )
     else:
+        missing_raw = summary.get("step_lines", 0) - summary.get("raw_persistent_nonempty", 0)
+        if missing_raw:
+            findings.append(f"{summary['run']}: raw_persistent missing/empty on {missing_raw}/{summary['step_lines']} steps")
         for key in ("skips", "hands_played", "unused_discards", "ecto_minus"):
             if summary.get(f"raw_{key}_present", 0) == 0 and summary.get("step_lines"):
                 findings.append(
@@ -285,7 +288,8 @@ def audit(run_dir: Path) -> dict:
             fail(f"{label}: step {index} lacks video_timestamp_ns linkage")
         elif meta["video_timestamp_ns"] != timestamp:
             fail(f"{label}: step {index} video timestamp disagrees")
-        if index and timestamp <= records[index - 1].get("capture_timestamp_ns", -1):
+        previous = records[index - 1].get("capture_timestamp_ns") if index else None
+        if index and isinstance(timestamp, int) and isinstance(previous, int) and timestamp <= previous:
             fail(f"{label}: capture timestamps are not strictly ordered")
     if len(run_ids) != 1 or session.get("run_id") not in run_ids:
         fail(f"{label}: step run_id does not match session run_id ({dict(run_ids)})")
@@ -404,6 +408,7 @@ def audit(run_dir: Path) -> dict:
     # --- raw persistent-field and legality coverage (D021, Issue #21) ---
     summary["raw_field_schema"] = bool(schema_version) and schema_version in RAW_FIELD_SCHEMA_VERSIONS
     raw_rows = [r.get("raw_persistent") or {} for r in records]
+    summary["raw_persistent_nonempty"] = sum(1 for row in raw_rows if isinstance(row, dict) and row)
     for field, subfield in RAW_LEAF_FIELDS:
         if subfield is None:
             key = f"raw_{field}_present"

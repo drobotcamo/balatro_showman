@@ -1469,12 +1469,19 @@ local function install_game_hooks()
   local original_start_run = Game.start_run
   if type(original_start_run) == "function" then
     Game.start_run = function(self, ...)
-      run_id = tostring(math.floor(love.timer.getTime() * 1e9)) .. "-" .. tostring(math.random(1000, 9999))
-      request_counter = 0
-      producer_write_failures = 0
-      run_ending = false
-      run_finalized = false
-      finalization_failure_logged = false
+      local args = select(1, ...)
+      -- Continue restores the same save after a menu visit. Keep its producer
+      -- identity and watermark, including terminal state (no resurrection).
+      -- A cold-process Continue has no in-memory identity to recover.
+      local continuing = type(args) == "table" and args.savetext and run_id
+      if not continuing then
+        run_id = tostring(math.floor(love.timer.getTime() * 1e9)) .. "-" .. tostring(math.random(1000, 9999))
+        request_counter = 0
+        producer_write_failures = 0
+        run_ending = false
+        run_finalized = false
+        finalization_failure_logged = false
+      end
       return original_start_run(self, ...)
     end
   end
@@ -1496,6 +1503,6 @@ pcall(function() love.filesystem.createDirectory("agent_io") end)
 install_game_hooks()
 install_action_hooks()
 
-print("[balatro_showman_bridge] loaded; build=issue81-file-queue-1; io_dir=" .. IO_DIR)
+print("[balatro_showman_bridge] loaded; build=issue115-continue-identity-1; io_dir=" .. IO_DIR)
 
 return Bridge
