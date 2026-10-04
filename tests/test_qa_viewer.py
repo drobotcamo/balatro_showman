@@ -173,6 +173,7 @@ class ViewerTests(unittest.TestCase):
 
         with patch("sys.argv", ["qa_viewer_launch", "--config", str(config_path)]), \
                 patch("ground_truth.qa_viewer.subprocess.Popen", side_effect=popen), \
+                patch("urllib.request.urlopen", return_value=contextlib.nullcontext(type("Response", (), {"status": 200})())), \
                 contextlib.redirect_stdout(io.StringIO()) as captured:
             launch_group()
         response = json.loads(captured.getvalue())

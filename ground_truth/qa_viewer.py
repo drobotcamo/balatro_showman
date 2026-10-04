@@ -11,6 +11,8 @@ import secrets
 import shutil
 import subprocess
 import threading
+import urllib.error
+import urllib.request
 import webbrowser
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -109,14 +111,14 @@ class Review:
                 raise ValueError("oracle payload and hashed bytes disagree")
             # Restrict output to a separate tree: never beneath a source directory
             # or an ancestor containing source files or the original video.
-            if self.export_root == root or self.export_root.is_relative_to(root) or root.is_relative_to(self.export_root):
+            if paths_overlap(self.export_root, root):
                 raise ValueError("export root overlaps an oracle source")
             self.sources.append(record)
             self.source_bytes.append(frozen)
         if not self.sources or len({r["run_id"] for r in self.sources}) != len(self.sources):
             raise ValueError("sources must be nonempty and have distinct run IDs")
-        if self.video.is_relative_to(self.export_root):
-            raise ValueError("export root contains the source video")
+        if paths_overlap(self.video, self.export_root):
+            raise ValueError("export root overlaps the source video")
         repository = Path(__file__).resolve().parent.parent
         if self.export_root.is_relative_to(repository):
             raise ValueError("generated exports must be outside the repository")
@@ -184,6 +186,15 @@ class Review:
         origin = float(self.media_probe["streams"][0].get("start_time", 0))
         if abs(origin) > 1 / self.video_probe["fps"] or abs(self.media_probe["duration"] - self.video_probe["duration"]) > 0.1:
             raise ValueError("remux timeline differs from source; inspect media before using candidate times")
+        source_times = self.video_probe["frame_timestamps"]
+        media_times = self.media_probe["frame_timestamps"]
+        if len(source_times) != len(media_times):
+            raise ValueError("browser remux frame count differs from source; frame review is unavailable")
+        maximum_frame_delta = max((abs(source - media) for source, media in zip(source_times, media_times)), default=0)
+        if maximum_frame_delta > 0.5 / self.video_probe["fps"]:
+            raise ValueError("browser remux frame timestamps do not map one-to-one to source frames")
+        self.frame_mapping = {"status": "one_to_one_timestamps_confirmed", "frame_count": len(source_times),
+                              "maximum_timestamp_delta_seconds": maximum_frame_delta}
         self.media, self.media_hash = destination, digest(destination)
         if not metadata.exists():
             with metadata.open("x", encoding="utf-8") as stream:
@@ -231,6 +242,7 @@ class Review:
             video_probe.pop("frame_timestamps", None)
         return {"video": str(self.video), "video_sha256": self.video_hash, "probe": video_probe,
                 "media_presentation_origin": self.media_probe.get("presentation_origin", 0) if self.media_probe else 0,
+                "frame_mapping": self.frame_mapping if self.media_probe else {"status": "not_prepared"},
                 "media": "/media", "seed": self.seed, "export_root": str(self.export_root),
                 "sources": [{"id": source["run_id"], "steps": len(source["steps"]),
                              "source": source["source"], "timing": self.timing[i]}
@@ -595,8 +607,7 @@ def launch_group():
             resolved_video = (base / video if args.config and not video.is_absolute() else video).resolve(strict=True)
             resolved_runs = [(base / run if args.config and not run.is_absolute() else run).resolve(strict=True) for run in runs]
             if (paths_overlap(resolved_video, export_root) or
-                    any(export_root == root or export_root.is_relative_to(root) or root.is_relative_to(export_root)
-                        for root in resolved_runs)):
+                    any(paths_overlap(export_root, root) for root in resolved_runs)):
                 raise ValueError("export root overlaps source video or oracle evidence")
             resolved_groups.append((resolved_video, resolved_runs, name))
         children = []
@@ -604,8 +615,7 @@ def launch_group():
             child_name = name
             child_export = export_root / child_name
             if (paths_overlap(video, child_export) or
-                    any(child_export == root or child_export.is_relative_to(root) or root.is_relative_to(child_export)
-                        for root in resolved_runs)):
+                    any(paths_overlap(child_export, root) for root in resolved_runs)):
                 raise ValueError("child export folder overlaps source video or oracle evidence")
             child_export.mkdir(parents=True, exist_ok=True)
             command = [sys.executable, "-m", "ground_truth.qa_viewer", "--video", str(video),
@@ -643,8 +653,15 @@ def launch_group():
                     except json.JSONDecodeError:
                         continue
                     if all(isinstance(record.get(key), str) for key in ("url", "export_root", "seed")):
-                        ready.append({"name": name, **record, "pid": proc.pid})
-                        break
+                        if proc.poll() is not None:
+                            continue
+                        try:
+                            with urllib.request.urlopen(record["url"] + "/", timeout=1) as response:
+                                if response.status == 200:
+                                    ready.append({"name": name, **record, "pid": proc.pid})
+                                    break
+                        except (OSError, urllib.error.URLError, TimeoutError):
+                            continue
             if len(ready) == len(children):
                 print(json.dumps({"viewers": ready}, indent=2))
                 for child in children:

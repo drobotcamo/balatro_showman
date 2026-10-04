@@ -93,10 +93,12 @@ labels. The reviewer field identifies the person who inspected the pixels.
 **Save unscored observation** writes a new JSON file under the selected external
 export root's `eligibility-reviews` directory. The browser's decoded-frame
 callback supplies the presented frame's timestamp; its index is mapped against
-decoded source timestamps. The server binds the oracle step to the displayed
-window and checks frame bounds, timestamp correspondence, constant-FPS cadence,
-and candidate/offset agreement. The callback and reviewer notes are evidence,
-not a cryptographic attestation of the display. Saves record source hashes and the
+source video packet presentation timestamps. The viewer checks that the browser
+remux has a one-to-one frame count and matching per-frame timestamps. The server
+binds the oracle step to the displayed window and checks frame bounds, timestamp
+correspondence, constant-FPS cadence, and candidate/offset agreement. The
+callback and reviewer notes are evidence, not a cryptographic attestation of the
+display. Saves record source hashes and the
 original step identity. They never replace a previous observation, edit source
 video/oracle files, certify source overlap, or produce a held-out manifest/score.
 For recordings with multiple recorder IDs, pass every associated `--run` for the
