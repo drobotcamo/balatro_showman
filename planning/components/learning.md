@@ -7,7 +7,8 @@ Status: `planned`
 Consume reconstructed state and events for exploration, prediction, and future
 agent experiments without making strategy assumptions part of data collection.
 Deep mechanics analytics is an early product (#124/#129/#130), not postponed until
-action modeling or full video reconstruction. See `planning/ARCHITECTURE.md`.
+action modeling or full video reconstruction. See `planning/ARCHITECTURE.md` and
+`planning/RUN_MECHANICS_DESIGN.md`.
 
 ## Inputs
 

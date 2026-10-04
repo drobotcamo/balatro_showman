@@ -15,6 +15,7 @@ maintain aligned real-frame evaluation and minimal annotation/QA. Suitability is
 field/revision-specific: defaults/coarse legality are not exact engine truth.
 `planning/ARCHITECTURE.md` defines separate evidence and answer-key channels.
 #123 stages Dagger reference first, then only the extensions consuming slices need.
+The mechanics evidence/reference boundary is in `planning/RUN_MECHANICS_DESIGN.md`.
 #82 owns annotation/evaluation; #115 owns Continue identity and live acceptance.
 
 ## Inputs

@@ -6,7 +6,8 @@ Status: `planned`
 
 Reduce permitted observations into evidence-linked persistent gameplay state for
 mechanics analytics now and video reconstruction later. Dagger (#124) is the first
-slice under #122; `planning/ARCHITECTURE.md` defines the shared boundary. The full
+slice under #122; `planning/ARCHITECTURE.md` and
+`planning/RUN_MECHANICS_DESIGN.md` define the shared boundary. The full
 action-space/mask interface remains a consumer target, not a Dagger prerequisite.
 
 ## Inputs

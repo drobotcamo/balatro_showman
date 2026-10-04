@@ -6,7 +6,8 @@ Status: `planned`
 
 Infer actions and mechanics occurrences without treating uncertain transitions as
 known. #122 defines shared derived-effect semantics; #124 starts with Dagger.
-`planning/ARCHITECTURE.md` separates observations, effects, state and reference.
+`planning/ARCHITECTURE.md` separates observations, effects, state and reference;
+`planning/RUN_MECHANICS_DESIGN.md` specifies the approved initial mechanics interface.
 
 ## Inputs
 
