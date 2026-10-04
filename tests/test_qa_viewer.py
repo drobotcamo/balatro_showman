@@ -1,4 +1,6 @@
 import http.client
+import contextlib
+import io
 import json
 import shutil
 import tempfile
@@ -7,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from ground_truth.qa_viewer import Review, byte_range, digest, make_server, run_ffmpeg
+from ground_truth.qa_viewer import Review, byte_range, digest, launch_group, make_server, probe, run_ffmpeg
 
 
 def source(root, name, n=23, marker=True):
@@ -34,7 +36,9 @@ class ViewerTests(unittest.TestCase):
         self.video.write_bytes(b"original video fixture")
         self.runs = [source(self.root, "a"), source(self.root, "b", 7, marker=False)]
         self.export_root = self.root / "exports"
-        self.probe = patch("ground_truth.qa_viewer.probe", return_value={"duration": 10.0, "fps": 10})
+        self.probe = patch("ground_truth.qa_viewer.probe", return_value={
+            "duration": 10.0, "fps": 10, "codec_name": "h264", "constant_fps": True, "frame_count": 100,
+            "presentation_origin": 0.0, "frame_timestamps": [i / 10 for i in range(100)]})
         self.probe.start()
         self.addCleanup(self.probe.stop)
 
@@ -74,6 +78,146 @@ class ViewerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.review().export(1, 0, 10, "")
         self.assertEqual(before, digest(self.runs[1] / "session.json"))
+
+    def test_eligibility_review_preserves_sources_and_rejects_unmeasured_confirmation(self):
+        review = self.review()
+        selection = review.window(source=0, start=0, count=2)
+        original = digest(self.runs[0] / "steps.ndjson")
+        payload = {"selection_id": selection["selection_id"], "source": 0, "index": 0, "stage": "start", "frame": 1,
+                   "frame_seconds": 0.1, "alignment": "confirmed", "offset_frames": None,
+                   "evidence": "rendered button visible at candidate", "visual_observation": "New Run",
+                   "missingness": "", "registry_audit": "external registry not yet checked",
+                   "reviewer": "human"}
+        with self.assertRaisesRegex(ValueError, "measured offset"):
+            review.save_eligibility(payload)
+        with self.assertRaisesRegex(ValueError, "measured offset"):
+            review.save_eligibility({**payload, "offset_frames": 4})
+        with self.assertRaisesRegex(ValueError, "server-issued"):
+            review.save_eligibility({**payload, "source": 1, "offset_frames": 0})
+        with self.assertRaisesRegex(ValueError, "server-issued"):
+            review.save_eligibility({**payload, "index": 2, "offset_frames": 0})
+        with self.assertRaisesRegex(ValueError, "disagrees with the candidate"):
+            review.save_eligibility({**payload, "offset_frames": -2})
+        saved = review.save_eligibility({**payload, "offset_frames": 0})
+        packet = json.loads(Path(saved["file"]).read_text())
+        self.assertEqual((packet["status"], packet["offset_frames"], packet["source_run_id"]),
+                         ("unscored", 0, "a"))
+        self.assertEqual(packet["video_sha256"], digest(self.video))
+        self.assertEqual(original, digest(self.runs[0] / "steps.ndjson"))
+        self.assertNotEqual(saved["file"], review.save_eligibility({**payload, "offset_frames": 0})["file"])
+
+    def test_eligibility_review_rejects_frame_time_mismatch_and_out_of_range(self):
+        review = self.review()
+        selection = review.window(source=0, start=0, count=1)
+        payload = {"source": 0, "index": 0, "stage": "start", "frame": 100,
+                   "selection_id": selection["selection_id"],
+                   "frame_seconds": 1.0, "alignment": "unverified", "offset_frames": None,
+                   "evidence": "candidate state inspected", "visual_observation": "",
+                   "missingness": "", "registry_audit": "not checked", "reviewer": "human"}
+        with self.assertRaisesRegex(ValueError, "outside the video duration"):
+            review.save_eligibility({**payload, "frame": 100})
+        with self.assertRaisesRegex(ValueError, "disagree"):
+            review.save_eligibility({**payload, "frame": 10, "frame_seconds": 2.0})
+
+    def test_viewer_rejects_variable_frame_rate_metadata(self):
+        self.probe.stop()
+        with patch("ground_truth.qa_viewer.probe", return_value={"duration": 10.0, "fps": 10,
+                                                                 "codec_name": "h264", "constant_fps": False}):
+            with self.assertRaisesRegex(ValueError, "constant-FPS"):
+                Review(self.video, self.runs, self.export_root)
+
+    def test_probe_checks_all_video_packet_presentation_timestamps(self):
+        stream = {"streams": [{"codec_name": "h264", "avg_frame_rate": "10/1", "r_frame_rate": "10/1"}],
+                  "format": {"duration": "0.3"}}
+        def result(packet_times):
+            return [type("Result", (), {"stdout": json.dumps(stream)})(),
+                    type("Result", (), {"stdout": json.dumps({"packets": packet_times})})()]
+        with patch("ground_truth.qa_viewer.subprocess.run", side_effect=result([
+                {"pts_time": "0.000"}, {"pts_time": "0.100"}, {"pts_time": "0.200"}])):
+            measured = probe(self.video)
+        self.assertTrue(measured["constant_fps"])
+        self.assertEqual(measured["frame_timestamps"], [0.0, 0.1, 0.2])
+        with patch("ground_truth.qa_viewer.subprocess.run", side_effect=result([
+                {"pts_time": "0.000"}, {"pts_time": "0.100"}, {"pts_time": "0.220"}])):
+            measured = probe(self.video)
+        self.assertFalse(measured["constant_fps"])
+        with patch("ground_truth.qa_viewer.subprocess.run", side_effect=result([
+                {"pts_time": "0.000"}, {}, {"pts_time": "0.200"}])):
+            with self.assertRaisesRegex(ValueError, "lacks a presentation timestamp"):
+                probe(self.video)
+
+    def test_group_launcher_preserves_spaced_paths_and_run_grouping(self):
+        output_parent = self.root / "external output"
+        output_parent.mkdir()
+        second_video = self.root / "recording two.mkv"
+        second_video.write_bytes(b"second fixture video")
+        config = {"export_root": "external output/reviews", "viewers": [
+            {"video": str(self.video), "runs": [str(self.runs[0])], "export_name": "first"},
+            {"video": str(second_video), "runs": [str(self.runs[0]), str(self.runs[1])]}
+        ]}
+        config_path = self.root / "review config.json"
+        config_path.write_text(json.dumps(config), encoding="utf-8")
+        launched = []
+
+        class Process:
+            pid = 42
+            def poll(self):
+                return None
+
+        def popen(command, cwd, stdout, stderr, text):
+            launched.append(command)
+            export = command[command.index("--export-root") + 1]
+            stdout.write(json.dumps({"url": f"http://127.0.0.1:{64000 + len(launched)}",
+                                     "export_root": export, "seed": "fixed"}) + "\n")
+            stdout.flush()
+            return Process()
+
+        with patch("sys.argv", ["qa_viewer_launch", "--config", str(config_path)]), \
+                patch("ground_truth.qa_viewer.subprocess.Popen", side_effect=popen), \
+                patch("urllib.request.urlopen", return_value=contextlib.nullcontext(type("Response", (), {"status": 200})())), \
+                contextlib.redirect_stdout(io.StringIO()) as captured:
+            launch_group()
+        response = json.loads(captured.getvalue())
+        self.assertEqual(len(response["viewers"]), 2)
+        self.assertIn(str(self.video), launched[0])
+        self.assertEqual(launched[1].count("--run"), 2)
+        self.assertTrue((output_parent / "reviews" / "first").is_dir())
+        self.assertTrue((output_parent / "reviews" / "02-recording-two").is_dir())
+
+    def test_group_launcher_rejects_child_that_exits_during_readiness_probe(self):
+        output_parent = self.root / "external output"
+        output_parent.mkdir()
+        config_path = self.root / "review config.json"
+        config_path.write_text(json.dumps({"export_root": "external output/reviews", "viewers": [
+            {"video": str(self.video), "runs": [str(self.runs[0])]}
+        ]}), encoding="utf-8")
+
+        class ExitingProcess:
+            pid = 43
+            calls = 0
+            alive = True
+            def poll(self):
+                self.calls += 1
+                return None if self.alive else 1
+
+        process = ExitingProcess()
+        def popen(command, cwd, stdout, stderr, text):
+            stdout.write(json.dumps({"url": "http://127.0.0.1:64001",
+                                     "export_root": "external", "seed": "fixed"}) + "\n")
+            stdout.flush()
+            return process
+
+        def urlopen(*args, **kwargs):
+            process.alive = False
+            return contextlib.nullcontext(type("Response", (), {"status": 200})())
+
+        with patch("sys.argv", ["qa_viewer_launch", "--config", str(config_path)]), \
+                patch("ground_truth.qa_viewer.subprocess.Popen", side_effect=popen), \
+                patch("urllib.request.urlopen", side_effect=urlopen), \
+                contextlib.redirect_stderr(io.StringIO()) as errors:
+            with self.assertRaises(SystemExit):
+                launch_group()
+        self.assertIn("exited during readiness probe", errors.getvalue())
 
     def test_export_rejects_changed_sources_and_overlapping_destinations(self):
         with self.assertRaises(ValueError):
@@ -189,7 +333,7 @@ class ViewerTests(unittest.TestCase):
         for name, expected in packet["files"].items():
             self.assertEqual(digest(folder / name), expected)
         self.assertEqual(before, {path: digest(path) for path in before})
-        self.assertNotIn('literal </script> note', (folder / "index.html").read_text())
+        self.assertNotIn('literal </script> note', (folder / "index.html").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
