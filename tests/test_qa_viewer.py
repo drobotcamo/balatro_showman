@@ -195,22 +195,29 @@ class ViewerTests(unittest.TestCase):
         class ExitingProcess:
             pid = 43
             calls = 0
+            alive = True
             def poll(self):
                 self.calls += 1
-                return None if self.calls <= 2 else 1
+                return None if self.alive else 1
 
+        process = ExitingProcess()
         def popen(command, cwd, stdout, stderr, text):
             stdout.write(json.dumps({"url": "http://127.0.0.1:64001",
                                      "export_root": "external", "seed": "fixed"}) + "\n")
             stdout.flush()
-            return ExitingProcess()
+            return process
+
+        def urlopen(*args, **kwargs):
+            process.alive = False
+            return contextlib.nullcontext(type("Response", (), {"status": 200})())
 
         with patch("sys.argv", ["qa_viewer_launch", "--config", str(config_path)]), \
                 patch("ground_truth.qa_viewer.subprocess.Popen", side_effect=popen), \
-                patch("urllib.request.urlopen", return_value=contextlib.nullcontext(type("Response", (), {"status": 200})())), \
-                contextlib.redirect_stderr(io.StringIO()):
+                patch("urllib.request.urlopen", side_effect=urlopen), \
+                contextlib.redirect_stderr(io.StringIO()) as errors:
             with self.assertRaises(SystemExit):
                 launch_group()
+        self.assertIn("exited during readiness probe", errors.getvalue())
 
     def test_export_rejects_changed_sources_and_overlapping_destinations(self):
         with self.assertRaises(ValueError):

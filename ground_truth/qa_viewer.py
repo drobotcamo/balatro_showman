@@ -644,7 +644,8 @@ def launch_group():
         while time.monotonic() < deadline:
             failed = [child for child in children if child[0].poll() is not None]
             if failed:
-                details = "; ".join(f"{name}: {err.read_text(encoding='utf-8', errors='replace')}" for _, _, _, name, err in failed)
+                details = "; ".join(f"{name}: {err.with_suffix(err.suffix + '.err.txt').read_text(encoding='utf-8', errors='replace')}"
+                                     for _, _, _, name, err in failed)
                 raise ValueError("viewer startup failed: " + details)
             ready = []
             for proc, _, _, name, log_base in children:
@@ -660,9 +661,11 @@ def launch_group():
                             continue
                         try:
                             with urllib.request.urlopen(record["url"] + "/", timeout=1) as response:
-                                if response.status == 200 and proc.poll() is None:
-                                    ready.append({"name": name, **record, "pid": proc.pid})
-                                    break
+                                if response.status == 200:
+                                    if proc.poll() is None:
+                                        ready.append({"name": name, **record, "pid": proc.pid})
+                                        break
+                                    raise ValueError(f"{name} viewer exited during readiness probe")
                         except (OSError, urllib.error.URLError, TimeoutError):
                             continue
             if len(ready) == len(children):
