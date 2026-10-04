@@ -144,14 +144,14 @@ do not execute Balatro's actual save restoration or menu callbacks.
    ```
 
    Restart Balatro completely and verify the latest Lovely log reports build
-    `issue123-dagger-reference-1`. The producer hash and loaded build are separate
+   `issue123-dagger-reference-1`. The producer hash and loaded build are separate
    checks. To roll back, close Balatro, move the new active directory out of
    `Mods`, and move the timestamped backup back to the active target. Keep the
    backup; do not delete it as part of an update.
 
 3. Launch Balatro and confirm the Lovely log reports the mod loaded:
    search `$env:APPDATA\Balatro\Mods\lovely\log\` for
-    `[balatro_showman_bridge] loaded; build=issue123-dagger-reference-1; io_dir=...`.
+   `[balatro_showman_bridge] loaded; build=issue123-dagger-reference-1; io_dir=...`.
    Before recording, trigger one action and inspect its queued
    `request_<run>_<id>.json`. It must contain
    `"schema_version":"producer/1.0.0"`,
