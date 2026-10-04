@@ -240,6 +240,22 @@ def load_example() -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def validate_schema_envelope(document: dict[str, Any]) -> list[Finding]:
+    """Check the document against the checked-in schema's top-level envelope."""
+    schema_path = Path(__file__).resolve().parent / "schemas" / "run_mechanics_v0_1.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    findings: list[Finding] = []
+    if document.get("schema_version") != schema["properties"]["schema_version"]["const"]:
+        findings.append(Finding("schema_version", "schema_version", "does not match checked-in schema"))
+    for field in schema["required"]:
+        if field not in document:
+            findings.append(Finding("schema_required", field, "required by checked-in schema"))
+    for field in document:
+        if field not in schema["properties"]:
+            findings.append(Finding("schema_property", field, "not allowed by checked-in schema"))
+    return findings
+
+
 def initial_examples() -> dict[str, dict[str, Any]]:
     """Return synthetic v0.1 fixtures for each owner-approved initial case."""
     import copy
@@ -267,6 +283,13 @@ def initial_examples() -> dict[str, dict[str, Any]]:
         "rule_revision": "video-annotation-v1",
         "confidence_basis": "ordered Joker row visibly has no card to Dagger's right",
     })
+
+    ineligible = copy.deepcopy(positive)
+    ineligible["run_id"] = "example-run-dagger-ineligible-right"
+    ineligible["effects"] = []
+    ineligible["instances"] = [ineligible["instances"][0]]
+    ineligible["facts"] = [fact for fact in ineligible["facts"] if fact["id"] != "fact-victim-sell-value"]
+    ineligible["evidence"] = [e for e in ineligible["evidence"] if e["id"] not in {"ev-victim-visible", "ev-victim-price", "ev-victim-removed"}]
 
     missing = copy.deepcopy(positive)
     missing["run_id"] = "example-run-dagger-unknown"
@@ -296,7 +319,7 @@ def initial_examples() -> dict[str, dict[str, Any]]:
     reset["effects"][0]["contributions"] = []
     reset["effects"][0]["dependency_fact_ids"] = []
     reset["effects"][0]["participation"] = []
-    return {"dagger-positive": positive, "dagger-zero": zero, "dagger-missing-dependency": missing, "scoring": scoring, "reset": reset}
+    return {"dagger-positive": positive, "dagger-zero": zero, "dagger-ineligible-right": ineligible, "dagger-missing-dependency": missing, "scoring": scoring, "reset": reset}
 
 
 def _record(**overrides: Any) -> dict[str, Any]:
@@ -344,7 +367,13 @@ def main() -> int:
     _check_rejected("missing-evidence", _record(evidence=None), "evidence_type")
     examples = initial_examples()
     example = examples["dagger-positive"]
+    schema_findings = validate_schema_envelope(example)
+    if schema_findings:
+        raise ContractError(f"approved Dagger example violates schema envelope: {schema_findings}")
     for name, fixture in examples.items():
+        schema_findings = validate_schema_envelope(fixture)
+        if schema_findings:
+            raise ContractError(f"approved {name} example violates schema envelope: {schema_findings}")
         fixture_findings = validate_document(fixture)
         if fixture_findings:
             raise ContractError(f"approved {name} example invalid: {fixture_findings}")

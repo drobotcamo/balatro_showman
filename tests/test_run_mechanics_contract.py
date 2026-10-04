@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from planning.mechanics_contract_check import initial_examples, load_example, validate_document
+from planning.mechanics_contract_check import initial_examples, load_example, validate_document, validate_schema_envelope
 
 
 def test_positive_dagger_fixture_has_resolved_run_references():
@@ -9,7 +9,7 @@ def test_positive_dagger_fixture_has_resolved_run_references():
 
 
 def test_all_initial_review_examples_have_resolved_references():
-    assert set(initial_examples()) == {"dagger-positive", "dagger-zero", "dagger-missing-dependency", "scoring", "reset"}
+    assert set(initial_examples()) == {"dagger-positive", "dagger-zero", "dagger-ineligible-right", "dagger-missing-dependency", "scoring", "reset"}
     for example in initial_examples().values():
         assert validate_document(example) == []
 
@@ -22,6 +22,18 @@ def test_dagger_without_right_neighbor_is_known_no_destruction_no_growth():
     assert neighbor_fact["value"] is False
     assert example["effects"] == []
     assert dagger_after["value"] == 6
+
+
+def test_dagger_with_ineligible_right_neighbor_is_known_no_destruction_no_growth():
+    example = initial_examples()["dagger-ineligible-right"]
+
+    assert example["effects"] == []
+    assert next(f for f in example["facts"] if f["id"] == "fact-dagger-mult-after")["value"] == 14
+
+
+def test_examples_use_the_checked_in_schema_envelope():
+    for example in initial_examples().values():
+        assert validate_schema_envelope(example) == []
 
 
 def test_effect_with_missing_instance_reference_is_rejected():
