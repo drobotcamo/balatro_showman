@@ -26,6 +26,9 @@ typography needed for synthetic OCR.
 - Typography assets: every glyph, digit, symbol, and modifier state (negative,
   debuffed, highlighted) needed by synthetic OCR.
 - Versioned class map usable by training and inference.
+- Mechanics definitions keyed to this vocabulary, distinct from run instances and
+  visual tracks. #122 versions the slice semantics; #125 owns exhaustive Joker
+  inventory and authored/user-approved/engine-validated statuses separately.
 
 ## Invariants
 
@@ -35,6 +38,8 @@ typography needed for synthetic OCR.
   composition labels with a dedicated visible-attribute channel.
 - Unknown assets can be represented without corrupting known IDs.
 - Every typography glyph declares its source and license.
+- A bounded mechanics/visual slice declares only its consumed vocabulary and
+  pinned revision. Exhaustive registry/typography is not a Dagger or Phase 0 gate.
 
 ## Acceptance Criteria
 

@@ -1,20 +1,22 @@
-# Component Contract: Persistent State, Action Space, and Masks
+# Component Contract: Derived Run State, Action Space, and Masks
 
 Status: `planned`
 
 ## Purpose
 
-Declare and implement the downstream contract the pipeline targets: reduce the
-composed state sequence into persistent state and deterministic legality masks
-over the declared action space. This is the interface learning consumes.
+Reduce permitted observations into evidence-linked persistent gameplay state for
+mechanics analytics now and video reconstruction later. Dagger (#124) is the first
+slice under #122; `planning/ARCHITECTURE.md` defines the shared boundary. The full
+action-space/mask interface remains a consumer target, not a Dagger prerequisite.
 
 ## Inputs
 
-- Composed per-frame state sequence.
+- Allowlisted captured or video-derived observations, with origins and evidence;
+  composed per-frame state is the visual adapter's source.
 - Ontology and composition rules.
 - Declared downstream contract and action-space version.
-- Oracle raw engine persistent fields and engine legal actions, used only to
-  validate reduction and masks (D021).
+- Independent engine persistent fields and legal actions go to the isolated
+  evaluator only, not the reducer (D021).
 
 ## Outputs
 
@@ -23,12 +25,16 @@ over the declared action space. This is the interface learning consumes.
 - The declared action-space index (the coordinate space the masks index).
 - Deterministic legality masks per step.
 - Explicit schema and contract versions.
+- Run-scoped instance hypotheses, valid-time values/attributes and unknowns;
+  state links to derived effect occurrences without becoming a second effect store.
 
 ## Invariants
 
 - Persistent state, per-step observations, and internal bookkeeping are
   distinguishable and versioned; promotion between them is a version bump.
 - No future-frame information leaks into a step's state.
+- Pre-action, pending and resolved state differ. Definition, visual track and
+  gameplay instance identity are distinct; engine IDs cannot seed video inference.
 - Masks are deterministic for a fixed input and configuration.
 - The reducer defines the action-space index and the masks; it does not label
   observed actions. Canonical action labels and `target_action_id` are produced
@@ -40,6 +46,12 @@ over the declared action space. This is the interface learning consumes.
 
 ## Acceptance Criteria
 
+- First slice: deterministic Dagger positive/zero/incomplete scenarios, separate
+  stored Mult and sacrifice effects, isolated reference comparison and diagnostics
+  identifying missing dependencies and downstream invalidation. #127 checks the
+  same reducer with restricted inputs and reference perturbation.
+- Broader action/mask acceptance below applies when that scope is implemented;
+  neither exhaustive Joker coverage nor full video inference blocks slice delivery.
 - The reducer reproduces reference persistent state from ground-truth runs
   (oracle raw engine fields projected through the documented reducer mapping;
   D021).

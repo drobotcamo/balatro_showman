@@ -292,6 +292,21 @@ under its Decisions section. This file is a knowledge base, not a task log.
   HEAD:.gitmodules` (absent), and `git worktree add` yielding empty vendor dirs
   on 2026-09-30.
 
+## 2026-10-04: Inspection and legacy generation are not an active mechanics pipeline
+
+- Context: Two-track planning audit at master `33338ea`.
+- Observation: Inspector state deltas/transitions explicitly return unsupported;
+  annotation export and the video/action viewer inspect existing evidence, not
+  inferred mechanics. Active scene/glyph generation and mechanics reduction are
+  absent. The legacy compositor lacks seeded configuration and source-level
+  evaluation/background separation; its detector emits sampled detections only.
+- Implication: Scope a reproducible pack and shared observation adapter explicitly;
+  neither viewer availability nor legacy code establishes a reconstruction result.
+- Verification/source: Read-only implementation audit of
+  `run_bundle/inspection.py`, `ground_truth/eval_manifest.py`,
+  `ground_truth/qa_viewer.py`, `legacy/tools/build_synthetic_dataset.py` and
+  `legacy/tools/detect.py`; focused exporter/viewer tests: 26 passed, 5 subtests passed.
+
 ## 2026-09-30: Engine raw fields for the producer's persistent-state basis (Issue #21)
 
 - Context: D021/D022 requires the oracle to emit engine-truth raw persistent fields and a legality basis without computing canonical `persistent_state`.

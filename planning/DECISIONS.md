@@ -472,6 +472,31 @@ documentation alone. This is presentation and additive access, not a change to
 storage, lifecycle, reconstruction semantics, evaluation thresholds, or phase
 acceptance. Canonical product documentation: `docs/capture/README.md`.
 
+### D037 — accepted — Deep run data and visual observations are complementary products
+
+Deliver evidence-driven state, effects and run-dynamics analytics from captured
+evidence now, starting with independently validated Dagger. Synthetic scenes/glyphs
+and video-only reconstruction improve and broaden the same run data through a
+shared allowlisted observation interface. Observed evidence, recomputable derived
+state/effects and independent engine references remain separate. Engine values can
+validate video-only inference but cannot enter its inputs. Timing, identity,
+provenance, uncertainty and coverage remain part of every slice.
+
+Replace the serial full-pipeline-before-analysis queue with bounded outcomes in
+`planning/ROADMAP.md`. #122 establishes Dagger interfaces first and extends them
+before later contribution/lineage slices. #125 retains exhaustive Joker authoring
+and individual review as a separate coverage outcome; it blocks neither a useful
+mechanics result nor Phase 0 acceptance. #82 retains evaluation ownership and #115
+retains recorder resume ownership. D034 thresholds, permissions, dependencies and
+required review/CI are unchanged. Concrete schemas, storage and new-slice evaluation
+criteria still require their applicable review/approval.
+
+Alternative: finish all visual stages and Joker definitions before analytics;
+rejected because it postpones useful validated results and hides actual observation
+requirements. D028's progressive-gate and publication rules remain; this decision
+supersedes only its now-obsolete next-delivery sequence. Source: explicit user
+direction in the two-track planning revision session, 2026-10-04.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the

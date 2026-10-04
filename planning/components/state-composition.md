@@ -22,6 +22,8 @@ game state, ready for persistent reduction.
 - Object records with attributes, zone, ordering, provenance, and confidence.
 - State-quality summary.
 - A handoff to persistent reduction (the composed state sequence).
+- The visual observation adapter boundary in `planning/ARCHITECTURE.md`, shared
+  with captured-evidence mechanics slices; unavailable fields stay explicit.
 
 ## Invariants
 
@@ -29,6 +31,8 @@ game state, ready for persistent reduction.
 - Modifier attachment is deterministic and explainable.
 - State schema versions are explicit.
 - No state field is silently filled from future frames.
+- No engine-reference field, hidden identity or capture action is promoted to a
+  video-only observation. Raw/normalized values and prediction origins survive export.
 - Zone and ordering come from page/zone assignment, not from assumptions about
   the sequence.
 

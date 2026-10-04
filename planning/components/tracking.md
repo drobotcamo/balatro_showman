@@ -27,6 +27,9 @@ with a single shared stabilization model for objects and OCR fields.
 
 - Track IDs are unique within a video and stable through allowed gaps.
 - A gap fill is marked as inferred, not observed.
+- Visual track IDs are not persistent gameplay IDs. #122's reducer maps identity
+  hypotheses with evidence; identical appearances, copies and resumes may remain
+  ambiguous. Engine identity is an isolated answer key, never a tracking input.
 - Parent/attribute tracks remain composable.
 - Objects are tracked within their zone; a track does not silently cross
   incompatible zones or pages.

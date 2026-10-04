@@ -11,6 +11,9 @@ earlier by Issue #34; this component owns scale-out dataset production.
 Early D028 slice manifests/export do not pass the broad Phase 9 scale-out gate.
 Their applicable protocol is approved before held-out evaluation, with source-
 level splits and the same provenance/leakage protections below.
+Small deep-data state/effect/query artifacts can ship before scale-out. Keep
+evidence, derived state/effects and reference namespaces distinct through the
+shared boundary in `planning/ARCHITECTURE.md`; do not create a second state authority.
 
 ## Inputs
 
@@ -54,7 +57,8 @@ the source.
 
 ## Invariants
 
-- Every row is traceable to source video and frame.
+- Every row is traceable to its source evidence (capture step or video/frame);
+  capture-only rows do not invent video correspondence.
 - Dataset production does not mutate the source run bundle.
 - Reprocessing a video is idempotent for the same versions and configuration.
 - Partial failures are resumable and visible.
