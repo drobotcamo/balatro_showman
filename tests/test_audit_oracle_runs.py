@@ -153,6 +153,29 @@ def _write_run(
 
 
 class AuditConformanceTests(unittest.TestCase):
+    def test_missing_legacy_timestamps_are_reported_without_crashing(self) -> None:
+        from planning.audit_oracle_runs import INTEGRITY_FAILURES
+
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = _write_run(Path(directory), [], [], omit=("capture_timestamp_ns",))
+            first = json.loads((run_dir / "steps.ndjson").read_text())
+            second = {**first, "request_id": 2, "step_id": "audit-test:2", "capture_timestamp_ns": None}
+            (run_dir / "steps.ndjson").write_text(json.dumps(first) + "\n" + json.dumps(second) + "\n")
+            before = len(INTEGRITY_FAILURES)
+            summary = audit(run_dir)
+            failures = INTEGRITY_FAILURES[before:]
+        self.assertEqual(summary["step_lines"], 2)
+        self.assertEqual(sum("invalid capture_timestamp_ns" in item for item in failures), 2)
+
+    def test_producer_schema_raw_fields_are_inspected_when_present(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = _write_run(Path(directory), [], [], schema_version="producer/1.0.0",
+                                 extra={"raw_persistent": _raw_persistent()})
+            summary = audit(run_dir)
+        self.assertFalse(summary["raw_field_schema"])
+        self.assertEqual(summary["raw_persistent_nonempty"], 1)
+        self.assertFalse(any("no raw persistent fields" in item for item in conformance_findings(summary)))
+
     def test_populated_run_has_no_attribute_findings(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             run_dir = _write_run(

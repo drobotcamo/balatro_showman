@@ -15,6 +15,24 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-03: Equal resume boundary counters are not duplicate action records
+
+- Context: Issue #115 inspected 15 persisted oracle sessions (1,543 steps),
+  including the user-confirmed menu/Continue split in the latest recording.
+- Observation: `1898258342000-5384:109` and `2317688862100-2663:1` have equal
+  scalar state 12.8777339 seconds apart, but select different cards. Decoded
+  frames show the same Big Blind, score, resources and jokers with those distinct
+  selections. Raw tracked-deck array ordering changes after reload. The existing
+  auditor also crashed on absent legacy timestamps and falsely reported missing
+  raw fields for populated `producer/1.0.0` snapshots.
+- Implication: Group confirmed fragments by source recording/play while retaining
+  every original source step; counter equality alone does not justify deduplication.
+  Inspect actual payload coverage independently of schema-name assumptions.
+- Verification/source: `planning/ISSUE115_RECORDING_AUDIT.md`; archive audit,
+  decoded candidate frames at 412.6541974 / 425.5319313 seconds, and focused
+  audit/producer/consumer tests (55 passed). Event-edge alignment and fresh live
+  Continue verification remain pending.
+
 ## 2026-10-03: Debug exports need the same source bytes as the displayed records
 
 - Context: Issue #118's video/action viewer exports original oracle lines beside
