@@ -5,7 +5,7 @@ actions on the right. It is debugging QA, not an annotation/evaluation exporter.
 Inputs are an existing video path and ordered capture directories for that video.
 Source files remain unchanged. Generated browser media and exports stay external.
 
-From the repository root, with Python 3.11+ and existing `ffmpeg` / `ffprobe` on PATH:
+From the repository root, with Python 3.11+ and existing `ffmpeg` / `ffprobe` on PATH. Quote every video/run/export path in PowerShell because recording filenames may contain spaces:
 
 ```powershell
 py -3 -m ground_truth.qa_viewer `
@@ -77,7 +77,7 @@ After restarting the server, reload the browser page to obtain its new session t
 
 Narrow checks: `py -3 -m unittest tests.test_qa_viewer` and
 `py -3 planning/check_contracts.py`, followed by browser playback/seek/export QA.
-# First-slice eligibility review
+## First-slice eligibility review
 
 Open **Open eligibility review ↗** in the local viewer to review the same video
 and action windows in a separate browser tab. Select a step, inspect the
@@ -96,3 +96,47 @@ For recordings with multiple recorder IDs, pass every associated `--run` for the
 same video and count that video only once. Review each stage and record missing
 stages explicitly; audit external training and synthetic registries independently.
 The frozen rules are in `planning/FIRST_SLICE_PROTOCOL_V2.md`.
+
+### Launching several recordings
+
+For a predeclared group, create one UTF-8 JSON config from
+[`issue82-review.example.json`](issue82-review.example.json), replace its
+external paths, and run this once:
+
+```powershell
+py -3 -m ground_truth.qa_viewer_launch --config "F:\OBS_RECORDINGS\issue82-review.json" --open
+```
+
+The config file's directory anchors relative paths. Each video needs one object
+with a `video`, ordered `runs`, and optional filesystem-safe `export_name`.
+Every logical video/play group gets its own child export folder, startup logs,
+and locally-bound server URL. Include every resumed/fragment run belonging to a
+video in that video's `runs` array; never list the same play as separate sources.
+The launcher reports each URL, PID, export directory, and seed after the server
+prints its ready record. Startup errors go to per-viewer `.err.txt` files beside
+the export root. The browser's **Open eligibility review** link opens the second
+tab; `--open` opens the regular viewer page.
+
+Direct single-viewer launch remains available through
+`py -3 -m ground_truth.qa_viewer`. Its `--run` can be repeated for all segments
+of one video. Do not use `Start-Process -ArgumentList` with a PowerShell array
+of space-containing paths: it split the video filename in observed launches.
+Use direct PowerShell invocation, or the JSON-config launcher above. If media
+preparation fails with a constant-FPS diagnostic, stop and preserve the source;
+do not accept average-FPS frame numbers as rendered-frame evidence.
+
+### Launch findings (verified 2026-10-04)
+
+- `Start-Process -ArgumentList @(...)` split `2026-10-03 17-25-24.mkv` at the
+  spaces and both viewers exited with `unrecognized arguments: 17-25-24.mkv`.
+  A single explicitly quoted argument string launched both successfully.
+- The initial browser link opened the same review page with
+  `?mode=eligibility`; the tab itself is within that page, not a second browser
+  tab. The separate eligibility tab is opened from the live viewer's link.
+- Large source files take a few seconds to prepare. The successful starts printed
+  localhost URLs, and the two source/run groups loaded with matching video hashes
+  and no oracle diagnostics. Exports remained under their separate external
+  folders; source videos and run files were unchanged.
+- A real independent pilot still needs human frame inspection. Server readiness,
+  matching hashes, and successful media playback do not confirm rendered
+  correspondence or source-registry eligibility.

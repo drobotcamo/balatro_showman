@@ -1,0 +1,20 @@
+{
+  "export_root": "F:\\OBS_RECORDINGS\\issue82-review",
+  "viewers": [
+    {
+      "export_name": "17-25-24",
+      "video": "F:\\OBS_RECORDINGS\\2026-10-03 17-25-24.mkv",
+      "runs": [
+        "F:\\OBS_RECORDINGS\\oracle_runs_issue79\\37294333000-7139"
+      ]
+    },
+    {
+      "export_name": "17-56-28",
+      "video": "F:\\OBS_RECORDINGS\\2026-10-03 17-56-28.mkv",
+      "runs": [
+        "F:\\OBS_RECORDINGS\\oracle_runs_issue79\\1898258342000-5384",
+        "F:\\OBS_RECORDINGS\\oracle_runs_issue79\\2317688862100-2663"
+      ]
+    }
+  ]
+}

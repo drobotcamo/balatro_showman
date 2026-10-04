@@ -36,10 +36,28 @@ def probe(path):
     stream = data["streams"][0]
     numerator, denominator = map(float, stream["avg_frame_rate"].split("/"))
     data["fps"] = numerator / denominator
-    data["constant_fps"] = stream.get("r_frame_rate") == stream.get("avg_frame_rate")
     data["duration"] = float(data["format"]["duration"])
     if not all(math.isfinite(data[key]) and data[key] > 0 for key in ("fps", "duration")):
         raise ValueError("video duration and FPS must be finite and positive")
+    frames = subprocess.run([
+        "ffprobe", "-v", "error", "-select_streams", "v:0", "-show_frames",
+        "-show_entries", "frame=best_effort_timestamp_time", "-of", "csv=p=0", str(path),
+    ], check=True, capture_output=True, text=True, timeout=600)
+    timestamps = []
+    for line in frames.stdout.splitlines():
+        try:
+            timestamp = float(line.strip())
+        except ValueError:
+            continue
+        if not math.isfinite(timestamp):
+            raise ValueError("video has non-finite presentation timestamps")
+        timestamps.append(timestamp)
+    if not timestamps or any(right <= left for left, right in zip(timestamps, timestamps[1:])):
+        raise ValueError("video has missing or non-monotonic frame presentation timestamps")
+    period = 1 / data["fps"]
+    data["frame_count"] = len(timestamps)
+    data["constant_fps"] = all(abs((right - left) - period) <= period * 0.05
+                               for left, right in zip(timestamps, timestamps[1:]))
     return data
 
 
@@ -275,7 +293,7 @@ class Review:
         frame = data.get("frame")
         if type(frame) is not int or frame < 0:
             raise ValueError("frame must be a nonnegative integer")
-        if frame >= math.ceil(self.video_probe["duration"] * self.video_probe["fps"]):
+        if frame >= self.video_probe.get("frame_count", math.ceil(self.video_probe["duration"] * self.video_probe["fps"])):
             raise ValueError("frame is outside the video duration")
         offset = data.get("offset_frames")
         if offset is not None and (type(offset) is not int or abs(offset) > 100000):
@@ -482,6 +500,128 @@ def main():
         pass
     finally:
         server.server_close()
+
+
+def launch_group():
+    """Launch explicitly grouped videos from a UTF-8 JSON file or command line."""
+    parser = argparse.ArgumentParser(description="Launch one local QA viewer per explicitly declared video/run group.")
+    parser.add_argument("--config", type=Path, help="UTF-8 JSON configuration containing a viewers array")
+    parser.add_argument("--video", action="append", type=Path, help="single video path (use --config for multiple videos)")
+    parser.add_argument("--run", action="append", type=Path, help="ordered run directory for the single command-line video")
+    parser.add_argument("--export-root", type=Path, help="base external export directory; each video gets a child")
+    parser.add_argument("--seed", help="optional seed prefix for repeatable navigation")
+    parser.add_argument("--steps", type=int, default=10)
+    parser.add_argument("--open", action="store_true", help="open every viewer in the default browser")
+    args = parser.parse_args()
+    try:
+        if args.config:
+            if args.video or args.run or args.export_root:
+                raise ValueError("--config cannot be combined with command-line video/run/export arguments")
+            config_path = args.config.resolve(strict=True)
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            viewers = config.get("viewers") if isinstance(config, dict) else None
+            if not isinstance(viewers, list) or not viewers:
+                raise ValueError("config must contain a nonempty viewers array")
+            base = config_path.parent
+            groups = []
+            for item in viewers:
+                if not isinstance(item, dict) or not item.get("video") or not item.get("runs"):
+                    raise ValueError("each viewer requires video and a nonempty runs array")
+                groups.append((Path(item["video"]), [Path(run) for run in item["runs"]], item.get("export_name")))
+            if not config.get("export_root"):
+                raise ValueError("config requires export_root")
+            export_root = Path(config["export_root"])
+            if not export_root.is_absolute():
+                export_root = base / export_root
+            export_root = export_root.resolve()
+        else:
+            if not args.video or not args.run or not args.export_root:
+                raise ValueError("provide --config or --video/--run/--export-root")
+            if len(args.video) != 1:
+                raise ValueError("command-line launch accepts one --video; use --config to group multiple videos")
+            groups = [(args.video[0], args.run, None)]
+            export_root = args.export_root.resolve()
+        if not export_root.parent.is_dir():
+            raise ValueError("export root must be absolute or have an existing parent")
+        if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+            raise ValueError("ffmpeg and ffprobe must already be installed on PATH")
+        import sys
+        import time
+        repository = Path(__file__).resolve().parent.parent
+        if export_root == repository or repository in export_root.parents or export_root in repository.parents:
+            raise ValueError("launcher export root must remain outside the repository")
+        names = [name or f"{ordinal:02d}-{re.sub(r'[^A-Za-z0-9._-]+', '-', Path(video).stem).strip('-')}"
+                 for ordinal, (video, _, name) in enumerate(groups, 1)]
+        if len(set(names)) != len(names) or any(not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}", name) for name in names):
+            raise ValueError("export names must be unique, filesystem-safe single path components")
+        resolved_groups = []
+        for ordinal, (video, runs, _) in enumerate(groups, 1):
+            name = names[ordinal - 1]
+            resolved_video = (base / video if args.config and not video.is_absolute() else video).resolve(strict=True)
+            resolved_runs = [(base / run if args.config and not run.is_absolute() else run).resolve(strict=True) for run in runs]
+            if (resolved_video.is_relative_to(export_root) or
+                    any(export_root == root or export_root.is_relative_to(root) or root.is_relative_to(export_root)
+                        for root in resolved_runs)):
+                raise ValueError("export root overlaps source video or oracle evidence")
+            resolved_groups.append((resolved_video, resolved_runs, name))
+        children = []
+        for ordinal, (video, resolved_runs, name) in enumerate(resolved_groups, 1):
+            child_name = name
+            child_export = export_root / child_name
+            child_export.mkdir(parents=True, exist_ok=True)
+            command = [sys.executable, "-m", "ground_truth.qa_viewer", "--video", str(video),
+                       "--export-root", str(child_export), "--steps", str(args.steps)]
+            for run in resolved_runs:
+                command.extend(("--run", str(run)))
+            if args.seed:
+                command.extend(("--seed", f"{args.seed}-{ordinal}"))
+            if args.open:
+                command.append("--open")
+            log_base = export_root / (child_name + "-" + secrets.token_hex(4) + ".log")
+            stdout = log_base.with_suffix(log_base.suffix + ".out.txt").open("x", encoding="utf-8")
+            stderr = log_base.with_suffix(log_base.suffix + ".err.txt").open("x", encoding="utf-8")
+            try:
+                proc = subprocess.Popen(command, cwd=Path(__file__).resolve().parent.parent,
+                                        stdout=stdout, stderr=stderr, text=True)
+            except Exception:
+                stdout.close()
+                stderr.close()
+                raise
+            children.append((proc, stdout, stderr, child_name, log_base))
+        deadline = time.monotonic() + 120
+        while time.monotonic() < deadline:
+            failed = [child for child in children if child[0].poll() not in (None, 0)]
+            if failed:
+                details = "; ".join(f"{name}: {err.read_text(encoding='utf-8', errors='replace')}" for _, _, _, name, err in failed)
+                raise ValueError("viewer startup failed: " + details)
+            ready = []
+            for proc, _, _, name, log_base in children:
+                out = log_base.with_suffix(log_base.suffix + ".out.txt")
+                text_out = out.read_text(encoding="utf-8", errors="replace") if out.exists() else ""
+                match = re.search(r'\{"url":\s*"([^"]+)",\s*"export_root":\s*"([^"]+)",\s*"seed":\s*"([^"]+)"\}', text_out)
+                if match:
+                    ready.append({"name": name, "url": match.group(1), "export_root": match.group(2), "seed": match.group(3), "pid": proc.pid})
+            if len(ready) == len(children):
+                print(json.dumps({"viewers": ready}, indent=2))
+                for child in children:
+                    child[1].close()
+                    child[2].close()
+                return
+            time.sleep(0.25)
+        raise ValueError("viewer startup timed out; inspect per-viewer .err.txt logs")
+    except (ValueError, OSError, json.JSONDecodeError, subprocess.SubprocessError) as exc:
+        for child in locals().get("children", []):
+            proc = child[0]
+            if proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+            child[1].close()
+            child[2].close()
+        parser.error(str(exc))
 
 
 if __name__ == "__main__":
