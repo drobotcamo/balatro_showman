@@ -306,6 +306,10 @@ class Review:
                   **{key: data[key] for key in fields}}
         if type(packet["frame_seconds"]) not in (int, float) or not math.isfinite(packet["frame_seconds"]) or not 0 <= packet["frame_seconds"] <= self.video_probe["duration"]:
             raise ValueError("invalid video time")
+        expected_seconds = frame / self.video_probe["fps"]
+        if abs(packet["frame_seconds"] - expected_seconds) > 1 / self.video_probe["fps"]:
+            raise ValueError("frame index and video time disagree with the declared FPS")
+        packet["frame_index_basis"] = "zero-based frame index; timestamp checked against declared constant FPS"
         destination = folder / (datetime.now(timezone.utc).strftime("review-%Y%m%dT%H%M%SZ-") + secrets.token_hex(8) + ".json")
         with destination.open("x", encoding="utf-8") as stream:
             json.dump(packet, stream, indent=2, sort_keys=True, allow_nan=False)
