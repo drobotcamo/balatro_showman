@@ -18,12 +18,16 @@ def frame_index(step_timestamp_ns: int, recording_start_ns: int, fps: float) -> 
     return round((step_timestamp_ns - recording_start_ns) / 1_000_000_000 * fps)
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
+def build_parser(*, add_help=True):
+    parser = argparse.ArgumentParser(add_help=add_help)
     parser.add_argument("steps", type=Path)
     parser.add_argument("--recording-start-ns", type=int)
     parser.add_argument("--fps", type=float)
-    args = parser.parse_args()
+    return parser
+
+
+def main(argv=None) -> int:
+    args = build_parser().parse_args(argv)
     session = json.loads((args.steps.parent / "session.json").read_text(encoding="utf-8"))
     recording = session.get("recording") or {}
     recording_start_ns = args.recording_start_ns or recording.get("capture_timestamp_ns")

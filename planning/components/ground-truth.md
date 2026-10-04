@@ -4,6 +4,12 @@ Status: `building`
 
 ## Purpose
 
+Showman Capture is the product name for the operational capture/inspection
+capability. `python -m showman` delegates to the existing producer consumer,
+Run Store, Inspector, recording association, alignment and development export
+interfaces. Usage and vocabulary are in `docs/capture/README.md`; the wrapper
+does not change the oracle/video separation or broad acceptance criteria.
+
 Produce exact `(state, action, outcome)` records from the game engine via the
 Lua live bridge, maintain the aligned real-frame evaluation set, and provide the
 minimal annotation/QA tooling the other phase gates depend on.

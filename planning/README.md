@@ -7,6 +7,8 @@ other work. Winning plays are not a special objective at this stage.
 
 ## How To Use These Documents
 
+- For operational use, start with `../docs/capture/README.md`: Showman Capture's
+  task guide, vocabulary, unified CLI, and Python API reference.
 - Read `ROADMAP.md` before starting work.
 - Read the relevant `agent-state/threads/<issue-number-or-tag>-<short-name>.md` to
   resume work from another session or worktree.
@@ -19,6 +21,8 @@ other work. Winning plays are not a special objective at this stage.
 
 ## Document Map
 
+- `../README.md`: project purpose and Showman Capture product entrypoint.
+- `../docs/capture/reference.md`: current CLI/library surfaces and result semantics.
 - `WORKFLOW_MIGRATION_IMPLEMENTATION_PLAN.md`: D028 implementation handoff,
   scoped subagent assignments, migration acceptance, and production follow-through.
 - `LEAD_WORKFLOW_MIGRATION_PROMPT.md`: direct lead launch prompt for that migration.
