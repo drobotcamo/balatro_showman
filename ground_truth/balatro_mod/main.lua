@@ -1626,6 +1626,6 @@ pcall(function() love.filesystem.createDirectory("agent_io") end)
 install_game_hooks()
 install_action_hooks()
 
-print("[balatro_showman_bridge] loaded; build=issue115-continue-identity-1; io_dir=" .. IO_DIR)
+print("[balatro_showman_bridge] loaded; build=issue123-dagger-reference-1; io_dir=" .. IO_DIR)
 
 return Bridge
