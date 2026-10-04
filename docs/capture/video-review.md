@@ -124,8 +124,9 @@ with a `video`, ordered `runs`, and optional filesystem-safe `export_name`.
 Every logical video/play group gets its own child export folder, startup logs,
 and locally-bound server URL. Include every resumed/fragment run belonging to a
 video in that video's `runs` array; never list the same play as separate sources.
-The launcher reports each URL, PID, export directory, and seed after the server
-prints its ready record. Startup errors go to per-viewer `.err.txt` files beside
+The launcher checks that each URL serves its viewer page and rechecks the child
+process before reporting its URL, PID, export directory, and seed. Startup errors
+go to per-viewer `.err.txt` files beside
 the export root. The browser's **Open eligibility review** link opens the second
 tab; `--open` opens the regular viewer page.
 

@@ -184,6 +184,34 @@ class ViewerTests(unittest.TestCase):
         self.assertTrue((output_parent / "reviews" / "first").is_dir())
         self.assertTrue((output_parent / "reviews" / "02-recording-two").is_dir())
 
+    def test_group_launcher_rejects_child_that_exits_during_readiness_probe(self):
+        output_parent = self.root / "external output"
+        output_parent.mkdir()
+        config_path = self.root / "review config.json"
+        config_path.write_text(json.dumps({"export_root": "external output/reviews", "viewers": [
+            {"video": str(self.video), "runs": [str(self.runs[0])]}
+        ]}), encoding="utf-8")
+
+        class ExitingProcess:
+            pid = 43
+            calls = 0
+            def poll(self):
+                self.calls += 1
+                return None if self.calls <= 2 else 1
+
+        def popen(command, cwd, stdout, stderr, text):
+            stdout.write(json.dumps({"url": "http://127.0.0.1:64001",
+                                     "export_root": "external", "seed": "fixed"}) + "\n")
+            stdout.flush()
+            return ExitingProcess()
+
+        with patch("sys.argv", ["qa_viewer_launch", "--config", str(config_path)]), \
+                patch("ground_truth.qa_viewer.subprocess.Popen", side_effect=popen), \
+                patch("urllib.request.urlopen", return_value=contextlib.nullcontext(type("Response", (), {"status": 200})())), \
+                contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                launch_group()
+
     def test_export_rejects_changed_sources_and_overlapping_destinations(self):
         with self.assertRaises(ValueError):
             Review(self.video, self.runs, self.runs[0] / "exports")
