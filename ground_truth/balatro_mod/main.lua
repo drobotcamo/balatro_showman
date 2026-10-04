@@ -734,7 +734,7 @@ end
 local function encode_inventory_object(card, object_type, zone, position)
   local key = center_key(card)
   local class_id = class_id_for_center_key(key)
-  local parts = {
+  local fields = {
     '"class_id":' .. (class_id and tostring(class_id) or "null"),
     '"object_type":' .. j_str(object_type),
     '"zone":' .. j_str(zone),
@@ -742,7 +742,34 @@ local function encode_inventory_object(card, object_type, zone, position)
     card_attributes_json(card),
     '"card":null',
   }
-  if key then parts[#parts + 1] = '"center_key":' .. j_str(key) end
+  if key then fields[#fields + 1] = '"center_key":' .. j_str(key) end
+  return "{" .. table.concat(fields, ",") .. "}"
+end
+
+-- Mechanics-reference identity is intentionally separate from the ordinary
+-- decision snapshot. Engine object references/instance ids never enter the
+-- observation payload consumed by reconstruction.
+local function mechanics_card_identity(card)
+  local id = try(function() return card.unique_val end)
+  if id == nil then id = try(function() return card.ID end) end
+  if id == nil then return nil end
+  return tostring(id)
+end
+
+local function encode_mechanics_card(card, position, role)
+  local ability = try(function() return card.ability end)
+  local mult = type(ability) == "table" and try(function() return ability.mult end) or nil
+  local identity = mechanics_card_identity(card)
+  local key = center_key(card)
+  local sell_cost = try(function() return card.sell_cost end)
+  local parts = {
+    '"role":' .. j_str(role),
+    '"position":' .. tostring(position),
+    '"center_key":' .. (key and j_str(key) or "null"),
+    '"instance_token":' .. (identity and j_str(identity) or "null"),
+    '"mult":' .. (type(mult) == "number" and j_num(mult) or "null"),
+    '"sell_cost":' .. (type(sell_cost) == "number" and j_num(sell_cost) or "null"),
+  }
   return "{" .. table.concat(parts, ",") .. "}"
 end
 
@@ -1175,12 +1202,28 @@ local function encode_meta(page)
     '"pack_key":' .. (key and j_str(key) or "null"),
     '"sent_at_real_time":' .. j_num(os.time()),
     '"producer":"balatro_showman_bridge"',
-    '"producer_revision":"issue81-file-queue-1"',
+    '"producer_revision":"issue123-dagger-reference-1"',
     '"smoke_subset":true',
     '"page":' .. j_str(page),
     '"runtime":' .. runtime,
   }
   return "{" .. table.concat(parts, ",") .. "}"
+end
+
+local function encode_mechanics_reference(step_id, timestamp_ns)
+  local jokers = {}
+  if G and G.jokers and G.jokers.cards then
+    for i, card in ipairs(G.jokers.cards) do
+      jokers[#jokers + 1] = encode_mechanics_card(card, i - 1, "joker")
+    end
+  end
+  local runtime = '{"balatro":' .. j_str((G and G.VERSION) or "unknown")
+    .. ',"steamodded":' .. j_str(steamodded_version())
+    .. ',"lovely":' .. j_str(lovely_version()) .. "}"
+  return '{"schema_version":"dagger-reference/1.0","step_id":' .. j_str(step_id)
+    .. ',"capture_phase":"pre_action","capture_timestamp_ns":' .. j_num(timestamp_ns)
+    .. ',"producer_revision":"issue123-dagger-reference-1","runtime":' .. runtime
+    .. ',"jokers":[' .. table.concat(jokers, ",") .. ']}'
 end
 
 -- ---------------------------------------------------------------------------
@@ -1335,6 +1378,7 @@ local function build_snapshot(rid, page, action_label)
     '"meta":' .. encode_meta(page):sub(1, -2)
       .. ',"capture_timestamp_ns":' .. j_num(timestamp_ns)
       .. ',"video_timestamp_ns":' .. j_num(timestamp_ns) .. '}',
+    '"mechanics_reference":' .. encode_mechanics_reference(run_id .. ":" .. tostring(rid), timestamp_ns),
   }
   return "{" .. table.concat(parts, ",") .. "}"
 end

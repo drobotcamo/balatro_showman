@@ -20,8 +20,9 @@ python -m run_bundle <command> --db <bundle.sqlite> ...
 
 `run_bundle/__main__.py` emits JSON envelopes and uses the read-only
 `RunBundleInspector`. Inspection commands include `list`, `summary`, `step`,
-`find`, `provenance`, `evidence`, `validate`, `outcome`, `transitions`, and
-`diff`. `validate --strict` requests strict diagnostics; inspection never
+`find`, `provenance`, `evidence`, `mechanics-reference`, `validate`, `outcome`,
+`transitions`, and `diff`. `mechanics-reference` is the only reader for the
+separate engine-answer channel. `validate --strict` requests strict diagnostics; inspection never
 repairs evidence or changes lifecycle state.
 
 Database setup is separate and mutating:
@@ -48,7 +49,10 @@ prompt for per-run review or confirmation. A human-reviewed live smoke run is a
 one-time acceptance check for this integration, not a runtime step.
 
 The file-source adapter requires `session.json` and `steps.ndjson`, verifies the
-declared step count and recorded action on every step. A repeat import with the same run
+declared step count and recorded action on every step. Optional
+`mechanics_reference.ndjson` records are imported as typed `mechanics_reference`
+entries; they are not merged into step payloads and are queried only with the
+explicit mechanics-reference reader. A repeat import with the same run
 ID and source-file hashes is a no-op success; a different source under that run
 ID is reported as a conflict. If session usage metadata is present, its action
 counts must match the steps. For

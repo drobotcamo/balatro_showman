@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://balatro-showman.invalid/schemas/dagger_reference_v1.schema.json",
+  "title": "Dagger Engine Reference Snapshot v1",
+  "description": "Isolated engine-reference capture. This is not a reconstruction observation or a game-rule validation by itself.",
+  "type": "object",
+  "required": ["schema_version", "run_id", "step_id", "capture_phase", "capture_timestamp_ns", "producer_revision", "runtime", "jokers"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "dagger-reference/1.0" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "step_id": { "type": "string", "minLength": 1 },
+    "capture_phase": { "enum": ["pre_action", "post_action", "pending", "resolved"] },
+    "capture_timestamp_ns": { "type": "number", "minimum": 0 },
+    "producer_revision": { "type": "string", "minLength": 1 },
+    "runtime": {
+      "type": "object",
+      "required": ["balatro", "steamodded", "lovely"],
+      "additionalProperties": false,
+      "properties": {
+        "balatro": { "type": "string", "minLength": 1 },
+        "steamodded": { "type": "string", "minLength": 1 },
+        "lovely": { "type": "string", "minLength": 1 }
+      }
+    },
+    "jokers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["role", "position", "center_key", "instance_token", "mult", "sell_cost"],
+        "additionalProperties": false,
+        "properties": {
+          "role": { "const": "joker" },
+          "position": { "type": "integer", "minimum": 0 },
+          "center_key": { "type": ["string", "null"] },
+          "instance_token": { "type": ["string", "null"] },
+          "mult": { "type": ["number", "null"] },
+          "sell_cost": { "type": ["number", "null"] }
+        }
+      }
+    }
+  }
+}

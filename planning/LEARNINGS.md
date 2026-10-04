@@ -15,6 +15,29 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-04: Existing Dagger video is not an aligned engine-reference capture
+
+- Context: Issue #123 inspection of the Dagger footage identified in
+  `planning/ISSUE115_RECORDING_AUDIT.md` and `planning/RUN_MECHANICS_DESIGN.md`.
+- Observation: The source recording is
+  `F:\OBS_RECORDINGS\2026-10-03 17-56-28.mkv`; the derived unscored clip is
+  `F:\OBS_RECORDINGS\qa_debug\review-20261004T041049Z-a2572aa9\clip.mp4`.
+  Its manifest associates runs `1898258342000-5384` and
+  `2317688862100-2663`, explicitly marks alignment `unverified`, and records
+  that the second run lacks its original recording marker. The local
+  `run_bundle_issue79.sqlite` has neither run ID. The resumed segment displays
+  Dagger +70 before a candidate sacrifice and +74 at a later action boundary;
+  the stored snapshots do not record Mult, actual sell cost, or an engine
+  instance identity.
+- Implication: The old recording remains descriptive evidence only. It cannot
+  establish exact pre-Mult, victim price, resolved queued aftermath, or identity
+  for #123; retain these values as unknown until a pinned live reference capture.
+- Verification/source: Read-only `python -m showman inspect list --db
+  "F:\OBS_RECORDINGS\run_bundle_issue79.sqlite"`; bundle queries for both run
+  IDs returned `run_not_found`; `planning/ISSUE115_RECORDING_AUDIT.md` lines
+  32-55, 187-219; external QA manifest at the path above. No source bundle or
+  video was modified.
+
 ## 2026-10-03: Continue can restore earlier counters without changing logical run identity
 
 - Context: Issue #115's fixed-build live smoke preserved source ID

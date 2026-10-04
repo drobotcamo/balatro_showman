@@ -15,6 +15,80 @@ from typing import Any
 
 
 OUTCOMES = {"win", "loss"}
+MECHANICS_REFERENCE_VERSION = "dagger-reference/1.0"
+
+
+def _validate_mechanics_reference(snapshot: dict[str, Any]) -> dict[str, Any] | None:
+    """Validate and retain isolated engine reference values when present.
+
+    Legacy snapshots without this additive channel remain valid. Values are
+    copied under a dedicated key and never merged into reconstructed fields.
+    """
+    value = snapshot.get("mechanics_reference")
+    if value is None:
+        return None
+    if not isinstance(value, dict) or value.get("capture_phase") not in {
+        "pre_action", "post_action", "pending", "resolved"
+    }:
+        raise ValueError("mechanics_reference requires a supported capture_phase")
+    if "run_id" in value and (not isinstance(value["run_id"], str) or not value["run_id"]):
+        raise ValueError("mechanics_reference.run_id must be a non-empty string")
+    if not isinstance(value.get("step_id"), str) or not value["step_id"]:
+        raise ValueError("mechanics_reference.step_id must be a non-empty string")
+    timestamp = value.get("capture_timestamp_ns")
+    if (isinstance(timestamp, bool) or not isinstance(timestamp, (int, float))
+            or not math.isfinite(timestamp) or timestamp < 0):
+        raise ValueError("mechanics_reference.capture_timestamp_ns must be a non-negative finite number")
+    if not isinstance(value.get("producer_revision"), str) or not value["producer_revision"]:
+        raise ValueError("mechanics_reference.producer_revision must be a non-empty string")
+    runtime = value.get("runtime")
+    if (not isinstance(runtime, dict)
+            or any(not isinstance(runtime.get(name), str) or not runtime[name]
+                   for name in ("balatro", "steamodded", "lovely"))):
+        raise ValueError("mechanics_reference.runtime requires Balatro, Steamodded, and Lovely revisions")
+    jokers = value.get("jokers")
+    if not isinstance(jokers, list):
+        raise ValueError("mechanics_reference.jokers must be a list")
+    seen_tokens: set[str] = set()
+    for index, joker in enumerate(jokers):
+        if not isinstance(joker, dict):
+            raise ValueError(f"mechanics_reference.jokers[{index}] must be an object")
+        if joker.get("role") != "joker" or joker.get("position") != index:
+            raise ValueError(f"mechanics_reference.jokers[{index}] has invalid role/position")
+        token = joker.get("instance_token")
+        if token is not None:
+            if not isinstance(token, str) or not token:
+                raise ValueError(f"mechanics_reference.jokers[{index}].instance_token must be non-empty string or null")
+            if token in seen_tokens:
+                raise ValueError(f"duplicate mechanics reference instance token: {token}")
+            seen_tokens.add(token)
+        for field in ("mult", "sell_cost"):
+            number = joker.get(field)
+            if number is not None and (isinstance(number, bool) or not isinstance(number, (int, float))
+                                       or not math.isfinite(number)):
+                raise ValueError(f"mechanics_reference.jokers[{index}].{field} must be finite number or null")
+        if joker.get("center_key") is not None and not isinstance(joker["center_key"], str):
+            raise ValueError(f"mechanics_reference.jokers[{index}].center_key must be string or null")
+    return value
+
+
+def read_mechanics_reference(run_dir: Path, step_id: str | None = None) -> list[dict[str, Any]]:
+    """Read isolated engine-reference records; never adapts them as observations."""
+    path = Path(run_dir) / "mechanics_reference.ndjson"
+    if not path.exists():
+        return []
+    records: list[dict[str, Any]] = []
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"invalid mechanics reference JSON on line {line_number}") from error
+        if not isinstance(record, dict) or record.get("schema_version") != MECHANICS_REFERENCE_VERSION:
+            raise ValueError(f"unsupported mechanics reference record on line {line_number}")
+        _validate_mechanics_reference({"mechanics_reference": record})
+        if step_id is None or record.get("step_id") == step_id:
+            records.append(record)
+    return records
 
 
 def _atomic_write(path: Path, text: str) -> None:
@@ -443,7 +517,11 @@ class FileIpcBridge:
             self._invalid_input(input_path, f"action {action!r} is not in legal_actions")
         session = self._session(run_id)
         recorded_at = datetime.now(timezone.utc).isoformat()
+        mechanics_reference = _validate_mechanics_reference(snapshot)
         record = {**snapshot, "_recorded_action": action, "_recorded_at": recorded_at}
+        record.pop("mechanics_reference", None)
+        if mechanics_reference is not None:
+            self._append_mechanics_reference(run_id, request_id, mechanics_reference)
         self._append_step_durable(session["session_dir"] / "steps.ndjson", record, session)
         self._seen_requests.add(request_key)
         self._request_actions[request_key] = action
@@ -454,6 +532,27 @@ class FileIpcBridge:
         self._write_session(session)
         _atomic_write(self.action_path, f"{request_id}\t{action}\n")
         input_path.unlink(missing_ok=True)
+
+    def _append_mechanics_reference(self, run_id: str, request_id: int,
+                                    reference: dict[str, Any]) -> None:
+        """Persist reference-channel values outside reconstruction step payloads."""
+        path = self._sessions[run_id]["session_dir"] / "mechanics_reference.ndjson"
+        record = {
+            "schema_version": MECHANICS_REFERENCE_VERSION,
+            "run_id": run_id,
+            "step_id": f"{run_id}:{request_id}",
+            **reference,
+        }
+        for existing in read_mechanics_reference(path.parent):
+            if existing.get("step_id") == record["step_id"]:
+                if existing != record:
+                    raise ValueError(f"conflicting mechanics reference for {record['step_id']}")
+                return
+        line = json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        with path.open("a", encoding="utf-8", newline="") as stream:
+            stream.write(line + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
 
     def _has_complete_requests(self, run_id: str, last_request_id: int) -> bool:
         request_ids = {
