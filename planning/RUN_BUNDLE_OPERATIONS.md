@@ -54,9 +54,11 @@ declared step count and recorded action on every step. Optional
 entries; they are not merged into step payloads and are queried only with the
 explicit mechanics-reference reader. A repeat import with the same run
 ID and source-file hashes is a no-op success; a different source under that run
-ID is reported as a conflict. If session usage metadata is present, its action
-counts must match the steps. For
-legacy sessions without usage metadata, the importer derives action counts from
+ID is reported as a conflict. For Dagger-capable terminal signals, the consumer
+waits for all declared resolved reference records before automatic import;
+unresolved watches leave an explicit diagnostic and do not imply completion.
+If session usage metadata is present, its action
+counts must match the steps. For legacy sessions without usage metadata, the importer derives action counts from
 the step records and leaves summary timestamps null when step timestamps are
 not consistently available. Present usage timestamps must be valid UTC ISO-8601
 values and must match the first/last step timestamp when that boundary is

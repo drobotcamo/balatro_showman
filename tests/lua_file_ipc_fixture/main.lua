@@ -173,6 +173,13 @@ function love.load()
       or not resolved:find('"victim_instance_token":"7002"', 1, true) then
     return fail("resolved Dagger reference did not preserve price, values, identity and timing")
   end
+  G.STATE = G.STATES.GAME_OVER
+  bridge.tick()
+  local dagger_end = read_file(end_for(next_id))
+  if not dagger_end or not dagger_end:find('"resolved_dagger_reference_count":1', 1, true)
+      or not dagger_end:find('"pending_dagger_reference_count":0', 1, true) then
+    return fail("terminal Dagger reference watermark does not include resolved sidecar")
+  end
   print("producer lifecycle fixture: cold Continue; New Run; menu; Continue 109->110->111; win; no resurrection")
   print("producer Dagger fixture: pre and resolved references retain sell value, mult, identity and timing")
   love.event.quit(0)

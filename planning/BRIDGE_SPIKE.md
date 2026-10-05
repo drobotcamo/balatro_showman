@@ -34,7 +34,12 @@ mechanics_reference_<run>_<id>_resolved.json ─▶ isolated Dagger answer-key r
   `mechanics_reference.ndjson`, outside `steps.ndjson`; the generic observation
   adapters never receive these records. The reference file is retained until the
   matching step is durable, then acknowledged. It is keyed by the original step
-  and phase, so resolved aftermath requires no intervening player action.
+  and phase, so resolved aftermath requires no intervening player action. A new
+  run-end signal declares the number of emitted resolved references and any
+  still pending Dagger watches. The consumer waits for the declared count before
+  automatic bundle import; pending watches remain diagnosed and do not claim
+  complete reference intake. Sidecar updates replace a complete file atomically
+  so an interrupted write preserves the prior reference records for replay.
 
 ## Lua producer
 

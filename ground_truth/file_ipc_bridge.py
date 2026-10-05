@@ -27,6 +27,8 @@ def _validate_mechanics_reference(snapshot: dict[str, Any]) -> dict[str, Any] | 
     value = snapshot.get("mechanics_reference")
     if value is None:
         return None
+    if not isinstance(value, dict) or value.get("schema_version") != MECHANICS_REFERENCE_VERSION:
+        raise ValueError("unsupported mechanics_reference.schema_version")
     if not isinstance(value, dict) or value.get("capture_phase") not in {
         "pre_action", "post_action", "pending", "resolved"
     }:
@@ -53,6 +55,8 @@ def _validate_mechanics_reference(snapshot: dict[str, Any]) -> dict[str, Any] | 
     for index, joker in enumerate(jokers):
         if not isinstance(joker, dict):
             raise ValueError(f"mechanics_reference.jokers[{index}] must be an object")
+        if any(field not in joker for field in ("role", "position", "center_key", "instance_token", "mult", "sell_cost")):
+            raise ValueError(f"mechanics_reference.jokers[{index}] is missing required fields")
         if joker.get("role") != "joker" or joker.get("position") != index:
             raise ValueError(f"mechanics_reference.jokers[{index}] has invalid role/position")
         token = joker.get("instance_token")
@@ -75,12 +79,28 @@ def _validate_mechanics_reference(snapshot: dict[str, Any]) -> dict[str, Any] | 
     for index, effect in enumerate(effects):
         if not isinstance(effect, dict) or effect.get("trigger") != "setting_blind":
             raise ValueError(f"mechanics_reference.resolved_effects[{index}] has invalid trigger")
+        required = ("dagger_instance_token", "victim_instance_token", "victim_sell_cost_pre",
+                    "mult_before", "mult_after", "mult_delta", "pre_capture_timestamp_ns",
+                    "resolved_capture_timestamp_ns")
+        if any(field not in effect for field in required):
+            raise ValueError(f"mechanics_reference.resolved_effects[{index}] is missing required fields")
+        for field in ("dagger_instance_token", "victim_instance_token"):
+            token = effect[field]
+            if token is not None and (not isinstance(token, str) or not token):
+                raise ValueError(f"mechanics_reference.resolved_effects[{index}].{field} must be non-empty string or null")
         for field in ("victim_sell_cost_pre", "mult_before", "mult_after", "mult_delta",
                       "pre_capture_timestamp_ns", "resolved_capture_timestamp_ns"):
             number = effect.get(field)
             if number is not None and (isinstance(number, bool) or not isinstance(number, (int, float))
                                        or not math.isfinite(number)):
                 raise ValueError(f"mechanics_reference.resolved_effects[{index}].{field} must be finite number or null")
+        if (effect["pre_capture_timestamp_ns"] is not None
+                and effect["resolved_capture_timestamp_ns"] is not None
+                and effect["pre_capture_timestamp_ns"] > effect["resolved_capture_timestamp_ns"]):
+            raise ValueError(f"mechanics_reference.resolved_effects[{index}] has reversed timing")
+        if (value["capture_phase"] == "resolved"
+                and effect["resolved_capture_timestamp_ns"] != timestamp):
+            raise ValueError(f"mechanics_reference.resolved_effects[{index}] timestamp differs from resolved capture")
     return value
 
 
@@ -530,6 +550,11 @@ class FileIpcBridge:
         session = self._session(run_id)
         recorded_at = datetime.now(timezone.utc).isoformat()
         mechanics_reference = _validate_mechanics_reference(snapshot)
+        if mechanics_reference is not None:
+            if mechanics_reference["step_id"] != f"{run_id}:{request_id}":
+                self._invalid_input(input_path, "mechanics reference step_id differs from queued request")
+            if mechanics_reference.get("run_id", run_id) != run_id:
+                self._invalid_input(input_path, "mechanics reference run_id differs from queued request")
         record = {**snapshot, "_recorded_action": action, "_recorded_at": recorded_at}
         record.pop("mechanics_reference", None)
         if mechanics_reference is not None:
@@ -559,6 +584,8 @@ class FileIpcBridge:
             **reference,
         }
         _validate_mechanics_reference({"mechanics_reference": record})
+        if record["run_id"] != run_id or record["step_id"] != f"{run_id}:{request_id}":
+            raise ValueError("mechanics reference identity differs from source step")
         for existing in read_mechanics_reference(path.parent):
             if (existing.get("step_id"), existing.get("capture_phase")) == (
                     record["step_id"], record["capture_phase"]):
@@ -566,10 +593,8 @@ class FileIpcBridge:
                     raise ValueError(f"conflicting {record['capture_phase']} mechanics reference for {record['step_id']}")
                 return
         line = json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-        with path.open("a", encoding="utf-8", newline="") as stream:
-            stream.write(line + "\n")
-            stream.flush()
-            os.fsync(stream.fileno())
+        previous = path.read_text(encoding="utf-8") if path.exists() else ""
+        _atomic_write(path, previous + line + "\n")
 
     def _handle_mechanics_reference(self) -> bool:
         did_work = False
@@ -635,6 +660,13 @@ class FileIpcBridge:
             self._invalid_input(signal_path, f"{signal_path.name} requires run_id")
         targets = [str(run_id)] if run_id is not None else list(self._sessions)
         watermark = signal.get("last_request_id")
+        resolved_count = signal.get("resolved_dagger_reference_count")
+        pending_count = signal.get("pending_dagger_reference_count")
+        if (resolved_count is None) != (pending_count is None) or any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 0
+            for value in (resolved_count, pending_count) if value is not None
+        ):
+            self._invalid_input(signal_path, "invalid Dagger reference terminal watermark")
         if watermark is not None and (
             not isinstance(watermark, int) or isinstance(watermark, bool) or watermark < 0
         ):
@@ -701,6 +733,10 @@ class FileIpcBridge:
                 })
                 self._write_capture_diagnostics(session["session_dir"], target)
             session["outcome"] = outcome
+            if resolved_count is not None:
+                session["dagger_reference_watermark"] = {
+                    "resolved_count": resolved_count, "pending_count": pending_count,
+                }
             session["lifecycle_status"] = {"win": "won", "loss": "lost"}[outcome]
             session["ended_at"] = datetime.now(timezone.utc).isoformat()
             self._write_session(session)
@@ -730,6 +766,24 @@ class FileIpcBridge:
                     or now < self._import_retry_after.get(run_id, 0)):
                 continue
             source = Path(session["session_dir"])
+            reference_watermark = session.get("dagger_reference_watermark")
+            if reference_watermark is not None:
+                if reference_watermark["pending_count"]:
+                    self._add_capture_diagnostic(run_id, {
+                        "code": "dagger_reference_unresolved_at_terminal",
+                        "pending_count": reference_watermark["pending_count"],
+                    })
+                    self._write_capture_diagnostics(source, run_id)
+                    continue
+                try:
+                    resolved = sum(item["capture_phase"] == "resolved"
+                                   for item in read_mechanics_reference(source))
+                except (OSError, ValueError) as error:
+                    self._import_retry_after[run_id] = now + 5.0
+                    print(f"[file_ipc_bridge] reference intake pending for {run_id}: {error}", file=sys.stderr)
+                    continue
+                if resolved != reference_watermark["resolved_count"]:
+                    continue
             bundle = None
             try:
                 bundle = RunBundle(self._bundle_db)

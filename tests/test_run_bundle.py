@@ -188,6 +188,30 @@ def test_mechanics_reference_import_and_read_are_separate_from_steps(tmp_path):
     with pytest.raises(ImportConflict, match="different source identity"):
         RunBundle(url).import_oracle_directory(source)
 
+def test_oracle_import_rejects_reference_to_another_step(tmp_path):
+    url = f"sqlite:///{tmp_path / 'bad-reference.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    source = tmp_path / "oracle" / "bad-reference"
+    source.mkdir(parents=True)
+    (source / "session.json").write_text(json.dumps({
+        "run_id": "bad-reference", "schema_version": "producer/1.0.0",
+        "started_at": "2026-10-05T00:00:00+00:00", "ended_at": "2026-10-05T00:00:01+00:00",
+        "outcome": "loss", "n_steps": 1,
+    }), encoding="utf-8")
+    (source / "steps.ndjson").write_text(json.dumps({
+        "request_id": 1, "_recorded_action": "SelectBlind",
+    }) + "\n", encoding="utf-8")
+    (source / "mechanics_reference.ndjson").write_text(json.dumps({
+        "schema_version": "dagger-reference/1.0", "run_id": "bad-reference",
+        "step_id": "bad-reference:2", "capture_phase": "resolved",
+        "capture_timestamp_ns": 123, "producer_revision": "test",
+        "runtime": {"balatro": "test", "steamodded": "test", "lovely": "test"},
+        "jokers": [], "resolved_effects": [],
+    }) + "\n", encoding="utf-8")
+    with pytest.raises(BundleError, match="invalid mechanics reference envelope"):
+        RunBundle(url).import_oracle_directory(source)
+    assert RunBundleInspector(url).list_runs()["data"] == []
+
 def test_file_ipc_retry_conflicts_when_same_run_id_has_different_source(tmp_path):
     url = f"sqlite:///{tmp_path / 'conflict.db'}"
     cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")

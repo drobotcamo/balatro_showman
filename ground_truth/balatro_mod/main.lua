@@ -65,6 +65,7 @@ local last_emit_clock = -math.huge
 local last_emit_seconds = -math.huge
 local recording_poll_diagnosed = false
 local pending_dagger_references = {}
+local resolved_dagger_reference_count = 0
 
 -- Monotonic producer timestamp with sub-second precision.  Recording-start
 -- capture must use this same clock (see planning/align_oracle_video.py); it
@@ -1361,6 +1362,8 @@ local function poll_dagger_references()
       if not wrote then
         print("[balatro_showman_bridge] could not enqueue resolved Dagger reference at " .. path)
         remaining[#remaining + 1] = pending
+      else
+        resolved_dagger_reference_count = resolved_dagger_reference_count + 1
       end
     else
       remaining[#remaining + 1] = pending
@@ -1463,6 +1466,7 @@ function Bridge.emit(action_label)
     request_counter = 0
     producer_write_failures = 0
     pending_dagger_references = {}
+    resolved_dagger_reference_count = 0
     run_ending = false
     run_finalized = false
   end
@@ -1496,6 +1500,8 @@ local function finalize(outcome)
     .. ',"ipc_schema_version":"file-queue/1.0.0"'
     .. ',"outcome":' .. j_str(outcome)
     .. ',"last_request_id":' .. tostring(request_counter)
+    .. ',"resolved_dagger_reference_count":' .. tostring(resolved_dagger_reference_count)
+    .. ',"pending_dagger_reference_count":' .. tostring(#pending_dagger_references)
     .. ',"producer_write_failures":' .. tostring(producer_write_failures) .. "}"
   local wrote = write_new_atomic(end_path, body)
   if wrote then
@@ -1601,6 +1607,7 @@ local function install_game_hooks()
         request_counter = 0
         producer_write_failures = 0
         pending_dagger_references = {}
+        resolved_dagger_reference_count = 0
         run_ending = false
         run_finalized = false
         finalization_failure_logged = false

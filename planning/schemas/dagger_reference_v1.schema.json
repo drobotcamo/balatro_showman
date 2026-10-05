@@ -9,7 +9,6 @@
   "properties": {
     "schema_version": { "const": "dagger-reference/1.0" },
     "run_id": { "type": "string", "minLength": 1 },
-    "run_id": { "type": "string", "minLength": 1 },
     "step_id": { "type": "string", "minLength": 1 },
     "capture_phase": { "enum": ["pre_action", "post_action", "pending", "resolved"] },
     "capture_timestamp_ns": { "type": "number", "minimum": 0 },
