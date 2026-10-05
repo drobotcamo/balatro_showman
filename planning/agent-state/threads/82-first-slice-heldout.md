@@ -1,7 +1,7 @@
 # Work Checkpoint
 Updated: 2026-10-04
 Issue: #82
-PR: none
+PR: #137
 Branch: issue-82-evidence-handoff
 Worktree: C:\Users\camgr\Documents\code_projects\balatro_showman-viewer
 Objective: Finish the first-slice held-out evidence workflow under frozen protocol v2; the bounded development pilot and viewer/exporter fixture work are complete, but held-out frame review/export/eligibility are not.
