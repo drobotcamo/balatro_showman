@@ -94,6 +94,9 @@ def _validate_mechanics_reference(snapshot: dict[str, Any]) -> dict[str, Any] | 
             if number is not None and (isinstance(number, bool) or not isinstance(number, (int, float))
                                        or not math.isfinite(number)):
                 raise ValueError(f"mechanics_reference.resolved_effects[{index}].{field} must be finite number or null")
+        for field in ("pre_capture_timestamp_ns", "resolved_capture_timestamp_ns"):
+            if effect[field] is None or effect[field] < 0:
+                raise ValueError(f"mechanics_reference.resolved_effects[{index}].{field} must be non-negative number")
         if (effect["pre_capture_timestamp_ns"] is not None
                 and effect["resolved_capture_timestamp_ns"] is not None
                 and effect["pre_capture_timestamp_ns"] > effect["resolved_capture_timestamp_ns"]):

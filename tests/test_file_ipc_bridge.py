@@ -84,6 +84,27 @@ class FileIpcBridgeTests(unittest.TestCase):
             FileIpcBridge(io_dir, out_dir)._append_mechanics_reference("atomic-reference", 2, later)
             self.assertEqual(len(read_mechanics_reference(out_dir / "atomic-reference")), 2)
 
+    def test_resolved_reference_rejects_missing_or_negative_timing(self) -> None:
+        from ground_truth.file_ipc_bridge import _validate_mechanics_reference
+
+        reference = {
+            "schema_version": "dagger-reference/1.0", "step_id": "run:1",
+            "capture_phase": "resolved", "capture_timestamp_ns": 456,
+            "producer_revision": "test",
+            "runtime": {"balatro": "test", "steamodded": "test", "lovely": "test"},
+            "jokers": [], "resolved_effects": [{
+                "trigger": "setting_blind", "dagger_instance_token": "1",
+                "victim_instance_token": "2", "victim_sell_cost_pre": 4,
+                "mult_before": 6, "mult_after": 14, "mult_delta": 8,
+                "pre_capture_timestamp_ns": None, "resolved_capture_timestamp_ns": 456,
+            }],
+        }
+        with self.assertRaisesRegex(ValueError, "pre_capture_timestamp_ns"):
+            _validate_mechanics_reference({"mechanics_reference": reference})
+        reference["resolved_effects"][0]["pre_capture_timestamp_ns"] = -1
+        with self.assertRaisesRegex(ValueError, "pre_capture_timestamp_ns"):
+            _validate_mechanics_reference({"mechanics_reference": reference})
+
     def test_mechanics_reference_is_stored_and_read_outside_observation_steps(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
