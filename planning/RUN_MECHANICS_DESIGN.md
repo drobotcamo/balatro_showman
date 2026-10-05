@@ -136,6 +136,62 @@ before setting `requires_exact_order=true`. The fixture keeps it false until
 then. Sell value at the trigger must still come from visible evidence or a
 reproducible derivation under the applicable pricing rules.
 
+#### Installed capture stack trace (2026-10-04; owner verification pending)
+
+The latest startup log is
+`C:\Users\camgr\AppData\Roaming\Balatro\Mods\lovely\log\lovely-2026.10.04-16.52.58.log`.
+It records Balatro `1.0.1o-FULL`, Lovely `0.10.0`, Steamodded runtime
+`26.926.0~dev-a`, and Issue #123 producer build. The Steamodded manifest says
+`26.829.0`; `version.lua` gives the loaded runtime identification. The installed
+Balatro executable SHA-256 is
+`0d75fe164accf3312734d4b37ac98788dd15f0b8e4f9bb8b7f90c4e59de93f47`.
+
+The unpatched files in `lovely/game-dump/` match the executable's embedded Lua
+hashes. The active post-Lovely files are in `lovely/dump/` (not
+`lovely/game-dump/`) and have these SHA-256 values:
+
+| File | SHA-256 |
+| --- | --- |
+| `card.lua` | `2BA1276C5850EA966733D4144602D866DDDBB9CBFFF1F588F409114D79584F54` |
+| `functions/state_events.lua` | `1E04EAAC3BF610F97D6C749F7D3762883B64A414DC5A6E14CE52BBC8FAE682A6` |
+| `functions/common_events.lua` | `8AE65634B2ABCDF0BC02FE1289CFFF57CACCAE47421BB69917BA8C84272E9968` |
+| `engine/event.lua` | `0A6A4FAC8436D502DDC654C40BF4579A86AC18121A853650C34F750DFF772D1F` |
+| `game.lua` | `9297C27F4AB66E6795AA30CB84E28A10A842A924182B85CF580E1FEDD5E0F8A1` |
+| `SMODS/_/src/utils.lua` | `AAF8C4CCCCBFC5AECDF6A828AFB4024E1E903ACDFB691A7FF7F9214CE6C95430` |
+| `smods-main/lovely/scaling.toml` | `ADE9F4A7F8B87EA64FE094445354A89710762950E8D9916D3354F779D8BA7666` |
+
+For this stack, `lovely/dump/functions/state_events.lua:241-243` queues the
+blocking `new_round` event. Its callback sets the blind and calls
+`SMODS.calculate_context({setting_blind=true, ...})` at `:281-284`. The generated
+`lovely/dump/card.lua:2953-2981` applies the Dagger eligibility condition: the
+immediate right neighbor must exist, must not be eternal according to
+`SMODS.is_eternal`, and must not already be getting sliced. It marks the victim,
+queues the dissolve event, then calls `SMODS.scale_card` outside that event
+callback. The active `smods-main/lovely/scaling.toml` removes vanilla's
+`self.ability.mult += sell_cost * 2` line and inserts this `SMODS.scale_card`
+call. In `SMODS/_/src/utils.lua:3370-3411`,
+`SMODS.scale_card` computes the scalar context and applies the scale before it
+returns; `SMODS.additive_scaling` updates the referenced ability value
+synchronously. Thus the post-Lovely stack updates Dagger Mult during the
+`setting_blind` calculation, while victim dissolution remains queued.
+
+The active event system still matters for the capture boundary. `Event:init`
+defaults to blocking events (`engine/event.lua:5-23`), `add_event` appends to
+the queue (`:119-129`), and the queue update defers subsequent blocking events
+after a blocking event runs (`:171-193`). `Game:update` calls the event manager
+at `game.lua:2644`. The producer wraps `Game.update` and samples after the
+original update returns; it therefore reads the synchronous Mult mutation after
+the setting-blind context, without waiting for a player action. This timing is
+different from embedded vanilla, where Mult changes in the queued Dagger event.
+
+This source trace is specific to the logged local stack. The owner must verify
+both that this runtime/source stack governs the intended behavior and that
+Dagger Mult counts as resolved while victim dissolution is still queued. If so,
+exact-order support can be approved for this stack only; other versions or
+Lovely patch sets need their own trace. The manifest/runtime version discrepancy
+and Lovely patch warnings remain part of its provenance. No Dagger run was made
+during this source inspection.
+
 ### Evidence, status, and recomputation
 
 Every claim/result carries one status: `observed`, `inferred`, `unknown`,
