@@ -20,8 +20,9 @@ python -m run_bundle <command> --db <bundle.sqlite> ...
 
 `run_bundle/__main__.py` emits JSON envelopes and uses the read-only
 `RunBundleInspector`. Inspection commands include `list`, `summary`, `step`,
-`find`, `provenance`, `evidence`, `validate`, `outcome`, `transitions`, and
-`diff`. `validate --strict` requests strict diagnostics; inspection never
+`find`, `provenance`, `evidence`, `mechanics-reference`, `validate`, `outcome`,
+`transitions`, and `diff`. `mechanics-reference` is the only reader for the
+separate engine-answer channel. `validate --strict` requests strict diagnostics; inspection never
 repairs evidence or changes lifecycle state.
 
 Database setup is separate and mutating:
@@ -48,11 +49,16 @@ prompt for per-run review or confirmation. A human-reviewed live smoke run is a
 one-time acceptance check for this integration, not a runtime step.
 
 The file-source adapter requires `session.json` and `steps.ndjson`, verifies the
-declared step count and recorded action on every step. A repeat import with the same run
+declared step count and recorded action on every step. Optional
+`mechanics_reference.ndjson` records are imported as typed `mechanics_reference`
+entries; they are not merged into step payloads and are queried only with the
+explicit mechanics-reference reader. A repeat import with the same run
 ID and source-file hashes is a no-op success; a different source under that run
-ID is reported as a conflict. If session usage metadata is present, its action
-counts must match the steps. For
-legacy sessions without usage metadata, the importer derives action counts from
+ID is reported as a conflict. For Dagger-capable terminal signals, the consumer
+waits for all declared resolved reference records before automatic import;
+unresolved watches leave an explicit diagnostic and do not imply completion.
+If session usage metadata is present, its action
+counts must match the steps. For legacy sessions without usage metadata, the importer derives action counts from
 the step records and leaves summary timestamps null when step timestamps are
 not consistently available. Present usage timestamps must be valid UTC ISO-8601
 values and must match the first/last step timestamp when that boundary is
@@ -60,8 +66,10 @@ available. Invalid step timestamps alongside usage metadata are rejected;
 legacy records without session usage keep the original step payload and receive
 null summary timestamps if timestamp coverage is missing or malformed.
 It maps `win`/`loss` to `won`/`lost`, preserves usage and recording metadata, and
-stores source type, source identity and SHA-256 hashes of both source files as
-provenance. Evidence records are canonicalized JSON objects. Import is one
+stores source type, source identity and SHA-256 hashes of `session.json`,
+`steps.ndjson`, and optional `mechanics_reference.ndjson` as provenance. Reference
+records are separate from steps and only appear through
+`mechanics-reference`. Evidence records are canonicalized JSON objects. Import is one
 database transaction, and it never deletes or rewrites source run files. If the
 database is unavailable or import validation fails, the bridge reports a pending
 import and retries while running or after restart. Re-running the manual

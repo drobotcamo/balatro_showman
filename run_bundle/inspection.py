@@ -54,14 +54,15 @@ class RunBundleInspector:
 
     def get_record(self, run_id, sequence):
         _, records, _ = self._load(run_id)
-        record = next((r for r in records if r.sequence == sequence), None)
+        record = next((r for r in records if r.sequence == sequence and r.kind != "mechanics_reference"), None)
         if record is None:
             raise InspectionError("record_not_found", f"record {sequence} not found")
         return self.envelope("observed", self._record(record))
 
     def find_records(self, run_id, *, kind=None, sequence_from=None, sequence_to=None):
         _, records, _ = self._load(run_id)
-        selected = [r for r in records if (kind is None or r.kind == kind)
+        selected = [r for r in records if r.kind != "mechanics_reference"
+                    and (kind is None or r.kind == kind)
                     and (sequence_from is None or r.sequence >= sequence_from)
                     and (sequence_to is None or r.sequence <= sequence_to)]
         return self.envelope("observed", [self._record(r) for r in selected])
@@ -88,7 +89,7 @@ class RunBundleInspector:
     def capabilities(self, run_id=None):
         if run_id is not None:
             self._load(run_id)
-        return self.envelope("derived", {"read_only": True, "operations": ["list", "summary", "step", "find", "provenance", "validate", "evidence", "outcome", "transitions", "diff"]})
+        return self.envelope("derived", {"read_only": True, "operations": ["list", "summary", "step", "find", "provenance", "validate", "evidence", "mechanics-reference", "outcome", "transitions", "diff"]})
 
     def outcome(self, run_id):
         run, _, _ = self._load(run_id)
@@ -96,6 +97,21 @@ class RunBundleInspector:
 
     def evidence(self, run_id, *, kind=None, sequence_from=None, sequence_to=None):
         return self.find_records(run_id, kind=kind, sequence_from=sequence_from, sequence_to=sequence_to)
+
+    def mechanics_reference(self, run_id, *, step_id=None):
+        """Read engine mechanics answers through an explicitly separate channel."""
+        _, records, _ = self._load(run_id)
+        values = []
+        for record in records:
+            if record.kind != "mechanics_reference":
+                continue
+            try:
+                payload = json.loads(record.payload.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise InspectionError("invalid_mechanics_reference", "mechanics reference record is not valid JSON") from error
+            if step_id is None or payload.get("step_id") == step_id:
+                values.append(self._record(record))
+        return self.envelope("observed" if values else "missing", values)
 
     def transitions(self, run_id):
         self._load(run_id)

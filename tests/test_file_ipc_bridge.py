@@ -4,7 +4,7 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 
-from ground_truth.file_ipc_bridge import FileIpcBridge
+from ground_truth.file_ipc_bridge import FileIpcBridge, read_mechanics_reference
 
 
 def _queue_request(io_dir: Path, run_id: str, request_id: int) -> Path:
@@ -19,6 +19,184 @@ def _queue_request(io_dir: Path, run_id: str, request_id: int) -> Path:
 
 
 class FileIpcBridgeTests(unittest.TestCase):
+    def test_resolved_reference_arriving_after_terminal_signal_is_imported_once(self) -> None:
+        from alembic import command
+        from alembic.config import Config
+        from run_bundle import RunBundleInspector
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            url = f"sqlite:///{(root / 'bundle.sqlite').as_posix()}"
+            config = Config("alembic.ini")
+            config.set_main_option("sqlalchemy.url", url)
+            command.upgrade(config, "head")
+            _queue_request(io_dir, "late-reference", 1)
+            (io_dir / "run_end_late-reference.json").write_text(json.dumps({
+                "ipc_schema_version": "file-queue/1.0.0", "run_id": "late-reference",
+                "last_request_id": 1, "outcome": "loss",
+                "resolved_dagger_reference_count": 1, "pending_dagger_reference_count": 0,
+            }), encoding="utf-8")
+            bridge = FileIpcBridge(io_dir, out_dir, bundle_db=url)
+            bridge.step_once()
+            inspector = RunBundleInspector(url)
+            self.assertEqual(inspector.list_runs()["data"], [])
+            sidecar = io_dir / "mechanics_reference_late-reference_000000000001_resolved.json"
+            sidecar.write_text(json.dumps({
+                "schema_version": "dagger-reference/1.0", "run_id": "late-reference",
+                "step_id": "late-reference:1", "capture_phase": "resolved",
+                "capture_timestamp_ns": 456, "producer_revision": "test",
+                "runtime": {"balatro": "1.0.1", "steamodded": "test", "lovely": "test"},
+                "jokers": [], "resolved_effects": [],
+            }), encoding="utf-8")
+            restarted = FileIpcBridge(io_dir, out_dir, bundle_db=url)
+            restarted.step_once()
+            self.assertEqual(inspector.summary("late-reference")["data"]["record_count"], 2)
+            self.assertEqual(len(inspector.mechanics_reference("late-reference")["data"]), 1)
+            self.assertFalse(sidecar.exists())
+            inspector.close()
+
+    def test_reference_atomic_replay_preserves_prior_bytes_after_replace_failure(self) -> None:
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            bridge = FileIpcBridge(io_dir, out_dir)
+            bridge._session("atomic-reference")
+            reference = {
+                "schema_version": "dagger-reference/1.0", "step_id": "atomic-reference:1",
+                "capture_phase": "pre_action", "capture_timestamp_ns": 123,
+                "producer_revision": "test",
+                "runtime": {"balatro": "1.0.1", "steamodded": "test", "lovely": "test"},
+                "jokers": [],
+            }
+            bridge._append_mechanics_reference("atomic-reference", 1, reference)
+            path = out_dir / "atomic-reference" / "mechanics_reference.ndjson"
+            initial = path.read_bytes()
+            later = {**reference, "step_id": "atomic-reference:2"}
+            with patch("ground_truth.file_ipc_bridge.os.replace", side_effect=OSError("injected rename failure")):
+                with self.assertRaisesRegex(OSError, "injected rename failure"):
+                    bridge._append_mechanics_reference("atomic-reference", 2, later)
+            self.assertEqual(path.read_bytes(), initial)
+            FileIpcBridge(io_dir, out_dir)._append_mechanics_reference("atomic-reference", 2, later)
+            self.assertEqual(len(read_mechanics_reference(out_dir / "atomic-reference")), 2)
+
+    def test_resolved_reference_rejects_missing_or_negative_timing(self) -> None:
+        from ground_truth.file_ipc_bridge import _validate_mechanics_reference
+
+        reference = {
+            "schema_version": "dagger-reference/1.0", "step_id": "run:1",
+            "capture_phase": "resolved", "capture_timestamp_ns": 456,
+            "producer_revision": "test",
+            "runtime": {"balatro": "test", "steamodded": "test", "lovely": "test"},
+            "jokers": [], "resolved_effects": [{
+                "trigger": "setting_blind", "dagger_instance_token": "1",
+                "victim_instance_token": "2", "victim_sell_cost_pre": 4,
+                "mult_before": 6, "mult_after": 14, "mult_delta": 8,
+                "pre_capture_timestamp_ns": None, "resolved_capture_timestamp_ns": 456,
+            }],
+        }
+        with self.assertRaisesRegex(ValueError, "pre_capture_timestamp_ns"):
+            _validate_mechanics_reference({"mechanics_reference": reference})
+        reference["resolved_effects"][0]["pre_capture_timestamp_ns"] = -1
+        with self.assertRaisesRegex(ValueError, "pre_capture_timestamp_ns"):
+            _validate_mechanics_reference({"mechanics_reference": reference})
+
+    def test_mechanics_reference_is_stored_and_read_outside_observation_steps(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            snapshot = {
+                "ipc_schema_version": "file-queue/1.0.0", "request_id": 1,
+                "meta": {"run_id": "dagger-reference"}, "action_taken": "SelectBlind",
+                "mechanics_reference": {"schema_version": "dagger-reference/1.0",
+                    "step_id": "dagger-reference:1", "capture_phase": "pre_action",
+                    "capture_timestamp_ns": 123, "producer_revision": "test",
+                    "runtime": {"balatro": "1.0.1", "steamodded": "test", "lovely": "test"}, "jokers": [
+                    {"role": "joker", "position": 0, "center_key": "j_dagger",
+                     "instance_token": "engine-17", "mult": 62, "sell_cost": 8},
+                ]},
+            }
+            request = io_dir / "request_dagger-reference_000000000001.json"
+            request.write_text(json.dumps(snapshot), encoding="utf-8")
+            resolved_reference = {
+                "schema_version": "dagger-reference/1.0", "run_id": "dagger-reference",
+                "step_id": "dagger-reference:1", "capture_phase": "resolved",
+                "capture_timestamp_ns": 456, "producer_revision": "test",
+                "runtime": {"balatro": "1.0.1", "steamodded": "test", "lovely": "test"},
+                "jokers": [{"role": "joker", "position": 0, "center_key": "j_dagger",
+                    "instance_token": "engine-17", "mult": 70, "sell_cost": 8}],
+                "resolved_effects": [{"trigger": "setting_blind", "dagger_instance_token": "engine-17",
+                    "victim_instance_token": "engine-18", "victim_sell_cost_pre": 4,
+                    "mult_before": 62, "mult_after": 70, "mult_delta": 8,
+                    "pre_capture_timestamp_ns": 123, "resolved_capture_timestamp_ns": 456}],
+            }
+            resolved_path = io_dir / "mechanics_reference_dagger-reference_000000000001_resolved.json"
+            resolved_path.write_text(json.dumps(resolved_reference), encoding="utf-8")
+            bridge = FileIpcBridge(io_dir, out_dir)
+            self.assertTrue(bridge.step_once())
+
+            step = json.loads((out_dir / "dagger-reference" / "steps.ndjson").read_text())
+            self.assertNotIn("mechanics_reference", step)
+            references = read_mechanics_reference(out_dir / "dagger-reference")
+            self.assertEqual(references[0]["jokers"][0]["mult"], 62)
+            self.assertEqual(references[0]["step_id"], "dagger-reference:1")
+            self.assertEqual(references[1]["capture_phase"], "resolved")
+            self.assertEqual(references[1]["resolved_effects"][0]["victim_sell_cost_pre"], 4)
+            self.assertFalse(resolved_path.exists())
+
+    def test_reference_perturbation_cannot_change_reconstruction_step_adapter(self) -> None:
+        from run_bundle import read_oracle_run
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            observed = []
+            for index, (mult, token) in enumerate(((6, "engine-a"), (999, "engine-b"))):
+                io_dir, out_dir = root / f"io-{index}", root / f"runs-{index}"
+                io_dir.mkdir()
+                request = _queue_request(io_dir, "same-run", 1)
+                payload = json.loads(request.read_text(encoding="utf-8"))
+                payload["objects"] = [{"center_key": "j_ceremonial", "zone": "CurrentJokers"}]
+                payload["mechanics_reference"] = {
+                    "schema_version": "dagger-reference/1.0", "step_id": "same-run:1",
+                    "capture_phase": "pre_action", "capture_timestamp_ns": 123,
+                    "producer_revision": "test",
+                    "runtime": {"balatro": "1.0.1", "steamodded": "test", "lovely": "test"},
+                    "jokers": [{"role": "joker", "position": 0, "center_key": "j_ceremonial",
+                                "instance_token": token, "mult": mult, "sell_cost": 5}],
+                }
+                request.write_text(json.dumps(payload), encoding="utf-8")
+                FileIpcBridge(io_dir, out_dir).step_once()
+                step = read_oracle_run(out_dir / "same-run")["steps"][0]
+                self.assertNotIn("mechanics_reference", step)
+                step.pop("_recorded_at")
+                observed.append(step)
+            self.assertEqual(observed[0], observed[1])
+
+    def test_mechanics_reference_rejects_nonfinite_values(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir = root / "io"
+            io_dir.mkdir()
+            request = _queue_request(io_dir, "bad-reference", 1)
+            item = json.loads(request.read_text())
+            item["mechanics_reference"] = {"schema_version": "dagger-reference/1.0",
+                "step_id": "bad-reference:1", "capture_phase": "pre_action",
+                "capture_timestamp_ns": 123, "producer_revision": "test",
+                "runtime": {"balatro": "1.0.1", "steamodded": "test", "lovely": "test"}, "jokers": [
+                {"role": "joker", "position": 0, "center_key": "j_ceremonial",
+                 "instance_token": "test-id", "mult": float("nan"), "sell_cost": 4},
+            ]}
+            request.write_text(json.dumps(item), encoding="utf-8")
+            bridge = FileIpcBridge(io_dir, root / "runs")
+            with self.assertRaisesRegex(ValueError, "finite number"):
+                bridge.step_once()
+            self.assertTrue(request.exists())
+
     def test_snapshot_action_and_run_end_are_recorded(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

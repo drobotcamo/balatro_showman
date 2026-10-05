@@ -101,6 +101,38 @@ OBS event log `2026-10-02 19-09-19.txt`, mod manifests/version files, generated
 `lovely/game-dump/globals.lua`, OBS profile `Untitled`, installed/check-in
 producer hashes, and the timestamped installation/archive records above.
 
+## Issue #123 Dagger-reference deployment (2026-10-04)
+
+The Issue #123 producer (`manifest` 0.3.0, build
+`issue123-dagger-reference-1`) was installed reversibly at
+`%APPDATA%\Balatro\Mods\balatro_showman_bridge`. Its `main.lua` SHA-256 is
+`C29A3370E8C8222891383FF0834EDA19F43D2FA6200214B1267044F39AAB049A`, matching
+the worktree. The prior active source SHA-256
+`F2D784516511D2F9F427A275871B3ED555F4965732921167DAC0F6FA888C94E6` is preserved
+as `bridge-backups\balatro_showman_bridge-issue123-pre-build-label-20261004-main.lua`;
+the previous full mod is preserved at
+`bridge-backups\balatro_showman_bridge-issue123-20261004`.
+
+The first launch log used the old startup label. After correcting it and
+recopying `main.lua`, `lovely-2026.10.04-16.52.58.log` reported
+`build=issue123-dagger-reference-1` and that action hooks were installed. It
+shows normal mod startup and existing Handy/JokerDisplay metadata/pattern
+warnings, then ends during startup. No gameplay, OBS recording, or reference
+request occurred. Windows recorded Kernel-Power event 41 at 16:53:44 and the
+previous shutdown as unexpected (event 6008); its event-41 bugcheck code is 0.
+No Balatro application-error/Windows Error Reporting record or minidump was
+found. Additional unexpected reboots were recorded earlier at 12:43 and 16:44
+that day. The logs do not establish the cause or rule out the latest game launch
+as a trigger.
+The prior IPC directory (three preserved marker/action files, including its
+`.invalid` marker) is archived at
+`%APPDATA%\Balatro\agent_io-issue123-pre-capture-20261004`; a fresh empty
+`agent_io` directory is active. The F: recording volume was absent after the
+restart and remains unavailable, so the new Issue #123 bundle/output paths on
+that volume are not currently available. No capture was made; do not relaunch
+the game or recorder until the system is stable and the intended storage volume
+is available.
+
 ## External references
 
 - Steamodded repository/source metadata is available in `smods-main/README.md`,

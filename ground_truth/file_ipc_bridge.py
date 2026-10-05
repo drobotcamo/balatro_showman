@@ -15,6 +15,115 @@ from typing import Any
 
 
 OUTCOMES = {"win", "loss"}
+MECHANICS_REFERENCE_VERSION = "dagger-reference/1.0"
+
+
+def _validate_mechanics_reference(snapshot: dict[str, Any]) -> dict[str, Any] | None:
+    """Validate and retain isolated engine reference values when present.
+
+    Legacy snapshots without this additive channel remain valid. Values are
+    copied under a dedicated key and never merged into reconstructed fields.
+    """
+    value = snapshot.get("mechanics_reference")
+    if value is None:
+        return None
+    if not isinstance(value, dict) or value.get("schema_version") != MECHANICS_REFERENCE_VERSION:
+        raise ValueError("unsupported mechanics_reference.schema_version")
+    if not isinstance(value, dict) or value.get("capture_phase") not in {
+        "pre_action", "post_action", "pending", "resolved"
+    }:
+        raise ValueError("mechanics_reference requires a supported capture_phase")
+    if "run_id" in value and (not isinstance(value["run_id"], str) or not value["run_id"]):
+        raise ValueError("mechanics_reference.run_id must be a non-empty string")
+    if not isinstance(value.get("step_id"), str) or not value["step_id"]:
+        raise ValueError("mechanics_reference.step_id must be a non-empty string")
+    timestamp = value.get("capture_timestamp_ns")
+    if (isinstance(timestamp, bool) or not isinstance(timestamp, (int, float))
+            or not math.isfinite(timestamp) or timestamp < 0):
+        raise ValueError("mechanics_reference.capture_timestamp_ns must be a non-negative finite number")
+    if not isinstance(value.get("producer_revision"), str) or not value["producer_revision"]:
+        raise ValueError("mechanics_reference.producer_revision must be a non-empty string")
+    runtime = value.get("runtime")
+    if (not isinstance(runtime, dict)
+            or any(not isinstance(runtime.get(name), str) or not runtime[name]
+                   for name in ("balatro", "steamodded", "lovely"))):
+        raise ValueError("mechanics_reference.runtime requires Balatro, Steamodded, and Lovely revisions")
+    jokers = value.get("jokers")
+    if not isinstance(jokers, list):
+        raise ValueError("mechanics_reference.jokers must be a list")
+    seen_tokens: set[str] = set()
+    for index, joker in enumerate(jokers):
+        if not isinstance(joker, dict):
+            raise ValueError(f"mechanics_reference.jokers[{index}] must be an object")
+        if any(field not in joker for field in ("role", "position", "center_key", "instance_token", "mult", "sell_cost")):
+            raise ValueError(f"mechanics_reference.jokers[{index}] is missing required fields")
+        if joker.get("role") != "joker" or joker.get("position") != index:
+            raise ValueError(f"mechanics_reference.jokers[{index}] has invalid role/position")
+        token = joker.get("instance_token")
+        if token is not None:
+            if not isinstance(token, str) or not token:
+                raise ValueError(f"mechanics_reference.jokers[{index}].instance_token must be non-empty string or null")
+            if token in seen_tokens:
+                raise ValueError(f"duplicate mechanics reference instance token: {token}")
+            seen_tokens.add(token)
+        for field in ("mult", "sell_cost"):
+            number = joker.get(field)
+            if number is not None and (isinstance(number, bool) or not isinstance(number, (int, float))
+                                       or not math.isfinite(number)):
+                raise ValueError(f"mechanics_reference.jokers[{index}].{field} must be finite number or null")
+        if joker.get("center_key") is not None and not isinstance(joker["center_key"], str):
+            raise ValueError(f"mechanics_reference.jokers[{index}].center_key must be string or null")
+    effects = value.get("resolved_effects", [])
+    if not isinstance(effects, list):
+        raise ValueError("mechanics_reference.resolved_effects must be a list")
+    for index, effect in enumerate(effects):
+        if not isinstance(effect, dict) or effect.get("trigger") != "setting_blind":
+            raise ValueError(f"mechanics_reference.resolved_effects[{index}] has invalid trigger")
+        required = ("dagger_instance_token", "victim_instance_token", "victim_sell_cost_pre",
+                    "mult_before", "mult_after", "mult_delta", "pre_capture_timestamp_ns",
+                    "resolved_capture_timestamp_ns")
+        if any(field not in effect for field in required):
+            raise ValueError(f"mechanics_reference.resolved_effects[{index}] is missing required fields")
+        for field in ("dagger_instance_token", "victim_instance_token"):
+            token = effect[field]
+            if token is not None and (not isinstance(token, str) or not token):
+                raise ValueError(f"mechanics_reference.resolved_effects[{index}].{field} must be non-empty string or null")
+        for field in ("victim_sell_cost_pre", "mult_before", "mult_after", "mult_delta",
+                      "pre_capture_timestamp_ns", "resolved_capture_timestamp_ns"):
+            number = effect.get(field)
+            if number is not None and (isinstance(number, bool) or not isinstance(number, (int, float))
+                                       or not math.isfinite(number)):
+                raise ValueError(f"mechanics_reference.resolved_effects[{index}].{field} must be finite number or null")
+        for field in ("pre_capture_timestamp_ns", "resolved_capture_timestamp_ns"):
+            if effect[field] is None or effect[field] < 0:
+                raise ValueError(f"mechanics_reference.resolved_effects[{index}].{field} must be non-negative number")
+        if (effect["pre_capture_timestamp_ns"] is not None
+                and effect["resolved_capture_timestamp_ns"] is not None
+                and effect["pre_capture_timestamp_ns"] > effect["resolved_capture_timestamp_ns"]):
+            raise ValueError(f"mechanics_reference.resolved_effects[{index}] has reversed timing")
+        if (value["capture_phase"] == "resolved"
+                and effect["resolved_capture_timestamp_ns"] != timestamp):
+            raise ValueError(f"mechanics_reference.resolved_effects[{index}] timestamp differs from resolved capture")
+    return value
+
+
+def read_mechanics_reference(run_dir: Path, step_id: str | None = None) -> list[dict[str, Any]]:
+    """Read isolated engine-reference records; never adapts them as observations."""
+    path = Path(run_dir) / "mechanics_reference.ndjson"
+    if not path.exists():
+        return []
+    records: list[dict[str, Any]] = []
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"invalid mechanics reference JSON on line {line_number}") from error
+        if not isinstance(record, dict) or record.get("schema_version") != MECHANICS_REFERENCE_VERSION:
+            raise ValueError(f"unsupported mechanics reference record on line {line_number}")
+        _validate_mechanics_reference({"mechanics_reference": record})
+        if step_id is None or record.get("step_id") == step_id:
+            records.append(record)
+    return records
 
 
 def _atomic_write(path: Path, text: str) -> None:
@@ -443,7 +552,16 @@ class FileIpcBridge:
             self._invalid_input(input_path, f"action {action!r} is not in legal_actions")
         session = self._session(run_id)
         recorded_at = datetime.now(timezone.utc).isoformat()
+        mechanics_reference = _validate_mechanics_reference(snapshot)
+        if mechanics_reference is not None:
+            if mechanics_reference["step_id"] != f"{run_id}:{request_id}":
+                self._invalid_input(input_path, "mechanics reference step_id differs from queued request")
+            if mechanics_reference.get("run_id", run_id) != run_id:
+                self._invalid_input(input_path, "mechanics reference run_id differs from queued request")
         record = {**snapshot, "_recorded_action": action, "_recorded_at": recorded_at}
+        record.pop("mechanics_reference", None)
+        if mechanics_reference is not None:
+            self._append_mechanics_reference(run_id, request_id, mechanics_reference)
         self._append_step_durable(session["session_dir"] / "steps.ndjson", record, session)
         self._seen_requests.add(request_key)
         self._request_actions[request_key] = action
@@ -454,6 +572,63 @@ class FileIpcBridge:
         self._write_session(session)
         _atomic_write(self.action_path, f"{request_id}\t{action}\n")
         input_path.unlink(missing_ok=True)
+
+    def _append_mechanics_reference(self, run_id: str, request_id: int,
+                                    reference: dict[str, Any]) -> None:
+        """Persist reference-channel values outside reconstruction step payloads."""
+        session = self._sessions.get(run_id) or self._finalized_session_data.get(run_id)
+        if session is None:
+            raise ValueError(f"mechanics reference arrived before run session {run_id!r}")
+        path = session["session_dir"] / "mechanics_reference.ndjson"
+        record = {
+            "schema_version": MECHANICS_REFERENCE_VERSION,
+            "run_id": run_id,
+            "step_id": f"{run_id}:{request_id}",
+            **reference,
+        }
+        _validate_mechanics_reference({"mechanics_reference": record})
+        if record["run_id"] != run_id or record["step_id"] != f"{run_id}:{request_id}":
+            raise ValueError("mechanics reference identity differs from source step")
+        for existing in read_mechanics_reference(path.parent):
+            if (existing.get("step_id"), existing.get("capture_phase")) == (
+                    record["step_id"], record["capture_phase"]):
+                if existing != record:
+                    raise ValueError(f"conflicting {record['capture_phase']} mechanics reference for {record['step_id']}")
+                return
+        line = json.dumps(record, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        previous = path.read_text(encoding="utf-8") if path.exists() else ""
+        _atomic_write(path, previous + line + "\n")
+
+    def _handle_mechanics_reference(self) -> bool:
+        did_work = False
+        for path in sorted(self.io_dir.glob("mechanics_reference_*.json")):
+            try:
+                record = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                continue
+            if not isinstance(record, dict):
+                continue
+            run_id = record.get("run_id")
+            step_id = record.get("step_id")
+            if not isinstance(run_id, str) or not isinstance(step_id, str):
+                continue
+            prefix = run_id + ":"
+            if not step_id.startswith(prefix) or not step_id[len(prefix):].isdigit():
+                continue
+            request_id = int(step_id[len(prefix):])
+            if f"{run_id}\x00{request_id}" not in self._seen_requests:
+                continue
+            if record.get("capture_phase") != "resolved":
+                continue
+            try:
+                _validate_mechanics_reference({"mechanics_reference": record})
+                self._append_mechanics_reference(run_id, request_id, record)
+            except ValueError as error:
+                print(f"[file_ipc_bridge] invalid mechanics reference {path.name}: {error}", file=sys.stderr)
+                continue
+            path.unlink(missing_ok=True)
+            did_work = True
+        return did_work
 
     def _has_complete_requests(self, run_id: str, last_request_id: int) -> bool:
         request_ids = {
@@ -488,6 +663,13 @@ class FileIpcBridge:
             self._invalid_input(signal_path, f"{signal_path.name} requires run_id")
         targets = [str(run_id)] if run_id is not None else list(self._sessions)
         watermark = signal.get("last_request_id")
+        resolved_count = signal.get("resolved_dagger_reference_count")
+        pending_count = signal.get("pending_dagger_reference_count")
+        if (resolved_count is None) != (pending_count is None) or any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 0
+            for value in (resolved_count, pending_count) if value is not None
+        ):
+            self._invalid_input(signal_path, "invalid Dagger reference terminal watermark")
         if watermark is not None and (
             not isinstance(watermark, int) or isinstance(watermark, bool) or watermark < 0
         ):
@@ -554,6 +736,10 @@ class FileIpcBridge:
                 })
                 self._write_capture_diagnostics(session["session_dir"], target)
             session["outcome"] = outcome
+            if resolved_count is not None:
+                session["dagger_reference_watermark"] = {
+                    "resolved_count": resolved_count, "pending_count": pending_count,
+                }
             session["lifecycle_status"] = {"win": "won", "loss": "lost"}[outcome]
             session["ended_at"] = datetime.now(timezone.utc).isoformat()
             self._write_session(session)
@@ -566,6 +752,7 @@ class FileIpcBridge:
     def step_once(self) -> bool:
         self._attach_recording_marker()
         did_work = self._handle_snapshot()
+        did_work = self._handle_mechanics_reference() or did_work
         did_work = self._handle_run_end() or did_work
         return self._retry_pending_imports() or did_work
 
@@ -582,6 +769,24 @@ class FileIpcBridge:
                     or now < self._import_retry_after.get(run_id, 0)):
                 continue
             source = Path(session["session_dir"])
+            reference_watermark = session.get("dagger_reference_watermark")
+            if reference_watermark is not None:
+                if reference_watermark["pending_count"]:
+                    self._add_capture_diagnostic(run_id, {
+                        "code": "dagger_reference_unresolved_at_terminal",
+                        "pending_count": reference_watermark["pending_count"],
+                    })
+                    self._write_capture_diagnostics(source, run_id)
+                    continue
+                try:
+                    resolved = sum(item["capture_phase"] == "resolved"
+                                   for item in read_mechanics_reference(source))
+                except (OSError, ValueError) as error:
+                    self._import_retry_after[run_id] = now + 5.0
+                    print(f"[file_ipc_bridge] reference intake pending for {run_id}: {error}", file=sys.stderr)
+                    continue
+                if resolved != reference_watermark["resolved_count"]:
+                    continue
             bundle = None
             try:
                 bundle = RunBundle(self._bundle_db)
