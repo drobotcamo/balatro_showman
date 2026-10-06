@@ -363,6 +363,34 @@ dependency, no numeric contribution, and a diagnostic pointing to the affected
 growth query. Do not substitute an estimate or later snapshot. This differs from
 no right-hand Joker, where the known outcome is no destruction and no growth.
 
+### Source-backed sell-value constructor (#124)
+
+Issue #124 implements the owned-Joker pricing path for the pinned source stack.
+`planning/dagger_sell_value.md` records line-level source evidence and hashes;
+`run_mechanics/dagger.py` implements integer-equivalent rounding, Egg/Gift Card
+`extra_value` changes, Dagger growth and round reports. Required inputs include
+Joker-center base cost, `G.GAME.inflation`, active edition purchase surcharges,
+discount percentage, rental state, and interval-valid `extra_value`. Vanilla
+Clearance Sale/Liquidation supply 25%/50% discounts, respectively; source order
+and floor/minimum behavior remain significant. An unrecognized source stack or
+missing/contradictory input yields unknown/unsupported output, never a base-price
+substitute. If Dagger growth is unknown, later stored Mult remains unknown until
+independently observed again. Engine-reference records stay outside reconstruction
+inputs and are used by a separate comparison step.
+
+Reports preserve known-zero opportunities and ownership-rounds with incomplete
+coverage, state pooled versus equal-run weighting, and include known/unknown
+denominators. Winning query selection includes only owner-confirmed Gold Stake
+wins with selection evidence. The #123 ordinary engine steps show a Negative
+Dagger and Holographic Photograph; source costs/surcharges explain the reference
+sell values for Castle ($3), Burnt Joker ($4), and Photograph ($4), as documented
+in `planning/dagger_sell_value.md`. The #124 engine-step fixture runs these through
+the same reducer, yielding Mult `0→6→14→22` and round growth `6, 8, 8`, then
+compares to the separate sidecar. These oracle step payloads can validate the
+calculation but cannot serve as video-only reconstruction inputs. The linked
+video's frame-to-step alignment remains unverified. This run is White Stake and
+does not qualify as a winning Gold Stake analytics sample.
+
 ### Scoring contribution (illustrative)
 
 Use base Joker with a scored hand. Inputs: one instance, definition Mult=+4,
