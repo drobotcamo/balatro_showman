@@ -192,6 +192,32 @@ Lovely patch sets need their own trace. The manifest/runtime version discrepancy
 and Lovely patch warnings remain part of its provenance. No Dagger run was made
 during this source inspection.
 
+#### Live engine-reference corroboration
+
+The owner-confirmed 41-step loss `1662755302000-5667` is associated with
+`F:\OBS_RECORDINGS\2026-10-05 14-19-09.mkv`. Its separate reference channel shows
+the same Dagger engine ID at three blind selections:
+
+| Step | Dagger Mult before | Immediate-right victim | Captured sell value | Dagger Mult resolved | Victim in resolved row | Victim in next pre-action row |
+| ---: | ---: | --- | ---: | ---: | --- | --- |
+| 12 | 0 | Castle (`47669`) | 3 | 6 | yes | no |
+| 26 | 6 | Burnt Joker (`49101`) | 4 | 14 | yes | no |
+| 36 | 14 | Photograph (`51265`) | 4 | 22 | yes | no |
+
+All three Mult deltas equal `2 × victim.sell_cost`. The matching Dagger
+instance ID is `47973`. At the resolved sample the victim is still in the
+Joker row; the following player-action snapshot no longer lists it. This agrees
+with the loaded source trace that resolves Mult before the victim leaves the
+area. It does not claim that rendered animation order was verified in the video;
+frame-to-step alignment remains unverified. Strict bundle validation reports
+85 records and valid integrity. The session, step, reference, and video hashes
+are retained in the #123 record and `planning/LEARNINGS.md`.
+
+Owner disposition still needed: accept this resolved-Mult boundary for the
+verified installed stack, or state that #122 exact-order support must wait until
+the victim-removal callback has completed. Do not extend the decision to another
+game/mod revision.
+
 ### Evidence, status, and recomputation
 
 Every claim/result carries one status: `observed`, `inferred`, `unknown`,
