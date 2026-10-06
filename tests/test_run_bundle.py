@@ -4,7 +4,7 @@ import json
 import hashlib
 from alembic import command
 from alembic.config import Config
-from run_bundle import RunBundle, BundleError, InvalidTransition, FinalizedEvidenceError
+from run_bundle import RunBundle, BundleError, ImportConflict, InvalidTransition, FinalizedEvidenceError
 from run_bundle import RunBundleInspector
 
 def bundle(tmp_path):
@@ -145,6 +145,72 @@ def test_file_ipc_oracle_import_is_queryable_with_usage_and_source_provenance(tm
     assert provenance["oracle.source_session_sha256"] == hashlib.sha256(session_path.read_bytes()).hexdigest()
     assert provenance["oracle.source_steps_sha256"] == hashlib.sha256(steps_path.read_bytes()).hexdigest()
     assert RunBundle(url).import_oracle_directory(source)["already_imported"] is True
+
+def test_mechanics_reference_import_and_read_are_separate_from_steps(tmp_path):
+    url = f"sqlite:///{tmp_path / 'reference.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    source = tmp_path / "oracle" / "dagger"
+    source.mkdir(parents=True)
+    (source / "session.json").write_text(json.dumps({
+        "run_id": "dagger", "schema_version": "producer/1.0.0",
+        "started_at": "2026-10-04T00:00:00+00:00", "ended_at": "2026-10-04T00:00:01+00:00",
+        "outcome": "loss", "n_steps": 1,
+    }), encoding="utf-8")
+    step = {"request_id": 1, "_recorded_action": "SelectBlind", "action": "SelectBlind"}
+    (source / "steps.ndjson").write_text(json.dumps(step) + "\n", encoding="utf-8")
+    reference = {
+        "schema_version": "dagger-reference/1.0", "run_id": "dagger", "step_id": "dagger:1",
+        "capture_phase": "pre_action", "capture_timestamp_ns": 123,
+        "producer_revision": "test", "runtime": {"balatro": "1.0.1", "steamodded": "test", "lovely": "test"},
+        "jokers": [{"role": "joker", "position": 0,
+            "center_key": "j_dagger", "instance_token": "engine-7", "mult": 62, "sell_cost": 8}],
+    }
+    resolved = {
+        **reference, "capture_phase": "resolved", "capture_timestamp_ns": 456,
+        "resolved_effects": [{"trigger": "setting_blind", "dagger_instance_token": "engine-7",
+            "victim_instance_token": "engine-8", "victim_sell_cost_pre": 4,
+            "mult_before": 62, "mult_after": 70, "mult_delta": 8,
+            "pre_capture_timestamp_ns": 123, "resolved_capture_timestamp_ns": 456}],
+    }
+    (source / "mechanics_reference.ndjson").write_text(
+        json.dumps(reference) + "\n" + json.dumps(resolved) + "\n", encoding="utf-8")
+
+    assert RunBundle(url).import_oracle_directory(source)["record_count"] == 3
+    inspector = RunBundleInspector(url)
+    assert inspector.find_records("dagger", kind="step")["data"][0]["payload"] == step
+    assert all(item["kind"] != "mechanics_reference" for item in inspector.find_records("dagger")["data"])
+    assert all(item["kind"] != "mechanics_reference" for item in inspector.evidence("dagger")["data"])
+    result = inspector.mechanics_reference("dagger", step_id="dagger:1")
+    assert [item["payload"] for item in result["data"]] == [reference, resolved]
+    assert inspector.mechanics_reference("dagger", step_id="dagger:missing")["status"] == "missing"
+    (source / "mechanics_reference.ndjson").write_text(
+        json.dumps({**reference, "capture_timestamp_ns": 124}) + "\n", encoding="utf-8")
+    with pytest.raises(ImportConflict, match="different source identity"):
+        RunBundle(url).import_oracle_directory(source)
+
+def test_oracle_import_rejects_reference_to_another_step(tmp_path):
+    url = f"sqlite:///{tmp_path / 'bad-reference.db'}"
+    cfg = Config("alembic.ini"); cfg.set_main_option("sqlalchemy.url", url); command.upgrade(cfg, "head")
+    source = tmp_path / "oracle" / "bad-reference"
+    source.mkdir(parents=True)
+    (source / "session.json").write_text(json.dumps({
+        "run_id": "bad-reference", "schema_version": "producer/1.0.0",
+        "started_at": "2026-10-05T00:00:00+00:00", "ended_at": "2026-10-05T00:00:01+00:00",
+        "outcome": "loss", "n_steps": 1,
+    }), encoding="utf-8")
+    (source / "steps.ndjson").write_text(json.dumps({
+        "request_id": 1, "_recorded_action": "SelectBlind",
+    }) + "\n", encoding="utf-8")
+    (source / "mechanics_reference.ndjson").write_text(json.dumps({
+        "schema_version": "dagger-reference/1.0", "run_id": "bad-reference",
+        "step_id": "bad-reference:2", "capture_phase": "resolved",
+        "capture_timestamp_ns": 123, "producer_revision": "test",
+        "runtime": {"balatro": "test", "steamodded": "test", "lovely": "test"},
+        "jokers": [], "resolved_effects": [],
+    }) + "\n", encoding="utf-8")
+    with pytest.raises(BundleError, match="invalid mechanics reference envelope"):
+        RunBundle(url).import_oracle_directory(source)
+    assert RunBundleInspector(url).list_runs()["data"] == []
 
 def test_file_ipc_retry_conflicts_when_same_run_id_has_different_source(tmp_path):
     url = f"sqlite:///{tmp_path / 'conflict.db'}"

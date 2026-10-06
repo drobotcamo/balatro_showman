@@ -161,6 +161,13 @@ class RunBundle:
         provenance["oracle.usage"] = json.dumps(usage, sort_keys=True, separators=(",", ":"))
         if "recording" in metadata:
             provenance["oracle.recording"] = json.dumps(metadata["recording"], sort_keys=True, separators=(",", ":"))
+        mechanics_reference_path = source / "mechanics_reference.ndjson"
+        mechanics_reference_raw = mechanics_reference_path.read_bytes() if mechanics_reference_path.exists() else None
+        if mechanics_reference_raw is not None:
+            identity_fields = json.loads(source_identity)
+            identity_fields["mechanics_reference_sha256"] = hashlib.sha256(mechanics_reference_raw).hexdigest()
+            source_identity = json.dumps(identity_fields, sort_keys=True, separators=(",", ":"))
+            provenance["oracle.mechanics_reference_sha256"] = identity_fields["mechanics_reference_sha256"]
         provenance.update({"source.type": "file-ipc-oracle", "source.identity": source_identity})
         envelope = {
             "run_id": metadata["run_id"],
@@ -173,7 +180,37 @@ class RunBundle:
             "finalized_at": finalized_at,
             "provenance": provenance,
         }
-        return self.ingest_run(envelope, [{"kind": "step", "payload": record} for record in records])
+        bundle_records = [{"kind": "step", "payload": record} for record in records]
+        if mechanics_reference_raw is not None:
+            valid_step_ids = {record.get("step_id", f"{metadata['run_id']}:{record['request_id']}")
+                              for record in records}
+            reference_keys = set()
+            try:
+                mechanics_lines = mechanics_reference_raw.decode("utf-8").splitlines()
+            except UnicodeDecodeError as exc:
+                raise BundleError("mechanics reference file must be UTF-8") from exc
+            for line_number, line in enumerate(mechanics_lines, start=1):
+                try:
+                    reference = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    raise BundleError(f"invalid mechanics reference JSON on line {line_number}") from exc
+                if (not isinstance(reference, dict)
+                        or reference.get("schema_version") != "dagger-reference/1.0"
+                        or reference.get("run_id") != metadata["run_id"]
+                        or not isinstance(reference.get("step_id"), str)
+                        or reference["step_id"] not in valid_step_ids):
+                    raise BundleError(f"invalid mechanics reference envelope on line {line_number}")
+                key = reference["step_id"], reference.get("capture_phase")
+                if key in reference_keys:
+                    raise BundleError(f"duplicate mechanics reference phase on line {line_number}")
+                reference_keys.add(key)
+                from ground_truth.file_ipc_bridge import _validate_mechanics_reference
+                try:
+                    _validate_mechanics_reference({"mechanics_reference": reference})
+                except ValueError as exc:
+                    raise BundleError(f"invalid mechanics reference on line {line_number}: {exc}") from exc
+                bundle_records.append({"kind": "mechanics_reference", "payload": reference})
+        return self.ingest_run(envelope, bundle_records)
 
     def ingest_run(self, envelope, records):
         """Persist a source-neutral run envelope and ordered typed records atomically."""

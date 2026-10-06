@@ -7,6 +7,7 @@ Lua producer (game)                 Python client (repo)
 request_<run>_<id>.json ──────────▶  record aligned step
                        ◀──────────  remove request after durable persistence (ack)
 run_end_<run>.json ──────────────▶  drain through last_request_id, finalize outcome
+mechanics_reference_<run>_<id>_resolved.json ─▶ isolated Dagger answer-key record
 ```
 
 ## Contract
@@ -26,6 +27,19 @@ run_end_<run>.json ──────────────▶  drain through 
   is not evidence that the producer is drained. Legacy `snapshot.json` and
   `run_end.json` remain readable but have no terminal watermark and are not
   proof of complete delivery.
+- Mechanics reference: the producer includes a pre-action Dagger snapshot in the
+  queued request and may later emit a separate
+  `mechanics_reference_<run_id>_<request_id>_resolved.json` after the game update
+  observes queued Dagger Mult growth. The client stores both phases in
+  `mechanics_reference.ndjson`, outside `steps.ndjson`; the generic observation
+  adapters never receive these records. The reference file is retained until the
+  matching step is durable, then acknowledged. It is keyed by the original step
+  and phase, so resolved aftermath requires no intervening player action. A new
+  run-end signal declares the number of emitted resolved references and any
+  still pending Dagger watches. The consumer waits for the declared count before
+  automatic bundle import; pending watches remain diagnosed and do not claim
+  complete reference intake. Sidecar updates replace a complete file atomically
+  so an interrupted write preserves the prior reference records for replay.
 
 ## Lua producer
 
@@ -60,6 +74,14 @@ contract only; it is never the granularized step schema `3.0.0`):
   counts). `persistent_state` stays `{}` — the canonical shape is owned by
   the pipeline reducer (D021). Unavailable engine reads are emitted as
   explicit nulls, never guessed.
+- `producer/1.0.0` with `issue123-dagger-reference-1`: appends a separate
+  `mechanics_reference` object to each action request. Dagger `SelectBlind`
+  requests also begin a pre-state watch; after the original `Game.update` runs,
+  observed Mult growth and the queued victim's `getting_sliced` flag emit a
+  resolved-phase queue file. Fields include Joker position/center, available
+  engine identity, Mult, sell cost, runtime revision, and source step/timing.
+  The consumer removes this object from step payloads and stores it in the
+  isolated reference sidecar. Missing identity or values remain null.
 
 ## Repository check
 
@@ -127,14 +149,14 @@ do not execute Balatro's actual save restoration or menu callbacks.
    ```
 
    Restart Balatro completely and verify the latest Lovely log reports build
-   `issue115-continue-identity-1`. The producer hash and loaded build are separate
+   `issue123-dagger-reference-1`. The producer hash and loaded build are separate
    checks. To roll back, close Balatro, move the new active directory out of
    `Mods`, and move the timestamped backup back to the active target. Keep the
    backup; do not delete it as part of an update.
 
 3. Launch Balatro and confirm the Lovely log reports the mod loaded:
    search `$env:APPDATA\Balatro\Mods\lovely\log\` for
-   `[balatro_showman_bridge] loaded; build=issue115-continue-identity-1; io_dir=...`.
+   `[balatro_showman_bridge] loaded; build=issue123-dagger-reference-1; io_dir=...`.
    Before recording, trigger one action and inspect its queued
    `request_<run>_<id>.json`. It must contain
    `"schema_version":"producer/1.0.0"`,

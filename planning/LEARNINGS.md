@@ -15,6 +15,86 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-05: Live Dagger reference captures separate Mult growth from victim removal
+
+- Context: Issue #123 authorized capture, run `1662755302000-5667` (41-step
+  loss), associated after explicit owner confirmation with
+  `F:\OBS_RECORDINGS\2026-10-05 14-19-09.mkv` and marker
+  `issue81-20261005T211909Z` in the external RunBundle
+  `F:\OBS_RECORDINGS\issue123_dagger_reference.sqlite`.
+- Observation: Reference-only Dagger instance `47973` grew 0→6 at step `:12`
+  (Castle `47669`, sell value $3), 6→14 at `:26` (Burnt Joker `49101`, $4),
+  and 14→22 at `:36` (Photograph `51265`, $4). Each increment matches twice
+  the independently captured victim sell value; each victim remains present
+  in the immediate resolved-phase Joker row but is absent in a later pre-action
+  row. No intervening STEP action is needed to read the changed Mult.
+- Implication: The post-update `resolved` record establishes the Dagger Mult
+  mutation, not completed victim dissolution. Keep separate timing claims for
+  the two effects. Reference IDs and prices remain outside generic step reads.
+  Candidate 60-FPS frame arithmetic is not verified rendered alignment.
+- Verification/source: `python -m run_bundle validate --db
+  "F:\OBS_RECORDINGS\issue123_dagger_reference.sqlite" --run
+  1662755302000-5667 --strict` returned `valid`, 85 records, no bad sequences;
+  `python -m run_bundle provenance` has session/steps/reference SHA-256 and
+  confirmed marker/video association. Video SHA-256 is
+  `ee7b7dd1c88435349b37fe89b2b4156fcd31c2b2de130ef2c586496a5ca984d5`.
+  The first 87-step fragment remains active with missing outcome, and the
+  separate 96-step Dagger loss has no original marker; neither is repaired or
+  silently associated with a video.
+
+## 2026-10-04: Existing Dagger video is not an aligned engine-reference capture
+
+- Context: Issue #123 inspection of the Dagger footage identified in
+  `planning/ISSUE115_RECORDING_AUDIT.md` and `planning/RUN_MECHANICS_DESIGN.md`.
+- Observation: The source recording is
+  `F:\OBS_RECORDINGS\2026-10-03 17-56-28.mkv`; the derived unscored clip is
+  `F:\OBS_RECORDINGS\qa_debug\review-20261004T041049Z-a2572aa9\clip.mp4`.
+  Its manifest associates runs `1898258342000-5384` and
+  `2317688862100-2663`, explicitly marks alignment `unverified`, and records
+  that the second run lacks its original recording marker. The local
+  `run_bundle_issue79.sqlite` has neither run ID. The resumed segment displays
+  Dagger +70 before a candidate sacrifice and +74 at a later action boundary;
+  the stored snapshots do not record Mult, actual sell cost, or an engine
+  instance identity.
+- Implication: The old recording remains descriptive evidence only. It cannot
+  establish exact pre-Mult, victim price, resolved queued aftermath, or identity
+  for #123; retain these values as unknown until a pinned live reference capture.
+- Verification/source: Read-only `python -m showman inspect list --db
+  "F:\OBS_RECORDINGS\run_bundle_issue79.sqlite"`; bundle queries for both run
+  IDs returned `run_not_found`; `planning/ISSUE115_RECORDING_AUDIT.md` lines
+  32-55, 187-219; external QA manifest at the path above. No source bundle or
+  video was modified.
+
+## 2026-10-04: Poll the installed Dagger mutation after the game update
+
+- Context: Issue #123 resolved-reference instrumentation for the installed
+  Balatro runtime documented in `planning/BALATRO_RUNTIME.md`.
+- Observation: Installed `Balatro.exe` SHA-256 is
+  `0d75fe164accf3312734d4b37ac98788dd15f0b8e4f9bb8b7f90c4e59de93f47`.
+  The unpatched `lovely/game-dump/card.lua` hash is
+  `5073d834e08119da9516f1795a8c3d93110669aeb409c29ad1b308e0eb0be453`, matching
+  the embedded game source; `functions/state_events.lua` hashes to
+  `6c86aefb42d0323d737f87aaa84f53e42b755e72cd0bfd163b7d9cca5c0a99a9`.
+  In that unpatched source `card.lua:2566-2576` mutates Mult inside a queued
+  callback. The active post-Lovely `lovely/dump/card.lua` instead calls
+  `SMODS.scale_card` synchronously at `:2969-2980`, leaving the victim dissolve
+  queued. Its SHA-256 is
+  `2ba1276c5850ea966733d4144602d866dddbb9cbfff1f588f409114d79584f54`;
+  the active patch source is `smods-main/lovely/scaling.toml` (SHA-256
+  `ade9f4a7f8b87ea64fe094445354a89710762950e8d9916d3354f779d8ba7666`).
+  The producer samples after the original `Game.update` returns, so the
+  captured Mult has changed without implying the victim is already removed.
+- Implication: Record the pre-action baseline with the blind-selection step,
+  then write a separate resolved reference record on the first post-update
+  observation of the mutation on the same Dagger instance. Tie both records by
+  run/step and retain runtime, instance tokens, victim price, observed Mult
+  delta, and both monotonic timestamps. This trace is specific to this installed
+  patch stack; other source stacks require a new trace before exact timing claims.
+- Verification/source: Read-only source inspection and SHA-256 of the installed
+  executable/generated dump; focused LÖVE producer fixture simulates an event
+  resolution and verifies pre/resolved fields. This does not replace the live
+  capture check.
+
 ## 2026-10-04: Launch grouped video reviews from a quoted JSON manifest
 
 - Context: Two external Issue #82 videos had to be launched with associated
