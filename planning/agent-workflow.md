@@ -42,6 +42,10 @@ Do not delete unfamiliar worktrees or discard changes to resolve uncertainty.
    checkpoint if present, roadmap gate and component contracts. Preserve unrelated
    work. A ready issue does not require reconstructing the closed portfolio.
 2. State observable acceptance, files in scope and narrowest verification.
+   Search relevant handoffs/worktrees, documented evidence locations and
+   existing tools before declaring an input missing or assigning investigation
+   to the user. Absence from this checkout is not proof it does not exist.
+   Keep the search bounded to the agreed outcome, not an archive-wide audit.
 3. Implement the smallest justified change. Use bounded independent research
    where it resolves uncertainty; keep unknowns explicit.
 4. Run relevant checks immediately after meaningful changes. Investigate failures,
@@ -63,6 +67,14 @@ blocked by a named external action/decision. Continue every pending criterion th
 can be advanced safely within this issue's scope. A focused test, partial PR,
 reviewer verdict, progress summary, or ordinary tool/step budget is not completion
 and does not by itself justify returning control to the user.
+
+When a check fails or a limitation remains, take the next authorized,
+evidence-producing action or materially different diagnostic before reporting
+an external blocker. Name the unmet claim, next action and owner. Do not ask
+the user to search paths, read files, choose agent-solvable technical defaults,
+or repeat `continue` for agent-owned work. Present a visual example and short
+factual summary when human judgment is actually required. This does not waive
+specific approval, the recording-association checkpoint, or safety boundaries.
 
 For `/work`, ask clarifying questions at most once, then use the narrowest
 reasonable assumptions. Do not pause for routine progress or permissions already
@@ -104,6 +116,12 @@ or settlement ceremony.
 
 ### Human Input And Recording Preparation
 
+Before asking for a new recording, inventory candidates and test the specific
+unmet evidence claim using `planning/RUN_BUNDLE_OPERATIONS.md`. An existing
+video, source segment or bundle must not be called missing solely because it
+is outside the current worktree. Do not treat recorder IDs as gameplay runs or
+ask the user to resolve their meaning from filenames.
+
 Before asking the user to perform a live recording action, complete the safe,
 agent-owned preparation in the existing `planning/TOOLING.md` and
 `planning/BRIDGE_SPIKE.md` procedure. Verify the checked-in and installed producer
@@ -125,10 +143,11 @@ If any required value is unavailable or ambiguous, do not guess or claim capture
 readiness. Finish all other preparation, then include the specific missing value
 in the minimal user request and do not begin capture until it is confirmed.
 
-The recording action does not satisfy the post-capture association checkpoint.
-Follow `planning/RUN_BUNDLE_OPERATIONS.md`: inspect and present the observed run,
-marker and required/optional status; wait for explicit `confirm`, `decline`, or
-`interrupt`; associate only after explicit confirmation and valid marker evidence.
+Recording does not itself confirm a separate association operation. Only when
+explicitly invoking that operation, follow `planning/RUN_BUNDLE_OPERATIONS.md`:
+inspect and present the observed run, marker and required/optional status; wait
+for explicit `confirm`, `decline`, or `interrupt`; associate only after explicit
+confirmation and valid marker evidence. Automatic run intake does not prompt.
 For required recording, any non-confirmed result remains `blocked` with
 `recording_required` and must not mutate association provenance (D025). The
 terminal checkpoint does not start, stop, inspect, or control OBS.
