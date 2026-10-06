@@ -558,6 +558,33 @@ cannot be relabeled held-out afterward. The frozen v2 support and scoring rules
 are unchanged. Source: explicit user authorization in the #82 conversation on
 2026-10-05 after the legacy-source audit.
 
+### D041 — accepted — Dagger sell value and growth analytics preserve unknowns
+
+For the pinned installed Balatro/Lovely/Steamodded stack, reconstruct victim sell
+value from the source-defined current-cost path: Joker center base cost, inflation,
+edition purchase surcharges, active discount percentage, rental override, and
+persistent `ability.extra_value`. Egg and Gift Card update `extra_value`; their
+chronological, instance-specific effects are required when applicable. Apply
+source rounding and minimums in order. An unsupported source stack or missing or
+contradictory input yields unknown sell value and Dagger increment; Dagger stored
+Mult remains unknown downstream until a separately evidenced observation
+re-establishes it. Engine-reference values are validation-only inputs and cannot
+populate reconstructed fields.
+
+Round reports include every Dagger ownership round. A known no-eligible-victim
+opportunity is zero growth; a missing opportunity record is unknown coverage.
+Report pooled and equal-run-weighted growth per known-value sacrifice and per
+known-growth ownership round with their known/unknown denominators. Winning-run
+selection includes only owner-confirmed Gold Stake wins with a selection evidence
+ID; stake and outcome are never guessed.
+
+Alternative: estimate missing sell value from base cost or treat an unrecorded
+opportunity as zero. Rejected because current sell cost includes ordered runtime
+pricing modifiers, and absence of an evidence row does not establish the known
+no-target outcome. Source: user direction and acceptance of denominator/weighting
+recommendations during Issue #124 execution, 2026-10-05; source trace in
+`planning/dagger_sell_value.md` and D039.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the

@@ -29,12 +29,14 @@ distinct. Analysis is a product now; learning is an optional downstream consumer
 | Run-bundle operations/storage | `RUN_BUNDLE_OPERATIONS.md`, `RUN_BUNDLE_STORAGE.md` |
 | Provenance and reducer boundary | `PHASE0_INVENTORY.md`, `PERSISTENT_STATE_OWNERSHIP.md` |
 | Decisions, findings and commands | `DECISIONS.md`, `LEARNINGS.md`, `TOOLING.md` |
-| Mechanics interface and checks | `RUN_MECHANICS_DESIGN.md`, `schemas/run_mechanics_v0_1.schema.json`, `mechanics_contract_check.py` |
+| Mechanics interface, Dagger source findings and checks | `RUN_MECHANICS_DESIGN.md`, `dagger_sell_value.md`, `schemas/run_mechanics_v0_1.schema.json`, `mechanics_contract_check.py`, `../run_mechanics/dagger.py` |
 
 Component contracts cover vocabulary/geometry, visual generation/inference,
 composition/reduction/events, evidence/storage and analytics. #122 publishes the
-approved initial mechanics interface and examples in `RUN_MECHANICS_DESIGN.md`.
-Source-order verification and staged extensions remain open as recorded there.
+approved initial mechanics interface and examples in `RUN_MECHANICS_DESIGN.md`;
+D039 approves Dagger order for the pinned installed stack. #124 owns the bounded
+Dagger sell-value constructor, reducer and round analytics; broader staged
+mechanics remain open as recorded there.
 Workflow migration and retrospective documents are historical references, not a
 second current execution plan.
 

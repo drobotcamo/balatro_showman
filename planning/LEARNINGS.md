@@ -15,6 +15,40 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-05: Dagger victim sell value is a current-cost derivation
+
+- Context: Issue #124 source inspection of installed Balatro `1.0.1o-FULL` and
+  the locally active post-Lovely runtime.
+- Observation: Vanilla `Card:set_cost` computes purchase cost from hard-coded
+  Joker base cost, inflation, edition purchase surcharges, and discount with
+  floor/minimum operations; rental then forces cost 1. Sell value is
+  `max(1, floor(cost/2)) + ability.extra_value`. Vanilla editions add Foil 2,
+  Holographic 3, and Polychrome 5 to purchase cost; these differ from edition
+  scoring config values. Clearance Sale/Liquidation set discount to 25%/50%.
+  Egg adds its configured amount to its own `extra_value`; Gift Card adds its
+  configured amount to each Joker/consumable `extra_value`. The captured patched
+  runtime reads edition purchase surcharge from each active edition center's
+  `extra_cost` and preserves half-cost-plus-extra_value sell calculation.
+- Implication: Reconstruct sell value from source-backed base and interval-valid
+  modifiers, applying order and rounding exactly. A missing/contradictory input
+  makes the sacrifice increment unknown and Dagger's stored Mult unknown
+  downstream until independently re-established. Reference values may validate
+  the reducer but cannot supply its inputs.
+- Verification/source: Read-only inspection of embedded `card.lua` lines
+  369-384, 1917-1923, 2561-2577 and 2985-3010; embedded `game.lua` lines 416,
+  451, 593, 610 and 659-661; active
+  `%APPDATA%\Balatro\Mods\lovely\dump\card.lua` lines 497-528 and 2953-2973.
+  Executable SHA-256 `0d75fe164accf3312734d4b37ac98788dd15f0b8e4f9bb8b7f90c4e59de93f47`,
+  active card.lua SHA-256
+  `2ba1276c5850ea966733d4144602d866dddbb9cbfff1f588f409114d79584f54`, and
+  scaling patch SHA-256
+  `ade9f4a7f8b87ea64fe094445354a89710762950e8d9916d3354f779d8ba7666`. Findings
+  are limited to these source revisions. `tests/test_dagger_mechanics.py`
+  exercises the corresponding synthetic constructor and reducer; no independent
+  video-input reconstruction validation was run. The #123 White-stake reference
+  shows Photograph sell cost $4 against base cost $5, but does not expose the
+  extra-value history needed to reconstruct that value from source inputs alone.
+
 ## 2026-10-05: Live Dagger reference captures separate Mult growth from victim removal
 
 - Context: Issue #123 authorized capture, run `1662755302000-5667` (41-step
