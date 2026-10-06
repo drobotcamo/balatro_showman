@@ -155,6 +155,7 @@ eligibility and baseline facts also require field-scoped evidence links. Input
 extraction from actual visuals, same-reducer validation on independent
 observation inputs, and populated
 gold-stake analytics remain pending. The analytics selector requires outcome,
-stake, owner confirmation, and a selection evidence ID; unverified runs are
-excluded. The #123 reference run is White stake, so it does not qualify for a
-winning Gold Stake analytics sample.
+stake, owner confirmation, and field-scoped selection evidence; its allowlist
+rejects reference-channel records. Unverified runs are excluded. The #123
+reference run is White stake, so it does not qualify for a winning Gold Stake
+analytics sample.

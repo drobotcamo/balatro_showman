@@ -270,6 +270,12 @@ def test_egg_and_gift_card_reconstruct_persistent_extra_value():
         initial_evidence_catalog=(EvidenceRecord("initial", "source", ("initial_extra_value",)),),
     )
     assert malformed_event.status == "unsupported"
+    invalid_collection = reconstruct_extra_value(
+        "victim", 0, None,
+        initial_field_evidence=(("initial_extra_value", ("initial",)),),
+        initial_evidence_catalog=(EvidenceRecord("initial", "source", ("initial_extra_value",)),),
+    )
+    assert invalid_collection.status == "unsupported"
 
 
 def test_unknown_growth_propagates_until_independent_baseline():
@@ -424,6 +430,8 @@ def test_gold_stake_winner_selection_requires_confirmation_and_evidence():
         for record in catalog
     )
     assert select_winning_gold_stake_runs([rows[0]], leaked_catalog)[0] == set()
+    unreferenced_oracle = catalog + (EvidenceRecord("unused-oracle", "reference", ("oracle_field",)),)
+    assert select_winning_gold_stake_runs([rows[0]], unreferenced_oracle)[0] == set()
     unlinked_row = {
         **rows[0],
         "field_evidence": (("stake", ("missing",)),) + rows[0]["field_evidence"][1:],

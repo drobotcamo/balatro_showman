@@ -216,10 +216,14 @@ def reconstruct_extra_value(
         if catalog and any(record.channel == "reference" for record in catalog.values()):
             return ExtraValueState(None, "unsupported", ("forbidden:reference_initial_extra_value",), ())
         return ExtraValueState(None, "unknown", ("missing:initial_extra_value_provenance",), ())
+    try:
+        event_rows = tuple(events)
+    except TypeError:
+        return ExtraValueState(None, "unsupported", ("invalid:extra_value_events",), ())
     value: int | None = initial_value
     evidence: list[str] = list(dict(initial_field_evidence)["initial_extra_value"])
     previous_order = -1
-    for event in events:
+    for event in event_rows:
         if not isinstance(event, ExtraValueEvent):
             return ExtraValueState(None, "unsupported", ("invalid:extra_value_event_type",), tuple(evidence))
         if not isinstance(event.order, int) or isinstance(event.order, bool):
@@ -592,6 +596,10 @@ def select_winning_gold_stake_runs(
     seen_ids: set[str] = set()
     ambiguous_ids: set[str] = set()
     catalog = _evidence_map(evidence_catalog)
+    if catalog is not None and any(record.channel == "reference" for record in catalog.values()):
+        # The selector catalogue is an input allowlist, not the bundle's general
+        # evidence store. Do not make engine answers available to its selection.
+        catalog = None
     for row in run_metadata:
         if not isinstance(row, dict):
             excluded.append({"run_id": None, "reasons": ["invalid_run_metadata"]})
