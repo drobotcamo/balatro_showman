@@ -384,7 +384,9 @@ denominators. Winning query selection includes only owner-confirmed Gold Stake
 wins with selection evidence. The #123 ordinary engine steps show a Negative
 Dagger and Holographic Photograph; source costs/surcharges explain the reference
 sell values for Castle ($3), Burnt Joker ($4), and Photograph ($4), as documented
-in `planning/dagger_sell_value.md`. These oracle step payloads can validate the
+in `planning/dagger_sell_value.md`. The #124 engine-step fixture runs these through
+the same reducer, yielding Mult `0→6→14→22` and round growth `6, 8, 8`, then
+compares to the separate sidecar. These oracle step payloads can validate the
 calculation but cannot serve as video-only reconstruction inputs. The linked
 video's frame-to-step alignment remains unverified. This run is White Stake and
 does not qualify as a winning Gold Stake analytics sample.

@@ -21,7 +21,7 @@ from run_mechanics.dagger import (
 )
 
 
-def price(**overrides):
+def price(*, evidence_prefix="synthetic", state_channel="observation", **overrides):
     values = {
         "base_cost": 8,
         "inflation": 0,
@@ -33,14 +33,14 @@ def price(**overrides):
     values.update(overrides)
     channels = {
         "base_cost": "source",
-        "inflation": "observation",
+        "inflation": state_channel,
         "edition_extra_costs": "source",
-        "discount_percent": "observation",
-        "rental": "observation",
+        "discount_percent": state_channel,
+        "rental": state_channel,
         "extra_value": "derived",
     }
     field_evidence = tuple(
-        (field, (f"{field}-evidence",)) for field in channels
+        (field, (f"{evidence_prefix}:{field}",)) for field in channels
     )
     evidence_catalog = tuple(
         (ids[0], channels[field]) for field, ids in field_evidence
@@ -57,27 +57,31 @@ def price(**overrides):
 
 def opportunity(
     round_id, interval_id, order, before, eligible, sell_inputs=None,
-    *, dagger_getting_sliced=False, victim_eternal=False, victim_getting_sliced=False, **extra
+    *, run_id="r", state_channel="observation", eligibility_channel="observation",
+    dagger_getting_sliced=False, victim_eternal=False, victim_getting_sliced=False,
+    mult_before_channel=None, **extra
 ):
-    evidence = (f"evidence-{interval_id}",)
+    evidence = (f"{interval_id}:joker-row",)
     position_inputs = None
     if eligible is True:
         position_inputs = DaggerEligibilityInputs(
             "dagger", ("dagger", "victim"), dagger_getting_sliced, victim_eternal,
-            victim_getting_sliced, evidence,
+            victim_getting_sliced, evidence, evidence_channel=eligibility_channel,
         )
     elif eligible is False:
         position_inputs = DaggerEligibilityInputs(
             "dagger", ("dagger",), False, None, None, evidence,
+            evidence_channel=eligibility_channel,
         )
     elif eligible is None:
         position_inputs = DaggerEligibilityInputs(
             "dagger", None, None, None, None, evidence,
+            evidence_channel=eligibility_channel,
         )
     return Sacrifice(
-        "r", round_id, interval_id, order, "dagger", before, position_inputs,
+        run_id, round_id, interval_id, order, "dagger", before, position_inputs,
         sell_inputs, evidence,
-        mult_before_channel="observation" if before is not None else None,
+        mult_before_channel=mult_before_channel or (state_channel if before is not None else None),
         **extra,
     )
 
@@ -174,6 +178,41 @@ def test_reference_channel_cannot_change_reconstruction():
     assert compare_reference(inferred, reference_a)[0]["status"] == "match"
     assert compare_reference(inferred, reference_b)[0]["status"] == "mismatch"
     assert reduce_sacrifices(events) == before
+
+
+def test_issue123_engine_steps_reconstruct_prices_and_match_separate_reference():
+    """Engine-step fields drive the test; sidecar answers are compare-only."""
+    run_id = "1662755302000-5667"
+    events = [
+        opportunity("1", "12", 12, 0, True,
+                    price(base_cost=6, evidence_prefix="step12-castle", state_channel="derived"),
+                    run_id=run_id, state_channel="derived", eligibility_channel="derived"),
+        opportunity("2", "26", 26, 6, True,
+                    price(base_cost=8, evidence_prefix="step26-burnt", state_channel="derived"),
+                    run_id=run_id, state_channel="derived", eligibility_channel="derived"),
+        opportunity("3", "36", 36, 14, True,
+                    price(base_cost=5, edition_extra_costs=(3,), evidence_prefix="step36-holo", state_channel="derived"),
+                    run_id=run_id, state_channel="derived", eligibility_channel="derived"),
+    ]
+    effects = reduce_sacrifices(events)
+    refs = [
+        {"run_id": run_id, "interval_id": "12", "mult_after": 6, "victim_sell_cost_pre": 3},
+        {"run_id": run_id, "interval_id": "26", "mult_after": 14, "victim_sell_cost_pre": 4},
+        {"run_id": run_id, "interval_id": "36", "mult_after": 22, "victim_sell_cost_pre": 4},
+    ]
+    assert [(e.victim_sell_value, e.growth, e.mult_after) for e in effects] == [
+        (3, 6, 6), (4, 8, 14), (4, 8, 22)
+    ]
+    assert [row["status"] for row in compare_reference(effects, refs)] == ["match"] * 3
+    # Perturbed answers can alter only the comparison results, not reducer output.
+    assert reduce_sacrifices(events) == effects
+    perturbed = [dict(ref, mult_after=-1, victim_sell_cost_pre=999) for ref in refs]
+    assert [row["status"] for row in compare_reference(effects, perturbed)] == ["mismatch"] * 3
+    assert reduce_sacrifices(events) == effects
+    report = round_growth_report(events, effects)
+    assert [row["growth"] for row in report["rounds"]] == [6, 8, 8]
+    assert report["denominators"]["ownership_rounds"] == 3
+    assert report["pooled_growth_per_sacrifice_with_known_value"] == pytest.approx(22 / 3)
 
 
 def test_reference_channel_cannot_reestablish_dagger_baseline():

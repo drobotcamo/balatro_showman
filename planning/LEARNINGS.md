@@ -51,6 +51,10 @@ under its Decisions section. This file is a knowledge base, not a task log.
   $5 → current cost $8 → sell $4 without extra_value. They also show Negative
   Dagger, which explains its sell $5 from base $6 + surcharge $5. These engine
   steps support a source calculation/check, but are not independent video inputs.
+  The #124 regression passes all three source-derived sell values through the
+  same reducer and matches the isolated sidecar's Mult `0→6→14→22`; per-round
+  growth is `6, 8, 8`. This checks the engine-source mechanics slice, not
+  video-only inference.
 
 ## 2026-10-05: Live Dagger reference captures separate Mult growth from victim removal
 

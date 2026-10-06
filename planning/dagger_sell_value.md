@@ -104,6 +104,14 @@ the reference sidecar would be circular. Independent reconstruction validation
 still needs aligned visual evidence; the video association is confirmed, but
 frame-to-step alignment is not.
 
+The checked-in engine-step fixture runs those three intervals through the same
+`reduce_sacrifices` used by the tests. It derives victim sell values `$3, $4, $4`,
+Dagger Mult `0→6→14→22`, and per-round growth `6, 8, 8`; the separate sidecar
+comparison matches all three Mult outputs. The pooled and one-run-equal-weighted
+growth per known sacrifice are both `22/3`. This White Stake engine-side fixture
+validates the pinned arithmetic/reducer path; it does not claim video-only
+reconstruction or contribute to the Gold Stake winner query.
+
 ## Source inspected
 
 - Embedded vanilla `card.lua`: `Card:set_cost` (369-384), Clearance Sale / Liquidation
