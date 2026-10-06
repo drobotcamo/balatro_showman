@@ -7,6 +7,7 @@ import pytest
 
 from run_mechanics.dagger import (
     ExtraValueEvent,
+    EvidenceRecord,
     DaggerEligibilityInputs,
     PINNED_SOURCE_HASHES,
     PINNED_STACK,
@@ -43,12 +44,12 @@ def price(*, evidence_prefix="synthetic", state_channel="observation", **overrid
         (field, (f"{evidence_prefix}:{field}",)) for field in channels
     )
     evidence_catalog = tuple(
-        (ids[0], channels[field]) for field, ids in field_evidence
+        EvidenceRecord(ids[0], channels[field], (field,)) for field, ids in field_evidence
     )
     return SellInputs(
         **values,
         source_stack=PINNED_STACK,
-        source_hashes=tuple(PINNED_SOURCE_HASHES),
+        source_hashes=tuple(PINNED_SOURCE_HASHES.items()),
         input_channels=tuple(channels.items()),
         field_evidence=field_evidence,
         evidence_catalog=evidence_catalog,
@@ -64,26 +65,98 @@ def opportunity(
     evidence = (f"{interval_id}:joker-row",)
     position_inputs = None
     if eligible is True:
+        eligibility_values = {
+            "ordered_joker_instance_ids": ("dagger", "victim"),
+            "dagger_getting_sliced": dagger_getting_sliced,
+            "right_victim_eternal": victim_eternal,
+            "right_victim_getting_sliced": victim_getting_sliced,
+        }
+        field_evidence = tuple(
+            (field, (f"{interval_id}:{field}",)) for field in eligibility_values
+        )
+        catalog = tuple(
+            EvidenceRecord(ids[0], eligibility_channel, (field,))
+            for field, ids in field_evidence
+        )
         position_inputs = DaggerEligibilityInputs(
-            "dagger", ("dagger", "victim"), dagger_getting_sliced, victim_eternal,
-            victim_getting_sliced, evidence, evidence_channel=eligibility_channel,
+            "dagger", **eligibility_values, field_evidence=field_evidence,
+            evidence_catalog=catalog,
         )
     elif eligible is False:
+        field_evidence = (("ordered_joker_instance_ids", (f"{interval_id}:joker-row",)),)
         position_inputs = DaggerEligibilityInputs(
-            "dagger", ("dagger",), False, None, None, evidence,
-            evidence_channel=eligibility_channel,
+            "dagger", ("dagger",), None, None, None, field_evidence,
+            (EvidenceRecord(field_evidence[0][1][0], eligibility_channel,
+                            ("ordered_joker_instance_ids",)),),
         )
     elif eligible is None:
         position_inputs = DaggerEligibilityInputs(
-            "dagger", None, None, None, None, evidence,
-            evidence_channel=eligibility_channel,
+            "dagger", None, None, None, None, (), (),
         )
+    event_field_evidence = [
+        ("run_id", (f"{run_id}:run",)),
+        ("round_id", (f"{interval_id}:round",)),
+        ("interval_id", (f"{interval_id}:interval",)),
+        ("dagger_instance_id", (f"{interval_id}:dagger",)),
+    ]
+    if before is not None:
+        event_field_evidence.append(("dagger_mult_before", (f"{interval_id}:mult-before",)))
+    baseline_after = extra.get("baseline_after")
+    if baseline_after is not None:
+        event_field_evidence.append(("baseline_after", (f"{interval_id}:baseline-after",)))
+    event_evidence_catalog = tuple(
+        EvidenceRecord(
+            ids[0],
+            (
+                extra.get("baseline_channel", "observation")
+                if field == "baseline_after"
+                else (mult_before_channel or state_channel)
+                if field == "dagger_mult_before"
+                else "derived"
+            ),
+            (field,),
+        )
+        for field, ids in event_field_evidence
+    )
+    event_evidence = tuple(ids[0] for _, ids in event_field_evidence)
     return Sacrifice(
         run_id, round_id, interval_id, order, "dagger", before, position_inputs,
-        sell_inputs, evidence,
+        sell_inputs, event_evidence,
+        field_evidence=tuple(event_field_evidence),
+        evidence_catalog=event_evidence_catalog,
         mult_before_channel=mult_before_channel or (state_channel if before is not None else None),
         **extra,
     )
+
+
+def value_event(order, kind, actor, increment, affected_ids, *, channel="observation"):
+    fields = {
+        "kind": (f"value-{order}:kind",),
+        "actor_instance_id": (f"value-{order}:actor",),
+        "increment": (f"value-{order}:increment",),
+    }
+    if kind == "gift_card" and affected_ids is not None:
+        fields["affected_instance_ids"] = (f"value-{order}:targets",)
+    catalog = tuple(
+        EvidenceRecord(evidence_ids[0], channel, (field,))
+        for field, evidence_ids in fields.items()
+    )
+    return ExtraValueEvent(order, kind, actor, increment, affected_ids, tuple(fields.items()), catalog)
+
+
+def run_selection(run_id, stake, outcome, owner_confirmed):
+    fields = tuple(
+        (field, (f"{run_id}:{field}",))
+        for field in ("stake", "outcome", "owner_confirmed")
+    )
+    records = tuple(EvidenceRecord(ids[0], "observation", (field,)) for field, ids in fields)
+    return {
+        "run_id": run_id,
+        "stake": stake,
+        "outcome": outcome,
+        "owner_confirmed": owner_confirmed,
+        "field_evidence": fields,
+    }, records
 
 
 def test_sell_value_follows_lua_order_rounding_and_modifiers():
@@ -125,7 +198,11 @@ def test_missing_sell_dependency_stays_unknown():
         field_evidence=tuple((field, ("missing-id",)) if field == "base_cost" else (field, ids)
                              for field, ids in price().field_evidence),
     )
-    assert construct_sell_value(unresolved).diagnostics == ("unresolved:evidence:base_cost",)
+    assert construct_sell_value(unresolved).diagnostics == ("missing_or_invalid:field_evidence_links",)
+    wrong_source = replace(price(), source_hashes=(("vanilla/game.lua", "bad-hash"),))
+    assert construct_sell_value(wrong_source).diagnostics == ("missing_or_mismatched:source_hashes",)
+    malformed_source = replace(price(), source_hashes=(([], "bad-hash"),))
+    assert construct_sell_value(malformed_source).diagnostics == ("missing_or_mismatched:source_hashes",)
 
 
 def test_egg_and_gift_card_reconstruct_persistent_extra_value():
@@ -133,23 +210,47 @@ def test_egg_and_gift_card_reconstruct_persistent_extra_value():
         "victim",
         0,
         [
-            ExtraValueEvent(1, "egg", "other-egg", 3, ("other-egg",), ("e1",)),
-            ExtraValueEvent(2, "gift_card", "gift", 1, ("victim", "gift"), ("e2",)),
-            ExtraValueEvent(3, "egg", "victim", 3, ("victim",), ("e3",)),
+            value_event(1, "egg", "other-egg", 3, ("other-egg",)),
+            value_event(2, "gift_card", "gift", 1, ("victim", "gift")),
+            value_event(3, "egg", "victim", 3, ("victim",)),
         ],
-        initial_channel="observation",
-        initial_evidence_ids=("initial-value",),
+        initial_field_evidence=(("initial_extra_value", ("initial-value",)),),
+        initial_evidence_catalog=(EvidenceRecord("initial-value", "observation", ("initial_extra_value",)),),
     )
-    assert (state.value, state.evidence_ids) == (4, ("initial-value", "e2", "e3"))
+    assert (state.value, state.evidence_ids) == (
+        4,
+        ("initial-value", "value-2:kind", "value-2:actor", "value-2:increment", "value-2:targets",
+         "value-3:kind", "value-3:actor", "value-3:increment"),
+    )
     ambiguous = reconstruct_extra_value(
-        "victim", 0, [ExtraValueEvent(1, "gift_card", "gift", 1, None, ("e4",))],
-        initial_channel="observation", initial_evidence_ids=("initial",),
+        "victim", 0, [value_event(1, "gift_card", "gift", 1, None)],
+        initial_field_evidence=(("initial_extra_value", ("initial",)),),
+        initial_evidence_catalog=(EvidenceRecord("initial", "observation", ("initial_extra_value",)),),
     )
     assert ambiguous.value is None
     leaked = reconstruct_extra_value(
-        "victim", 9, [], initial_channel="reference", initial_evidence_ids=("oracle",)
+        "victim", 9, [],
+        initial_field_evidence=(("initial_extra_value", ("oracle",)),),
+        initial_evidence_catalog=(EvidenceRecord("oracle", "reference", ("initial_extra_value",)),),
     )
     assert leaked.status == "unsupported"
+    leaked_event = value_event(1, "gift_card", "gift", 1, ("victim",), channel="reference")
+    with pytest.raises(ValueError, match="engine-reference"):
+        reconstruct_extra_value(
+            "victim", 0, [leaked_event],
+            initial_field_evidence=(("initial_extra_value", ("initial",)),),
+            initial_evidence_catalog=(EvidenceRecord("initial", "source", ("initial_extra_value",)),),
+        )
+    unlinked = value_event(1, "gift_card", "gift", 1, ("victim",))
+    unlinked = replace(unlinked, field_evidence=tuple(
+        item for item in unlinked.field_evidence if item[0] != "affected_instance_ids"
+    ))
+    with pytest.raises(ValueError, match="evidence must resolve"):
+        reconstruct_extra_value(
+            "victim", 0, [unlinked],
+            initial_field_evidence=(("initial_extra_value", ("initial",)),),
+            initial_evidence_catalog=(EvidenceRecord("initial", "source", ("initial_extra_value",)),),
+        )
 
 
 def test_unknown_growth_propagates_until_independent_baseline():
@@ -203,6 +304,8 @@ def test_issue123_engine_steps_reconstruct_prices_and_match_separate_reference()
     assert [(e.victim_sell_value, e.growth, e.mult_after) for e in effects] == [
         (3, 6, 6), (4, 8, 14), (4, 8, 22)
     ]
+    assert [e.mult_resolution for e in effects] == ["resolved"] * 3
+    assert [e.victim_removal_status for e in effects] == ["pending"] * 3
     assert [row["status"] for row in compare_reference(effects, refs)] == ["match"] * 3
     # Perturbed answers can alter only the comparison results, not reducer output.
     assert reduce_sacrifices(events) == effects
@@ -220,8 +323,31 @@ def test_reference_channel_cannot_reestablish_dagger_baseline():
         "1", "i1", 1, None, None, baseline_after=40,
         baseline_channel="reference",
     )
-    with pytest.raises(ValueError, match="must be observed"):
+    with pytest.raises(ValueError, match="reference evidence"):
         reduce_sacrifices([event])
+
+
+def test_eligibility_and_baseline_fields_require_linked_evidence():
+    positive = opportunity("1", "i1", 1, 0, True, price(base_cost=6))
+    bad_eligibility = replace(
+        positive.eligibility_inputs,
+        field_evidence=tuple(
+            item for item in positive.eligibility_inputs.field_evidence
+            if item[0] != "right_victim_eternal"
+        ),
+    )
+    unknown = reduce_sacrifices([replace(positive, eligibility_inputs=bad_eligibility)])[0]
+    assert unknown.growth is None
+    assert "missing_or_invalid:field_evidence_links" in unknown.diagnostic
+
+    baseline = opportunity(
+        "1", "i1", 1, None, None, baseline_after=20, baseline_channel="observation"
+    )
+    baseline = replace(baseline, field_evidence=tuple(
+        item for item in baseline.field_evidence if item[0] != "baseline_after"
+    ))
+    with pytest.raises(ValueError, match="evidence does not resolve"):
+        reduce_sacrifices([baseline])
 
 
 def test_rightmost_eternal_and_already_sliced_targets_are_known_zero():
@@ -263,14 +389,27 @@ def test_analytics_include_zero_and_unknown_ownership_rounds():
 
 
 def test_gold_stake_winner_selection_requires_confirmation_and_evidence():
-    selected, excluded = select_winning_gold_stake_runs([
-        {"run_id": "gold-win", "stake": "Gold Stake", "outcome": "won", "owner_confirmed": True, "evidence_id": "owner-note"},
-        {"run_id": "white-win", "stake": "White", "outcome": "won", "owner_confirmed": True, "evidence_id": "owner-note"},
-        {"run_id": "gold-loss", "stake": "Gold", "outcome": "lost", "owner_confirmed": True, "evidence_id": "owner-note"},
-        {"run_id": "gold-unconfirmed", "stake": "Gold", "outcome": "won", "owner_confirmed": False, "evidence_id": ""},
-    ])
+    metadata = [
+        run_selection("gold-win", "Gold Stake", "won", True),
+        run_selection("white-win", "White", "won", True),
+        run_selection("gold-loss", "Gold", "lost", True),
+        run_selection("gold-unconfirmed", "Gold", "won", False),
+    ]
+    rows = [item[0] for item in metadata]
+    catalog = tuple(record for item in metadata for record in item[1])
+    selected, excluded = select_winning_gold_stake_runs(rows, catalog)
     assert selected == {"gold-win"}
     assert len(excluded) == 3
+    leaked_catalog = tuple(
+        replace(record, channel="reference") if record.id == "gold-win:stake" else record
+        for record in catalog
+    )
+    assert select_winning_gold_stake_runs([rows[0]], leaked_catalog)[0] == set()
+    unlinked_row = {
+        **rows[0],
+        "field_evidence": (("stake", ("missing",)),) + rows[0]["field_evidence"][1:],
+    }
+    assert select_winning_gold_stake_runs([unlinked_row], catalog)[0] == set()
 
 
 def test_gold_stake_report_uses_one_consistent_population():
@@ -278,13 +417,12 @@ def test_gold_stake_report_uses_one_consistent_population():
     white = replace(opportunity("1", "white-i", 1, 0, True, price(base_cost=8)), run_id="white")
     events = [replace(gold, run_id="gold"), white]
     effects = reduce_sacrifices(events)
+    selected_metadata, selected_catalog = run_selection("gold", "Gold", "won", True)
     report = round_growth_report(
         events,
         effects,
-        eligible_gold_stake_runs=[{
-            "run_id": "gold", "stake": "Gold", "outcome": "won",
-            "owner_confirmed": True, "evidence_id": "owner-approval",
-        }],
+        eligible_gold_stake_runs=[selected_metadata],
+        gold_stake_evidence_catalog=selected_catalog,
     )
     assert report["selected_run_ids"] == ["gold"]
     assert [row["run_id"] for row in report["rounds"]] == ["gold"]

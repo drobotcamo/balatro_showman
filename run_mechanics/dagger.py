@@ -11,14 +11,73 @@ from statistics import fmean
 from typing import Iterable
 
 PINNED_STACK = "balatro-1.0.1o-FULL+lovely-0.10.0+steamodded-26.926.0~dev-a"
-PINNED_SOURCE_HASHES = frozenset({
-    "0d75fe164accf3312734d4b37ac98788dd15f0b8e4f9bb8b7f90c4e59de93f47",
-    "5073d834e08119da9516f1795a8c3d93110669aeb409c29ad1b308e0eb0be453",
-    "bbc67bd3fbadd1ea3f3f0aba07ef8596118d89ff1e9758718f9e17c07a96e912",
-    "2ba1276c5850ea966733d4144602d866dddbb9cbfff1f588f409114d79584f54",
-    "ade9f4a7f8b87ea64fe094445354a89710762950e8d9916d3354f779d8ba7666",
-    "9b201d810eff0d79e22a1b505668f5c9f23255f5ca6e7d687802b81081db1690",
-})
+PINNED_SOURCE_HASHES = {
+    "Balatro.exe": "0d75fe164accf3312734d4b37ac98788dd15f0b8e4f9bb8b7f90c4e59de93f47",
+    "vanilla/card.lua": "5073d834e08119da9516f1795a8c3d93110669aeb409c29ad1b308e0eb0be453",
+    "vanilla/game.lua": "bbc67bd3fbadd1ea3f3f0aba07ef8596118d89ff1e9758718f9e17c07a96e912",
+    "lovely/dump/card.lua": "2ba1276c5850ea966733d4144602d866dddbb9cbfff1f588f409114d79584f54",
+    "smods-main/lovely/scaling.toml": "ade9f4a7f8b87ea64fe094445354a89710762950e8d9916d3354f779d8ba7666",
+    "smods-main/src/game_object.lua": "9b201d810eff0d79e22a1b505668f5c9f23255f5ca6e7d687802b81081db1690",
+}
+
+
+@dataclass(frozen=True)
+class EvidenceRecord:
+    id: str
+    channel: str
+    supports: tuple[str, ...]
+
+
+def _evidence_map(records: tuple[EvidenceRecord, ...]) -> dict[str, EvidenceRecord] | None:
+    if not isinstance(records, tuple):
+        return None
+    mapped: dict[str, EvidenceRecord] = {}
+    for record in records:
+        if (
+            not isinstance(record, EvidenceRecord)
+            or not isinstance(record.id, str)
+            or not record.id
+            or not isinstance(record.channel, str)
+            or record.channel not in {"source", "observation", "derived", "reference"}
+            or not isinstance(record.supports, tuple)
+            or not record.supports
+            or any(not isinstance(field, str) or not field for field in record.supports)
+            or record.id in mapped
+        ):
+            return None
+        mapped[record.id] = record
+    return mapped
+
+
+def _field_evidence_valid(
+    field_evidence: tuple[tuple[str, tuple[str, ...]], ...],
+    catalog: dict[str, EvidenceRecord],
+    expected_fields: set[str],
+    allowed_channels: dict[str, set[str]],
+) -> bool:
+    if not isinstance(field_evidence, tuple):
+        return False
+    if any(
+        not isinstance(pair, tuple)
+        or len(pair) != 2
+        or not isinstance(pair[0], str)
+        or not pair[0]
+        for pair in field_evidence
+    ):
+        return False
+    refs = dict(field_evidence)
+    if len(refs) != len(field_evidence) or set(refs) != expected_fields:
+        return False
+    referenced: set[str] = set()
+    for field, ids in refs.items():
+        if not isinstance(ids, tuple) or not ids or any(not isinstance(item, str) or not item for item in ids):
+            return False
+        for evidence_id in ids:
+            record = catalog.get(evidence_id)
+            if record is None or field not in record.supports or record.channel not in allowed_channels[field]:
+                return False
+            referenced.add(evidence_id)
+    return referenced == set(catalog)
 
 
 @dataclass(frozen=True)
@@ -32,10 +91,10 @@ class SellInputs:
     rental: bool | None
     extra_value: int | None
     source_stack: str | None = None
-    source_hashes: tuple[str, ...] = ()
+    source_hashes: tuple[tuple[str, str], ...] = ()
     input_channels: tuple[tuple[str, str], ...] = ()
     field_evidence: tuple[tuple[str, tuple[str, ...]], ...] = ()
-    evidence_catalog: tuple[tuple[str, str], ...] = ()
+    evidence_catalog: tuple[EvidenceRecord, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -53,8 +112,8 @@ class ExtraValueEvent:
     actor_instance_id: str
     increment: int | None
     affected_instance_ids: tuple[str, ...] | None
-    evidence_ids: tuple[str, ...] = ()
-    evidence_channel: str = "observation"
+    field_evidence: tuple[tuple[str, tuple[str, ...]], ...]
+    evidence_catalog: tuple[EvidenceRecord, ...]
 
 
 @dataclass(frozen=True)
@@ -72,8 +131,8 @@ class DaggerEligibilityInputs:
     dagger_getting_sliced: bool | None
     right_victim_eternal: bool | None
     right_victim_getting_sliced: bool | None
-    evidence_ids: tuple[str, ...]
-    evidence_channel: str = "observation"
+    field_evidence: tuple[tuple[str, tuple[str, ...]], ...]
+    evidence_catalog: tuple[EvidenceRecord, ...]
 
 
 @dataclass(frozen=True)
@@ -85,13 +144,30 @@ class DaggerEligibility:
 
 def resolve_dagger_eligibility(inputs: DaggerEligibilityInputs) -> DaggerEligibility:
     """Apply the pinned immediate-right-neighbor Dagger condition."""
-    if inputs.evidence_channel == "reference":
-        return DaggerEligibility(None, None, ("forbidden:reference_eligibility",))
-    if inputs.evidence_channel not in {"observation", "derived"} or not inputs.evidence_ids:
-        return DaggerEligibility(None, None, ("missing:eligibility_provenance",))
     row = inputs.ordered_joker_instance_ids
+    provided_fields = set()
+    if row is not None:
+        provided_fields.add("ordered_joker_instance_ids")
+    for field_name, value in (
+        ("dagger_getting_sliced", inputs.dagger_getting_sliced),
+        ("right_victim_eternal", inputs.right_victim_eternal),
+        ("right_victim_getting_sliced", inputs.right_victim_getting_sliced),
+    ):
+        if value is not None:
+            provided_fields.add(field_name)
+    catalog = _evidence_map(inputs.evidence_catalog)
+    if provided_fields:
+        if catalog is None or not catalog:
+            return DaggerEligibility(None, None, ("missing:eligibility_evidence_catalog",))
+        allowed = {field: {"observation", "derived"} for field in provided_fields}
+        if any(record.channel == "reference" for record in catalog.values()):
+            return DaggerEligibility(None, None, ("forbidden:reference_eligibility",))
+        if not _field_evidence_valid(inputs.field_evidence, catalog, provided_fields, allowed):
+            return DaggerEligibility(None, None, ("missing_or_invalid:field_evidence_links",))
     if row is None:
         return DaggerEligibility(None, None, ("missing:ordered_joker_row",))
+    if not isinstance(row, tuple) or any(not isinstance(item, str) or not item for item in row):
+        return DaggerEligibility(None, None, ("invalid:ordered_joker_row",))
     if any(value is not None and not isinstance(value, bool) for value in (
         inputs.dagger_getting_sliced,
         inputs.right_victim_eternal,
@@ -122,42 +198,66 @@ def reconstruct_extra_value(
     initial_value: int | None,
     events: Iterable[ExtraValueEvent],
     *,
-    initial_channel: str,
-    initial_evidence_ids: tuple[str, ...],
+    initial_field_evidence: tuple[tuple[str, tuple[str, ...]], ...],
+    initial_evidence_catalog: tuple[EvidenceRecord, ...],
 ) -> ExtraValueState:
     """Apply Egg self-growth and Gift Card's all-owned-card increments."""
     if initial_value is None:
-        return ExtraValueState(None, "unknown", ("missing:initial_extra_value",), initial_evidence_ids)
-    if initial_channel == "reference":
-        return ExtraValueState(None, "unsupported", ("forbidden:reference_initial_extra_value",), ())
-    if initial_channel not in {"observation", "derived"} or not initial_evidence_ids:
+        return ExtraValueState(None, "unknown", ("missing:initial_extra_value",), ())
+    if not isinstance(initial_value, int) or isinstance(initial_value, bool):
+        return ExtraValueState(None, "unsupported", ("invalid:initial_extra_value",), ())
+    catalog = _evidence_map(initial_evidence_catalog)
+    if catalog is None or not _field_evidence_valid(
+        initial_field_evidence, catalog, {"initial_extra_value"},
+        {"initial_extra_value": {"source", "observation", "derived"}},
+    ):
+        if catalog and any(record.channel == "reference" for record in catalog.values()):
+            return ExtraValueState(None, "unsupported", ("forbidden:reference_initial_extra_value",), ())
         return ExtraValueState(None, "unknown", ("missing:initial_extra_value_provenance",), ())
     value: int | None = initial_value
-    evidence: list[str] = list(initial_evidence_ids)
+    evidence: list[str] = list(dict(initial_field_evidence)["initial_extra_value"])
     previous_order = -1
     for event in events:
-        if event.evidence_channel == "reference":
-            raise ValueError("engine-reference evidence cannot update reconstructed extra_value")
-        if event.evidence_channel not in {"observation", "derived"}:
-            raise ValueError("extra_value event needs observation/derived evidence")
-        if not event.evidence_ids:
-            raise ValueError("extra_value event requires evidence references")
+        if not isinstance(event.order, int) or isinstance(event.order, bool):
+            raise ValueError("extra-value event order must be an integer")
         if event.order <= previous_order:
             raise ValueError("extra-value events must be strictly chronological")
         previous_order = event.order
+        required = {"kind", "actor_instance_id", "increment"}
+        if event.kind == "gift_card" and event.affected_instance_ids is not None:
+            required.add("affected_instance_ids")
+        event_catalog = _evidence_map(event.evidence_catalog)
+        if event_catalog is None or not event_catalog:
+            raise ValueError("extra_value event requires a valid evidence catalog")
+        if any(record.channel == "reference" for record in event_catalog.values()):
+            raise ValueError("engine-reference evidence cannot update reconstructed extra_value")
+        if not _field_evidence_valid(
+            event.field_evidence,
+            event_catalog,
+            required,
+            {field: {"observation", "derived", "source"} for field in required},
+        ):
+            raise ValueError("extra_value event evidence must resolve to its input fields")
+        event_evidence = tuple(
+            evidence_id for _, evidence_ids in event.field_evidence for evidence_id in evidence_ids
+        )
         if event.kind == "egg":
             applies = event.actor_instance_id == instance_id
         elif event.kind == "gift_card":
             if event.affected_instance_ids is None:
                 if value is not None:
                     value = None
-                evidence.extend(event.evidence_ids)
+                evidence.extend(event_evidence)
                 continue
             applies = instance_id in event.affected_instance_ids
         else:
             raise ValueError(f"unsupported extra-value rule: {event.kind}")
         if applies:
-            evidence.extend(event.evidence_ids)
+            evidence.extend(event_evidence)
+            if event.increment is not None and (
+                not isinstance(event.increment, int) or isinstance(event.increment, bool)
+            ):
+                return ExtraValueState(None, "unsupported", ("invalid:extra_value_increment",), tuple(evidence))
             if value is None or event.increment is None:
                 value = None
             else:
@@ -192,12 +292,30 @@ def construct_sell_value(inputs: SellInputs) -> SellValue:
     )
     if missing:
         return SellValue(None, "unknown", tuple(f"missing:{key}" for key in missing))
-    if inputs.source_stack is None:
+    if not isinstance(inputs.source_stack, str) or not inputs.source_stack:
         return SellValue(None, "unknown", ("missing:source_stack",))
     if inputs.source_stack != PINNED_STACK:
         return SellValue(None, "unsupported", ("unsupported:source_stack",))
-    if len(set(inputs.source_hashes)) != len(inputs.source_hashes) or set(inputs.source_hashes) != PINNED_SOURCE_HASHES:
+    if (
+        not isinstance(inputs.source_hashes, tuple)
+        or any(
+            not isinstance(pair, tuple)
+            or len(pair) != 2
+            or not all(isinstance(value, str) for value in pair)
+            for pair in inputs.source_hashes
+        )
+        or len(dict(inputs.source_hashes)) != len(inputs.source_hashes)
+        or dict(inputs.source_hashes) != PINNED_SOURCE_HASHES
+    ):
         return SellValue(None, "unknown", ("missing_or_mismatched:source_hashes",))
+    if not isinstance(inputs.input_channels, tuple) or any(
+        not isinstance(pair, tuple)
+        or len(pair) != 2
+        or not isinstance(pair[0], str)
+        or not isinstance(pair[1], str)
+        for pair in inputs.input_channels
+    ):
+        return SellValue(None, "unknown", ("invalid:input_channel_provenance",))
     channels = dict(inputs.input_channels)
     required_channels = {
         "base_cost", "inflation", "edition_extra_costs", "discount_percent",
@@ -219,36 +337,11 @@ def construct_sell_value(inputs: SellInputs) -> SellValue:
     }
     if any(channels[key] not in allowed for key, allowed in allowed_channels.items()):
         return SellValue(None, "unsupported", ("invalid:field_provenance",))
-    field_evidence = dict(inputs.field_evidence)
-    catalog = dict(inputs.evidence_catalog)
-    if (
-        len(field_evidence) != len(inputs.field_evidence)
-        or set(field_evidence) != required_channels
-        or len(catalog) != len(inputs.evidence_catalog)
-        or not catalog
-    ):
+    catalog = _evidence_map(inputs.evidence_catalog)
+    if catalog is None or not catalog:
         return SellValue(None, "unknown", ("missing:input_evidence_catalog",))
-    expected_evidence_channel = {
-        "source": "source",
-        "observation": "observation",
-        "derived": "derived",
-    }
-    referenced_ids: set[str] = set()
-    for field_name, evidence_ids in field_evidence.items():
-        if not evidence_ids:
-            return SellValue(None, "unknown", (f"missing:evidence:{field_name}",))
-        if any(evidence_id not in catalog for evidence_id in evidence_ids):
-            return SellValue(None, "unknown", (f"unresolved:evidence:{field_name}",))
-        if any(catalog[evidence_id] == "reference" for evidence_id in evidence_ids):
-            return SellValue(None, "unsupported", (f"forbidden:reference_evidence:{field_name}",))
-        if not any(
-            catalog[evidence_id] == expected_evidence_channel[channels[field_name]]
-            for evidence_id in evidence_ids
-        ):
-            return SellValue(None, "unknown", (f"channel_mismatch:evidence:{field_name}",))
-        referenced_ids.update(evidence_ids)
-    if referenced_ids != set(catalog):
-        return SellValue(None, "unsupported", ("unreferenced:evidence_catalog_entries",))
+    if not _field_evidence_valid(inputs.field_evidence, catalog, required_channels, allowed_channels):
+        return SellValue(None, "unknown", ("missing_or_invalid:field_evidence_links",))
     values = (inputs.base_cost, inputs.inflation, inputs.discount_percent, inputs.extra_value)
     if any(not isinstance(value, int) or isinstance(value, bool) for value in values):
         return SellValue(None, "unsupported", ("non_integer_cost_input",))
@@ -295,6 +388,8 @@ class Sacrifice:
     eligibility_inputs: DaggerEligibilityInputs | None
     sell_inputs: SellInputs | None = None
     evidence_ids: tuple[str, ...] = ()
+    field_evidence: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    evidence_catalog: tuple[EvidenceRecord, ...] = ()
     rule_revision: str = "balatro-1.0.1o-lovely-0.10.0-smods-26.926.0-dev-a:dagger-sell-v1"
     baseline_after: int | None = None
     mult_before_channel: str | None = None
@@ -308,6 +403,8 @@ class DaggerEffect:
     interval_id: str
     dagger_instance_id: str
     victim_instance_id: str | None
+    mult_resolution: str
+    victim_removal_status: str
     condition: str
     status: str
     opportunity: bool
@@ -328,14 +425,21 @@ def reduce_sacrifices(events: Iterable[Sacrifice]) -> list[DaggerEffect]:
     seen_intervals: set[tuple[str, str]] = set()
     last_order: dict[str, int] = {}
     for event in events:
+        if any(not isinstance(value, str) or not value for value in (
+            event.run_id, event.round_id, event.interval_id, event.dagger_instance_id,
+        )):
+            raise ValueError("Dagger event identifiers must be non-empty strings")
         key = (event.run_id, event.interval_id)
         if key in seen_intervals:
             raise ValueError(f"duplicate Dagger interval: {key}")
         seen_intervals.add(key)
         if not isinstance(event.order, int) or isinstance(event.order, bool):
             raise ValueError(f"event order must be an integer: {key}")
-        if not event.evidence_ids:
-            raise ValueError(f"Dagger interval requires evidence references: {key}")
+        event_catalog = _evidence_map(event.evidence_catalog)
+        if event_catalog is None or not event_catalog:
+            raise ValueError(f"Dagger interval requires an evidence catalog: {key}")
+        if any(record.channel == "reference" for record in event_catalog.values()):
+            raise ValueError(f"Dagger reconstruction event cannot use reference evidence: {key}")
         previous = last_order.get(event.run_id)
         if previous is not None and event.order <= previous:
             raise ValueError(f"events are not globally chronological for {event.run_id}")
@@ -344,7 +448,26 @@ def reduce_sacrifices(events: Iterable[Sacrifice]) -> list[DaggerEffect]:
         instance_key = (event.run_id, event.dagger_instance_id)
         has_prior_state = instance_key in current_by_instance
         before = current_by_instance[instance_key] if has_prior_state else event.dagger_mult_before
-        if before is not None and not has_prior_state and event.mult_before_channel not in {"observation", "derived"}:
+        event_fields = {"run_id", "round_id", "interval_id", "dagger_instance_id"}
+        event_channels = {field: {"observation", "derived", "source"} for field in event_fields}
+        if event.dagger_mult_before is not None:
+            event_fields.add("dagger_mult_before")
+            event_channels["dagger_mult_before"] = {"observation", "derived"}
+        if event.baseline_after is not None:
+            event_fields.add("baseline_after")
+            event_channels["baseline_after"] = {"observation"}
+        if not _field_evidence_valid(event.field_evidence, event_catalog, event_fields, event_channels):
+            raise ValueError(f"Dagger interval evidence does not resolve to its fields: {key}")
+        event_evidence = tuple(
+            evidence_id for _, evidence_ids in event.field_evidence for evidence_id in evidence_ids
+        )
+        if (
+            not isinstance(event.evidence_ids, tuple)
+            or any(not isinstance(value, str) or not value for value in event.evidence_ids)
+            or set(event.evidence_ids) != set(event_evidence)
+        ):
+            raise ValueError(f"Dagger interval evidence IDs disagree with its field references: {key}")
+        if event.dagger_mult_before is not None and event.mult_before_channel not in {"observation", "derived"}:
             raise ValueError(f"Dagger baseline must be observation/derived, never reference: {key}")
         if event.baseline_after is not None:
             if event.baseline_channel != "observation":
@@ -355,6 +478,8 @@ def reduce_sacrifices(events: Iterable[Sacrifice]) -> list[DaggerEffect]:
                 condition="baseline_reestablished",
                 status="observed",
                 victim_instance_id=None,
+                mult_resolution="baseline_observed",
+                victim_removal_status="not_applicable",
                 opportunity=False,
                 confirmed_sacrifice=False,
                 victim_sell_value=None,
@@ -362,7 +487,7 @@ def reduce_sacrifices(events: Iterable[Sacrifice]) -> list[DaggerEffect]:
                 mult_before=before,
                 mult_after=event.baseline_after,
                 diagnostic=(),
-                evidence_ids=event.evidence_ids,
+                evidence_ids=event_evidence,
                 rule_revision=event.rule_revision,
             ))
             continue
@@ -375,29 +500,35 @@ def reduce_sacrifices(events: Iterable[Sacrifice]) -> list[DaggerEffect]:
             raise ValueError(f"eligibility cannot use reference evidence: {key}")
         if eligibility.eligible is False:
             after = before
+            mult_resolution, removal_status = "no_mutation", "not_scheduled"
             status, condition, confirmed, growth, victim_value, diagnostic = "inferred", "not_met", False, 0, None, ()
         elif eligibility.eligible is None:
             after = None
-            status, condition, confirmed, growth, victim_value = "unknown", "unknown", None, None
+            mult_resolution, removal_status = "unknown", "unknown"
+            status, condition, confirmed, growth, victim_value = "unknown", "unknown", None, None, None
             diagnostic = eligibility.diagnostic + ("invalidates:dagger_mult_and_future_growth",)
         elif before is None:
             after = None
+            mult_resolution, removal_status = "unknown", "pending"
             status, condition, confirmed, growth, victim_value = "unknown", "unknown", True, None, None
             diagnostic = ("missing:dagger_mult_before", "invalidates:dagger_mult_and_future_growth")
         elif event.sell_inputs is None:
             after = None
+            mult_resolution, removal_status = "unknown", "pending"
             status, condition, confirmed, growth, victim_value = "unknown", "unknown", True, None, None
             diagnostic = ("missing:sell_value_inputs", "invalidates:dagger_mult_and_future_growth")
         else:
             sell = construct_sell_value(event.sell_inputs)
             if sell.value is None:
                 after = None
+                mult_resolution, removal_status = "unknown", "pending"
                 status, condition, confirmed, growth, victim_value = sell.status, "unknown", True, None, None
                 diagnostic = sell.diagnostics + ("invalidates:dagger_mult_and_future_growth",)
             else:
                 victim_value = sell.value
                 growth = 2 * victim_value
                 after = before + growth
+                mult_resolution, removal_status = "resolved", "pending"
                 status, condition, confirmed, diagnostic = "inferred", "met", True, ()
         current_by_instance[instance_key] = after
         input_evidence = tuple(
@@ -405,14 +536,17 @@ def reduce_sacrifices(events: Iterable[Sacrifice]) -> list[DaggerEffect]:
             for _, evidence_ids in (event.sell_inputs.field_evidence if event.sell_inputs else ())
             for evidence_id in evidence_ids
         )
-        eligibility_evidence = (
-            event.eligibility_inputs.evidence_ids if event.eligibility_inputs else ()
+        eligibility_evidence = tuple(
+            evidence_id
+            for _, evidence_ids in (event.eligibility_inputs.field_evidence if event.eligibility_inputs else ())
+            for evidence_id in evidence_ids
         )
         effects.append(DaggerEffect(
             event.run_id, event.round_id, event.interval_id, event.dagger_instance_id,
-            eligibility.victim_instance_id, condition, status, True, confirmed,
+            eligibility.victim_instance_id, mult_resolution, removal_status,
+            condition, status, True, confirmed,
             victim_value, growth, before, after, diagnostic,
-            tuple(dict.fromkeys(event.evidence_ids + eligibility_evidence + input_evidence)),
+            tuple(dict.fromkeys(event_evidence + eligibility_evidence + input_evidence)),
             event.rule_revision,
         ))
     return effects
@@ -438,23 +572,58 @@ def compare_reference(effects: Iterable[DaggerEffect], references: Iterable[dict
     return comparisons
 
 
-def select_winning_gold_stake_runs(run_metadata: Iterable[dict]) -> tuple[set[str], list[dict]]:
+def select_winning_gold_stake_runs(
+    run_metadata: Iterable[dict],
+    evidence_catalog: tuple[EvidenceRecord, ...],
+) -> tuple[set[str], list[dict]]:
     """Select only explicitly owner-confirmed Gold Stake wins with evidence."""
     selected: set[str] = set()
     excluded: list[dict] = []
+    seen_ids: set[str] = set()
+    ambiguous_ids: set[str] = set()
+    catalog = _evidence_map(evidence_catalog)
     for row in run_metadata:
+        if not isinstance(row, dict):
+            excluded.append({"run_id": None, "reasons": ["invalid_run_metadata"]})
+            continue
         run_id = row.get("run_id")
         reasons = []
         if not isinstance(run_id, str) or not run_id:
             reasons.append("missing_run_id")
+        elif run_id in seen_ids:
+            ambiguous_ids.add(run_id)
+            selected.discard(run_id)
+            reasons.append("duplicate_run_metadata")
+        if isinstance(run_id, str):
+            seen_ids.add(run_id)
+        row_field_evidence = row.get("field_evidence", ())
+        row_ids = (
+            tuple(evidence_id for _, ids in row_field_evidence for evidence_id in ids)
+            if isinstance(row_field_evidence, tuple)
+            and all(isinstance(pair, tuple) and len(pair) == 2 and isinstance(pair[1], tuple) for pair in row_field_evidence)
+            else ()
+        )
+        row_catalog = (
+            {evidence_id: catalog[evidence_id] for evidence_id in row_ids if evidence_id in catalog}
+            if catalog is not None else {}
+        )
+        if not _field_evidence_valid(
+            row_field_evidence,
+            row_catalog,
+            {"stake", "outcome", "owner_confirmed"},
+            {field: {"observation", "derived"} for field in ("stake", "outcome", "owner_confirmed")},
+        ):
+            reasons.append("selection_evidence_invalid")
         if row.get("owner_confirmed") is not True:
             reasons.append("stake_not_owner_confirmed")
-        if row.get("stake") not in {"Gold", "Gold Stake", 8}:
+        stake = row.get("stake")
+        if not ((isinstance(stake, str) and stake in {"Gold", "Gold Stake"}) or (type(stake) is int and stake == 8)):
             reasons.append("not_gold_stake")
-        if row.get("outcome") not in {"won", "win"}:
+        if not isinstance(row.get("outcome"), str) or row["outcome"] not in {"won", "win"}:
             reasons.append("not_a_win")
-        if not isinstance(row.get("evidence_id"), str) or not row["evidence_id"]:
-            reasons.append("missing_selection_evidence")
+        if isinstance(run_id, str) and run_id in ambiguous_ids:
+            if "duplicate_run_metadata" not in reasons:
+                reasons.append("duplicate_run_metadata")
         if reasons:
             excluded.append({"run_id": run_id, "reasons": reasons})
         else:
@@ -467,6 +636,7 @@ def round_growth_report(
     effects: Iterable[DaggerEffect],
     ownership_rounds: Iterable[tuple[str, str]] | None = None,
     eligible_gold_stake_runs: Iterable[dict] | None = None,
+    gold_stake_evidence_catalog: tuple[EvidenceRecord, ...] = (),
 ) -> dict:
     """Report known-zero ownership rounds, unknown rounds, and both weightings."""
     event_rows = list(events)
@@ -482,7 +652,9 @@ def round_growth_report(
         selected_runs = {run_id for run_id, _ in all_owned_rounds}
         population_status = "unverified_input_population"
     else:
-        selected_runs, selection_excluded = select_winning_gold_stake_runs(eligible_gold_stake_runs)
+        selected_runs, selection_excluded = select_winning_gold_stake_runs(
+            eligible_gold_stake_runs, gold_stake_evidence_catalog
+        )
         population_status = "owner_confirmed_gold_stake_wins"
     owned_rounds = {(run_id, round_id) for run_id, round_id in all_owned_rounds if run_id in selected_runs}
     selected_effects = [effect for effect in effect_rows if effect.run_id in selected_runs]

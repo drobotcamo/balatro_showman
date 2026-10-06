@@ -79,6 +79,9 @@ input is missing or contradictory, emit an unknown sell value and unknown Dagger
 increment, then propagate Dagger Mult as unknown for subsequent rounds until a
 new independent observation re-establishes it. Do not use the isolated engine
 reference as a reconstruction input. It remains a separate validation channel.
+For a confirmed sacrifice, the reducer reports Mult `resolved` and victim removal
+`pending`; it does not infer completed removal from the Mult update. A known
+no-target/ineligible opportunity reports no mutation and no scheduled removal.
 
 ## Reference cross-check caveat
 
@@ -140,8 +143,11 @@ slicing eligibility checks, chronological Dagger effect reducer, and separate
 reference comparator. `tests/test_dagger_mechanics.py` checks these rules on
 synthetic inputs. Inputs require the exact pinned stack, all source hashes,
 per-field source channels, and evidence IDs; reference-channel values are rejected
-from pricing, eligibility, and baseline inputs. Input extraction from actual
-visuals, same-reducer validation on independent observation inputs, and populated
+from pricing, eligibility, and baseline inputs. Evidence catalogs resolve each
+sell-value field and its source/input channel; Egg/Gift Card events, Joker-row
+eligibility and baseline facts also require field-scoped evidence links. Input
+extraction from actual visuals, same-reducer validation on independent
+observation inputs, and populated
 gold-stake analytics remain pending. The analytics selector requires outcome,
 stake, owner confirmation, and a selection evidence ID; unverified runs are
 excluded. The #123 reference run is White stake, so it does not qualify for a
