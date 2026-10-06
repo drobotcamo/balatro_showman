@@ -203,6 +203,19 @@ def test_missing_sell_dependency_stays_unknown():
     assert construct_sell_value(wrong_source).diagnostics == ("missing_or_mismatched:source_hashes",)
     malformed_source = replace(price(), source_hashes=(([], "bad-hash"),))
     assert construct_sell_value(malformed_source).diagnostics == ("missing_or_mismatched:source_hashes",)
+    channel_mismatch = replace(
+        price(),
+        input_channels=tuple(
+            (field, "observation" if field == "inflation" else channel)
+            for field, channel in price().input_channels
+        ),
+        evidence_catalog=tuple(
+            replace(record, channel="derived")
+            if "inflation" in record.supports else record
+            for record in price().evidence_catalog
+        ),
+    )
+    assert construct_sell_value(channel_mismatch).diagnostics == ("evidence_channel_mismatch",)
 
 
 def test_egg_and_gift_card_reconstruct_persistent_extra_value():
@@ -235,22 +248,28 @@ def test_egg_and_gift_card_reconstruct_persistent_extra_value():
     )
     assert leaked.status == "unsupported"
     leaked_event = value_event(1, "gift_card", "gift", 1, ("victim",), channel="reference")
-    with pytest.raises(ValueError, match="engine-reference"):
-        reconstruct_extra_value(
-            "victim", 0, [leaked_event],
-            initial_field_evidence=(("initial_extra_value", ("initial",)),),
-            initial_evidence_catalog=(EvidenceRecord("initial", "source", ("initial_extra_value",)),),
-        )
+    leaked_state = reconstruct_extra_value(
+        "victim", 0, [leaked_event],
+        initial_field_evidence=(("initial_extra_value", ("initial",)),),
+        initial_evidence_catalog=(EvidenceRecord("initial", "source", ("initial_extra_value",)),),
+    )
+    assert leaked_state.status == "unsupported"
     unlinked = value_event(1, "gift_card", "gift", 1, ("victim",))
     unlinked = replace(unlinked, field_evidence=tuple(
         item for item in unlinked.field_evidence if item[0] != "affected_instance_ids"
     ))
-    with pytest.raises(ValueError, match="evidence must resolve"):
-        reconstruct_extra_value(
-            "victim", 0, [unlinked],
-            initial_field_evidence=(("initial_extra_value", ("initial",)),),
-            initial_evidence_catalog=(EvidenceRecord("initial", "source", ("initial_extra_value",)),),
-        )
+    unlinked_state = reconstruct_extra_value(
+        "victim", 0, [unlinked],
+        initial_field_evidence=(("initial_extra_value", ("initial",)),),
+        initial_evidence_catalog=(EvidenceRecord("initial", "source", ("initial_extra_value",)),),
+    )
+    assert unlinked_state.status == "unknown"
+    malformed_event = reconstruct_extra_value(
+        "victim", 0, [object()],
+        initial_field_evidence=(("initial_extra_value", ("initial",)),),
+        initial_evidence_catalog=(EvidenceRecord("initial", "source", ("initial_extra_value",)),),
+    )
+    assert malformed_event.status == "unsupported"
 
 
 def test_unknown_growth_propagates_until_independent_baseline():

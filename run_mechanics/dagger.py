@@ -144,6 +144,8 @@ class DaggerEligibility:
 
 def resolve_dagger_eligibility(inputs: DaggerEligibilityInputs) -> DaggerEligibility:
     """Apply the pinned immediate-right-neighbor Dagger condition."""
+    if not isinstance(inputs, DaggerEligibilityInputs):
+        return DaggerEligibility(None, None, ("unsupported:eligibility_input_type",))
     row = inputs.ordered_joker_instance_ids
     provided_fields = set()
     if row is not None:
@@ -218,26 +220,28 @@ def reconstruct_extra_value(
     evidence: list[str] = list(dict(initial_field_evidence)["initial_extra_value"])
     previous_order = -1
     for event in events:
+        if not isinstance(event, ExtraValueEvent):
+            return ExtraValueState(None, "unsupported", ("invalid:extra_value_event_type",), tuple(evidence))
         if not isinstance(event.order, int) or isinstance(event.order, bool):
-            raise ValueError("extra-value event order must be an integer")
+            return ExtraValueState(None, "unsupported", ("invalid:extra_value_event_order",), tuple(evidence))
         if event.order <= previous_order:
-            raise ValueError("extra-value events must be strictly chronological")
+            return ExtraValueState(None, "ambiguous", ("contradictory:extra_value_event_order",), tuple(evidence))
         previous_order = event.order
         required = {"kind", "actor_instance_id", "increment"}
         if event.kind == "gift_card" and event.affected_instance_ids is not None:
             required.add("affected_instance_ids")
         event_catalog = _evidence_map(event.evidence_catalog)
         if event_catalog is None or not event_catalog:
-            raise ValueError("extra_value event requires a valid evidence catalog")
+            return ExtraValueState(None, "unknown", ("missing:extra_value_event_catalog",), tuple(evidence))
         if any(record.channel == "reference" for record in event_catalog.values()):
-            raise ValueError("engine-reference evidence cannot update reconstructed extra_value")
+            return ExtraValueState(None, "unsupported", ("forbidden:reference_extra_value_event",), tuple(evidence))
         if not _field_evidence_valid(
             event.field_evidence,
             event_catalog,
             required,
             {field: {"observation", "derived", "source"} for field in required},
         ):
-            raise ValueError("extra_value event evidence must resolve to its input fields")
+            return ExtraValueState(None, "unknown", ("missing_or_invalid:extra_value_field_evidence",), tuple(evidence))
         event_evidence = tuple(
             evidence_id for _, evidence_ids in event.field_evidence for evidence_id in evidence_ids
         )
@@ -251,7 +255,7 @@ def reconstruct_extra_value(
                 continue
             applies = instance_id in event.affected_instance_ids
         else:
-            raise ValueError(f"unsupported extra-value rule: {event.kind}")
+            return ExtraValueState(None, "unsupported", ("unsupported:extra_value_rule",), tuple(evidence))
         if applies:
             evidence.extend(event_evidence)
             if event.increment is not None and (
@@ -342,6 +346,12 @@ def construct_sell_value(inputs: SellInputs) -> SellValue:
         return SellValue(None, "unknown", ("missing:input_evidence_catalog",))
     if not _field_evidence_valid(inputs.field_evidence, catalog, required_channels, allowed_channels):
         return SellValue(None, "unknown", ("missing_or_invalid:field_evidence_links",))
+    field_refs = dict(inputs.field_evidence)
+    if any(
+        not any(catalog[evidence_id].channel == channels[field] for evidence_id in field_refs[field])
+        for field in required_channels
+    ):
+        return SellValue(None, "unknown", ("evidence_channel_mismatch",))
     values = (inputs.base_cost, inputs.inflation, inputs.discount_percent, inputs.extra_value)
     if any(not isinstance(value, int) or isinstance(value, bool) for value in values):
         return SellValue(None, "unsupported", ("non_integer_cost_input",))
@@ -600,7 +610,13 @@ def select_winning_gold_stake_runs(
         row_ids = (
             tuple(evidence_id for _, ids in row_field_evidence for evidence_id in ids)
             if isinstance(row_field_evidence, tuple)
-            and all(isinstance(pair, tuple) and len(pair) == 2 and isinstance(pair[1], tuple) for pair in row_field_evidence)
+            and all(
+                isinstance(pair, tuple)
+                and len(pair) == 2
+                and isinstance(pair[1], tuple)
+                and all(isinstance(evidence_id, str) and evidence_id for evidence_id in pair[1])
+                for pair in row_field_evidence
+            )
             else ()
         )
         row_catalog = (

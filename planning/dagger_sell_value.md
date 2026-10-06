@@ -115,6 +115,12 @@ growth per known sacrifice are both `22/3`. This White Stake engine-side fixture
 validates the pinned arithmetic/reducer path; it does not claim video-only
 reconstruction or contribute to the Gold Stake winner query.
 
+| Run step / round | Ordered Dagger victim | Derived sell value | Sidecar Mult before → after | Growth |
+| --- | --- | ---: | ---: | ---: |
+| `1662755302000-5667:12` / 1 | Castle, immediately right | $3 | 0 → 6 | +6 |
+| `1662755302000-5667:26` / 2 | Burnt Joker, immediately right | $4 | 6 → 14 | +8 |
+| `1662755302000-5667:36` / 3 | Holographic Photograph, immediately right | $4 | 14 → 22 | +8 |
+
 ## Source inspected
 
 - Embedded vanilla `card.lua`: `Card:set_cost` (369-384), Clearance Sale / Liquidation
