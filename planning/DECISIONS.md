@@ -542,6 +542,22 @@ equating a pending destruction with completed removal. Source: owner-confirmed
 runtime in the #122 conversation, delegated timing decision on 2026-10-05,
 post-Lovely source trace and three live reference occurrences from #123.
 
+### D040 — accepted — Quarantine unauditable legacy data from the first-slice evaluation
+
+Do not train a model for the #82 first-slice held-out set on the legacy label
+store, derived crops, synthetic images or their unknown gameplay backgrounds;
+exclude those artifacts from evaluation/reference construction as well. Retain
+them unchanged for historical research only. The original `BU*.mp4` footage is
+unavailable, and the synthetic outputs carry no source-frame registry, so the
+surviving alias database and derivatives cannot prove whole-play disjointness.
+This exclusion is a data-use boundary, not proof that old and held-out plays
+never overlapped. Record source identity, split and grouping prospectively for
+new training and held-out data. Existing #82 candidates retain their documented
+alignment/QA limits; a recording made without a pre-capture held-out declaration
+cannot be relabeled held-out afterward. The frozen v2 support and scoring rules
+are unchanged. Source: explicit user authorization in the #82 conversation on
+2026-10-05 after the legacy-source audit.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the
