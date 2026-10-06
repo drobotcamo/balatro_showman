@@ -79,14 +79,14 @@ action order separately from internal engine-trigger order.
 
 For this design, **trigger ordering is intended to be exact, not an approximation**.
 Establish it by inspecting the applicable game/mod source code and encode the
-source revision and ordering evidence. The project owner will verify the traced
-ordering; this investigation is expected to be arduous. Do not freeze or claim an
-ordering based only on observed STEP boundaries, runtime intuition, or a partial
-source inspection. If the relevant code path or version cannot be established,
-mark that ordering unsupported/unknown and block exact downstream claims. No
-future observation may appear in pre-action model-visible state.
+source revision and ordering evidence. D039 approves the bounded Dagger order
+for the installed stack below; it does not approve other trigger paths or source
+revisions. Do not claim an order based only on STEP boundaries or runtime
+intuition. If the relevant source or version cannot be established, mark the
+ordering unsupported/unknown and block exact downstream claims. No future
+observation may appear in pre-action model-visible state.
 
-#### Dagger source trace (owner verification pending)
+#### Dagger source trace (installed stack verified under D039)
 
 I inspected both the embedded vanilla Lua source and the generated local
 Steamodded/Lovely runtime dump. They differ in the timing of Dagger's mutation,
@@ -129,14 +129,15 @@ the victim dissolve, then calls `SMODS.scale_card` outside that callback. This
 differs from the embedded vanilla source, which mutates Mult inside the queued
 callback.
 
-The hashes identify local artifacts, not a pinned upstream Steamodded/Lovely
-patch set or the exact mods active in any recording. The owner must decide which
-source stack governs the intended run and verify the order-sensitive timing
-before setting `requires_exact_order=true`. The fixture keeps it false until
-then. Sell value at the trigger must still come from visible evidence or a
-reproducible derivation under the applicable pricing rules.
+These hashes identify local artifacts, not a pinned upstream Steamodded/Lovely
+patch set or all mods active in any other recording. The installed stack below
+governs the accepted live Dagger reference. The synthetic fixture still keeps
+`requires_exact_order=false` because it is not a pinned-engine trigger trace.
+Sell value for a reconstruction query still requires visual evidence or a
+reproducible derivation under the applicable pricing rules; engine-reference
+sell value remains validation-only.
 
-#### Installed capture stack trace (2026-10-04; owner verification pending)
+#### Installed capture stack trace (2026-10-04; D039-approved scope)
 
 The latest startup log is
 `C:\Users\camgr\AppData\Roaming\Balatro\Mods\lovely\log\lovely-2026.10.04-16.52.58.log`.
@@ -184,13 +185,16 @@ original update returns; it therefore reads the synchronous Mult mutation after
 the setting-blind context, without waiting for a player action. This timing is
 different from embedded vanilla, where Mult changes in the queued Dagger event.
 
-This source trace is specific to the logged local stack. The owner must verify
-both that this runtime/source stack governs the intended behavior and that
-Dagger Mult counts as resolved while victim dissolution is still queued. If so,
-exact-order support can be approved for this stack only; other versions or
-Lovely patch sets need their own trace. The manifest/runtime version discrepancy
-and Lovely patch warnings remain part of its provenance. No Dagger run was made
-during this source inspection.
+This source trace is specific to the logged local stack. The owner confirmed
+this as the intended stack, then delegated the timing decision. Under D039,
+marking the victim for slicing and queuing its dissolve precedes the synchronous
+Mult update; completed removal is a later state transition. A query for stored
+Dagger Mult may use the updated value after `SMODS.scale_card` returns, while a
+query for victim removal must wait for independent evidence of removal. Other
+versions or Lovely patch sets need their own trace. The manifest/runtime
+version discrepancy and Lovely warnings remain in provenance. No Dagger run
+was made during the initial source inspection; the later live reference below
+corroborates this boundary.
 
 #### Live engine-reference corroboration
 
@@ -213,10 +217,10 @@ frame-to-step alignment remains unverified. Strict bundle validation reports
 85 records and valid integrity. The session, step, reference, and video hashes
 are retained in the #123 record and `planning/LEARNINGS.md`.
 
-Owner disposition still needed: accept this resolved-Mult boundary for the
-verified installed stack, or state that #122 exact-order support must wait until
-the victim-removal callback has completed. Do not extend the decision to another
-game/mod revision.
+The owner delegated the boundary choice; D039 selects the three-stage account:
+victim marked/queued, Dagger Mult updated, victim removed. Do not treat the
+immediate resolved reference's still-present victim as a contradiction or as
+completed destruction. Do not extend this order to another game/mod revision.
 
 ### Evidence, status, and recomputation
 

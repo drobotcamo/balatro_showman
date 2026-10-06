@@ -511,13 +511,36 @@ and reset examples are versioned in `planning/RUN_MECHANICS_DESIGN.md` and
 `planning/schemas/run_mechanics_v0_1.schema.json`.
 
 This approval does not validate a production reducer or game-rule implementation.
-Exact Dagger trigger order still requires verification against the intended
-game/mod source; Hermit/Mail-In Rebate and Certificate/Death/Gold Seal remain
+Exact Dagger trigger order for the installed stack is scoped by D039;
+Hermit/Mail-In Rebate and Certificate/Death/Gold Seal remain
 staged for #129/#130. Held-out evaluation requires its applicable frozen protocol.
 Alternative: combine state and effects or treat STEP as a complete trigger
 stream; rejected because persistent state, causal effect occurrences and queued
 engine order have different semantics. Source: owner approval in the #122
 conversation, 2026-10-04.
+
+### D039 — accepted — Dagger growth and victim removal have distinct completion times
+
+For the owner-confirmed installed Balatro `1.0.1o-FULL` / Lovely `0.10.0` /
+Steamodded `26.926.0~dev-a` patch stack, record three distinct moments: the
+immediate right-hand eligible victim is marked and its dissolve queued; Dagger
+stored Mult is updated synchronously by `SMODS.scale_card` during
+`setting_blind`; the victim is removed later. "Resolved Mult" means the
+updated stored value has been read after scaling, not that victim removal has
+completed. A removal claim needs separate evidence. Exact-order claims require
+the source file/patch hashes and runtime identification in
+`planning/RUN_MECHANICS_DESIGN.md`; other stacks remain unsupported until traced.
+STEP actions anchor the interval and do not supply the internal order. Engine
+identity and sell value remain reference-only, not reconstruction inputs.
+
+Alternative: define Dagger growth only after completed victim removal. Rejected
+for this stack because the active patched source updates Mult before the queued
+dissolve finishes; the independent live reference shows the higher Mult while
+the victim remains in the Joker row, then its absence at the next pre-action
+snapshot. This choice avoids backdating a known state mutation or falsely
+equating a pending destruction with completed removal. Source: owner-confirmed
+runtime in the #122 conversation, delegated timing decision on 2026-10-05,
+post-Lovely source trace and three live reference occurrences from #123.
 
 ## Open Questions
 
