@@ -82,15 +82,27 @@ reference as a reconstruction input. It remains a separate validation channel.
 
 ## Reference cross-check caveat
 
-The owner-confirmed #123 reference contains resolved values for Castle ($3),
-Burnt Joker ($4), and Photograph ($4). Vanilla `game.lua` defines their base
-costs as 6, 8, and 5. Castle and Burnt Joker match base half-cost with no extra
-value; Photograph's $4 does not follow from its base cost alone (base half-cost
-is $2). The reference schema does not expose `ability.extra_value` or its
-history. Do not backsolve extra value from the reference for reconstruction;
-establish the Photograph value from observation or the chronological Egg/Gift
-Card effects and other price inputs, or leave it unknown. The #123 record reports
-the price as engine-reference data, not visual evidence of its derivation.
+The owner-confirmed #123 RunBundle's ordinary engine-step payloads contain useful
+pricing inputs that are absent from the mechanics-reference sidecar: the ordered
+Joker rows show the Dagger is Negative at step 12, and Photograph is Holographic
+at step 36; the relevant victims have no edition and their sticker arrays are
+empty. The 41 ordinary steps contain no Egg or Gift Card, `modifiers` stays empty,
+and the only redeemed voucher is Director's Cut (not Clearance Sale or
+Liquidation). Source initializes inflation and discount at zero; the step payloads
+do not serialize those two numeric fields directly.
+
+Using those engine-side step inputs and source constants, the three reference
+sell values follow without extra value: Castle base 6 → $3; Burnt Joker base 8 →
+$4; Photograph base 5 + Holographic surcharge 3 → current cost 8 → $4. Dagger
+itself is base 6 + Negative surcharge 5 → current cost 11 → $5. The dedicated
+reference sidecar independently records the victim prices and Dagger growth.
+
+This is enough to exercise a source calculation against separate engine outputs,
+but the ordinary steps are oracle payloads, not video observations. They cannot
+be passed into video-only reconstruction. Using the same sell-cost inputs from
+the reference sidecar would be circular. Independent reconstruction validation
+still needs aligned visual evidence; the video association is confirmed, but
+frame-to-step alignment is not.
 
 ## Source inspected
 
@@ -124,6 +136,5 @@ from pricing, eligibility, and baseline inputs. Input extraction from actual
 visuals, same-reducer validation on independent observation inputs, and populated
 gold-stake analytics remain pending. The analytics selector requires outcome,
 stake, owner confirmation, and a selection evidence ID; unverified runs are
-excluded. The #123 reference run is White stake, and
-its reference channel does not contain the persistent `extra_value` history
-needed to independently reconstruct Photograph's $4 sell value from base cost $5.
+excluded. The #123 reference run is White stake, so it does not qualify for a
+winning Gold Stake analytics sample.

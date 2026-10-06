@@ -95,6 +95,10 @@ def test_sell_value_follows_lua_order_rounding_and_modifiers():
     assert construct_sell_value(price(base_cost=1, discount_percent=50)).value == 1
     assert construct_sell_value(price(extra_value=3)).value == 7
     assert construct_sell_value(price(base_cost=5, extra_value=2)).value == 4
+    # Photograph's base $5 plus the Holographic purchase surcharge $3 sells for $4.
+    assert construct_sell_value(price(base_cost=5, edition_extra_costs=(3,))).value == 4
+    # Dagger's base $6 plus the Negative surcharge $5 sells for $5.
+    assert construct_sell_value(price(base_cost=6, edition_extra_costs=(5,))).value == 5
     assert construct_sell_value(price(base_cost=8, discount_percent=50)).value == 2
     assert construct_sell_value(price(base_cost=8, edition_extra_costs=(2, 3, 5))).value == 9
 

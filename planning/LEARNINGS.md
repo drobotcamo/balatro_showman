@@ -45,9 +45,12 @@ under its Decisions section. This file is a knowledge base, not a task log.
   `ade9f4a7f8b87ea64fe094445354a89710762950e8d9916d3354f779d8ba7666`. Findings
   are limited to these source revisions. `tests/test_dagger_mechanics.py`
   exercises the corresponding synthetic constructor and reducer; no independent
-  video-input reconstruction validation was run. The #123 White-stake reference
-  shows Photograph sell cost $4 against base cost $5, but does not expose the
-  extra-value history needed to reconstruct that value from source inputs alone.
+  video-input reconstruction validation was run. The #123 ordinary engine-step
+  payloads identify Photograph as Holographic at step 36 and show no Egg/Gift
+  Card in any of the 41 recorded steps; the source surcharge (+3) explains base
+  $5 → current cost $8 → sell $4 without extra_value. They also show Negative
+  Dagger, which explains its sell $5 from base $6 + surcharge $5. These engine
+  steps support a source calculation/check, but are not independent video inputs.
 
 ## 2026-10-05: Live Dagger reference captures separate Mult growth from victim removal
 

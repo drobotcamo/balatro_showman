@@ -381,9 +381,13 @@ inputs and are used by a separate comparison step.
 Reports preserve known-zero opportunities and ownership-rounds with incomplete
 coverage, state pooled versus equal-run weighting, and include known/unknown
 denominators. Winning query selection includes only owner-confirmed Gold Stake
-wins with selection evidence. The #123 reference run is White Stake and does not
-supply the price modifier history needed to derive every victim price
-independently; it does not qualify as a winning Gold Stake analytics sample.
+wins with selection evidence. The #123 ordinary engine steps show a Negative
+Dagger and Holographic Photograph; source costs/surcharges explain the reference
+sell values for Castle ($3), Burnt Joker ($4), and Photograph ($4), as documented
+in `planning/dagger_sell_value.md`. These oracle step payloads can validate the
+calculation but cannot serve as video-only reconstruction inputs. The linked
+video's frame-to-step alignment remains unverified. This run is White Stake and
+does not qualify as a winning Gold Stake analytics sample.
 
 ### Scoring contribution (illustrative)
 
