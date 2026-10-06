@@ -23,6 +23,10 @@ against a Lua ground-truth oracle. `planning/README.md` is the planning index.
   `python -m run_bundle ...` for read-only inspection; pause at the documented
   terminal checkpoint before recording association and request user input when
   the summary is incomplete or disputed.
+- For video capture or association, inventory existing evidence and use the
+  staged live preflight in `planning/RUN_BUNDLE_OPERATIONS.md` before asking for
+  a new recording. Do not ask the user to inspect files or identify opaque run
+  IDs; prepare a visual example and plain-language pairing for confirmation.
 
 ## Local Balatro Source
 

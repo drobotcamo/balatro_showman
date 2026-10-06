@@ -157,12 +157,15 @@ do not execute Balatro's actual save restoration or menu callbacks.
 3. Launch Balatro and confirm the Lovely log reports the mod loaded:
    search `$env:APPDATA\Balatro\Mods\lovely\log\` for
    `[balatro_showman_bridge] loaded; build=issue123-dagger-reference-1; io_dir=...`.
-   Before recording, trigger one action and inspect its queued
-   `request_<run>_<id>.json`. It must contain
+   On a separate diagnostic run, trigger one action and inspect its persisted
+   record in that run's `steps.ndjson` after the bridge acknowledges it (or
+   inspect the queued `request_<run>_<id>.json` if still present). It must contain
    `"schema_version":"producer/1.0.0"`,
    `"ipc_schema_version":"file-queue/1.0.0"`, `step_id`, and
-   `capture_timestamp_ns`; abort if the installed producer still writes only
-   `snapshot.json`.
+   `capture_timestamp_ns`; abort if the producer still writes only
+   `snapshot.json` or if no persisted/queued action appears. Do not use this
+   diagnostic run as the intended video run: if its consumer session already
+   exists, a later OBS marker will not attach to it. Preserve its evidence.
 
 ## Smoke test
 
@@ -188,9 +191,11 @@ do not execute Balatro's actual save restoration or menu callbacks.
 
 ## Video alignment procedure
 
-Before pressing OBS Record, write a start request so the Lua producer samples
-its own monotonic clock. The bridge persists the resulting marker in
-`session.json`:
+For current live recording, use the OBS started-event hook below and the
+preflight/identity procedure in `planning/RUN_BUNDLE_OPERATIONS.md`. The manual
+request shown here is a historical diagnostic only: do not issue it before OBS
+Record or use its timestamp as evidence that recording began. The bridge
+persists the producer's response marker in `session.json`:
 
 The client-side `usage` object in `session.json` and `_recorded_at` on new
 `steps.ndjson` records are optional additive metadata under the existing
@@ -207,8 +212,11 @@ must only re-acknowledge the original action.
   Set-Content "$env:APPDATA\Balatro\agent_io\recording_start.json" -Encoding utf8
 ```
 
-Verify `session.json` contains the resulting `recording` object after the
-first snapshot is persisted. Never use the wall-clock filename timestamp as a
+For a diagnostic, use a fresh producer run with no existing consumer session;
+after its first action is persisted, verify that run's `session.json` contains
+the resulting `recording` object. A marker on an already-created session will
+not be attached retroactively. This alone does not establish a video file or
+frame correspondence. Never use the wall-clock filename timestamp as a
 substitute.
 
 For an automatic event hook, load `ground_truth/obs_recording_start.py` from
@@ -227,10 +235,11 @@ Paste the printed path into the OBS script property. The script writes the
 request on `OBS_FRONTEND_EVENT_RECORDING_STARTED`; use this hook, rather than
 the manual command above, for recording evidence.
 
-At the instant OBS recording starts, capture the producer monotonic clock value
-(`capture_timestamp_ns`) from a fresh snapshot or the bridge diagnostic. Pass
-that value as `--recording-start-ns`; do not substitute the wall-clock filename
-timestamp. For a persisted `steps.ndjson`, map each step to a zero-based frame:
+Use the producer's persisted `capture_timestamp_ns` response to the OBS
+started-event request; do not estimate it from a later snapshot or wall-clock
+video filename. Lua samples that clock when it polls the request, not at the
+instant OBS begins recording. For a persisted `steps.ndjson`, compute candidate
+zero-based frame indices:
 
 ```powershell
 py -3 planning\align_oracle_video.py runs\<run>\steps.ndjson
@@ -241,7 +250,9 @@ optional flags override it for diagnostics only.
 
 The utility emits `step_id` and nearest `frame_idx`. Negative indices indicate
 that the producer timestamp predates the recorded start and require capture
-review; they are not silently clamped.
+review; they are not silently clamped. Poll/IPC latency is not measured by this
+mapping; inspect rendered pre-action frames against oracle observations and
+report actual timing error before claiming the ±3-frame criterion is met.
 
 ## Status
 
