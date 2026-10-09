@@ -405,10 +405,12 @@ python -m run_mechanics.video_like
 python -m pytest -q tests/test_video_like_dagger.py
 ```
 
-The fixture verifies the observation boundary and reducer behavior only. It does
-not establish CV accuracy, actual-video alignment, source eligibility, or an
-evaluation threshold. The separate #127 actual-video outcome still requires
-selected visual outputs and verified rendered alignment.
+The synthetic fixture verifies the observation boundary and reducer behavior; it
+does not establish CV accuracy, actual-video alignment, source eligibility, or an
+evaluation threshold. The separate #127 diagnostic above establishes alignment
+and descriptive agreement only for its three reviewed intervals. Other intervals
+in the recording and the distinct #82 first-slice candidates remain unaligned;
+the diagnostic does not score a CV model or pass an evaluation gate.
 
 ### Dagger positive growth (illustrative)
 
