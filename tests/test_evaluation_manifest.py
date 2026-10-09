@@ -47,6 +47,10 @@ def test_rejects_oracle_promotion_and_boolean_dimensions():
 def test_rejects_nested_nonfinite_annotation_values():
     value = manifest(); value["frames"][0]["annotations"]["page"] = {"status": "observed", "raw": {"score": float("nan")}}
     assert any("non-finite" in e for e in validate_manifest(value))
+    value["frames"][0]["annotations"]["page"] = {"status": "observed", "raw": 10 ** 400}
+    assert any("non-finite" in e for e in validate_manifest(value))
+    value["frames"][0]["mapping"]["x"] = 10 ** 400
+    assert any("mapping is malformed" in e for e in validate_manifest(value))
 
 def test_malformed_manifest_shapes_return_diagnostics():
     value = manifest(); value["frames"][0]["review"] = None
@@ -59,6 +63,8 @@ def test_malformed_manifest_shapes_return_diagnostics():
     assert any("field names must be strings" in e for e in validate_manifest(value))
     value["frames"][0]["annotations"] = {"page": {"status": []}}
     assert any("invalid status" in e for e in validate_manifest(value))
+    value = manifest(); value["frames"][0].pop("review")
+    assert any("review is required" in e for e in validate_manifest(value))
 
 def test_unknown_fields_are_rejected_at_runtime():
     mutations = [
@@ -113,6 +119,9 @@ def test_schema_enums_match_runtime_contract():
     assert frame_properties["mapping"]["additionalProperties"] is False
     assert frame_properties["review"]["additionalProperties"] is False
     assert frame_properties["annotations"]["additionalProperties"]["additionalProperties"] is False
+    finite_number = schema["$defs"]["finiteNumber"]
+    assert finite_number["minimum"] == -finite_number["maximum"]
+    assert frame_properties["annotations"]["additionalProperties"]["properties"]["raw"]["$ref"] == "#/$defs/jsonValue"
 
 def test_held_out_export_requires_and_checks_development_split_context(tmp_path: Path):
     development = manifest()

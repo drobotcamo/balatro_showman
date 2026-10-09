@@ -5,6 +5,7 @@ import argparse
 import json
 import math
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -15,11 +16,21 @@ SUPPORTED_FIELDS = {"page", "zone", "identity", "modifier", "edition", "seal", "
 def _has_nonfinite(value: Any) -> bool:
     if isinstance(value, float):
         return not math.isfinite(value)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return abs(value) > int(sys.float_info.max)
     if isinstance(value, dict):
         return any(_has_nonfinite(item) for item in value.values())
     if isinstance(value, list):
         return any(_has_nonfinite(item) for item in value)
     return False
+
+def _finite_number(value: Any) -> bool:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
 
 def validate_manifest(manifest: dict[str, Any]) -> list[str]:
     errors: list[str] = []
@@ -64,12 +75,16 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
         if isinstance(mapping, dict):
             unknown = set(mapping) - {"x", "y", "width", "height"}
             if unknown: errors.append(f"{prefix}.mapping has unknown fields: {','.join(sorted(map(str, unknown)))}")
-        if not isinstance(mapping, dict) or any(isinstance(mapping.get(k), bool) or not isinstance(mapping.get(k), (int, float)) or not math.isfinite(mapping[k]) for k in ("x", "y", "width", "height")) or mapping.get("width", 0) <= 0 or mapping.get("height", 0) <= 0:
+        if not isinstance(mapping, dict) or any(not _finite_number(mapping.get(k)) for k in ("x", "y", "width", "height")) or mapping.get("width", 0) <= 0 or mapping.get("height", 0) <= 0:
             errors.append(f"{prefix}.mapping is malformed")
         transform = frame.get("canonical_to_source")
-        if not isinstance(transform, list) or len(transform) != 6 or any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) for v in transform):
+        if not isinstance(transform, list) or len(transform) != 6 or any(not _finite_number(v) for v in transform):
             errors.append(f"{prefix}.canonical_to_source is malformed")
-        review = frame.get("review", {})
+        if "review" not in frame:
+            errors.append(f"{prefix}.review is required")
+            review = {}
+        else:
+            review = frame["review"]
         if not isinstance(review, dict):
             errors.append(f"{prefix}.review must be an object")
             review = {}
