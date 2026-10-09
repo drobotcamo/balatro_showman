@@ -20,11 +20,13 @@ and incomplete review are export diagnostics, not silently repaired rows.
 
 ## Splits and review
 
-Assign splits at source-video/run level. Neighboring frames from one source
-cannot be split across partitions. Held-out exports require split-context
-manifests, and the exporter rejects reused source/run identities across splits.
-The standalone `validate_split_assignments()` helper can additionally check a
-collection of manifests. Synthetic backgrounds are excluded. A second reviewer must mark
+Assign splits at source-video/run level. A video or run identity may occur in
+only one split; neighboring source frames cannot cross partitions. Held-out
+exports require at least one development split-context manifest; callers must
+provide the complete development-manifest inventory for a meaningful leakage
+check. The exporter rejects reused video/run identities across the provided
+manifests. The standalone `validate_split_assignments()` helper can additionally
+check a collection. Synthetic backgrounds are excluded. A second reviewer must mark
 every exported frame reviewed; disagreements remain explicit until resolved.
 The development pilot reports coverage, disagreement, missingness, and
 exclusions. Held-out criteria are frozen only after this pilot and explicit

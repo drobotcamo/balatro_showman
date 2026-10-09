@@ -22,6 +22,10 @@ def test_rejects_unreviewed_and_duplicate():
     assert any("duplicate" in e for e in errors)
     assert any("not independently reviewed" in e for e in errors)
 
+def test_unhashable_reviewer_is_a_validation_error():
+    value = manifest(); value["frames"][0]["review"]["reviewers"] = [{}]
+    assert any("not independently reviewed" in e for e in validate_manifest(value))
+
 def test_invalid_mapping_is_not_repaired(tmp_path: Path):
     value = manifest(); value["frames"][0]["mapping"]["width"] = 0
     with pytest.raises(ValueError, match="mapping"):
@@ -60,7 +64,7 @@ def test_split_validation_blocks_source_and_neighbor_leakage():
     second["source"]["split"] = "held_out"
     second["frames"] = [{**second["frames"][0], "frame_index": 3}]
     errors = validate_split_assignments([first, second])
-    assert any("source video/run assigned" in e for e in errors)
+    assert any("source video assigned" in e for e in errors)
     assert any("neighboring source frames cross splits" in e for e in errors)
 
 def test_split_validation_allows_distant_frames_only_if_same_source_split():
@@ -84,14 +88,20 @@ def test_held_out_export_requires_and_checks_development_split_context(tmp_path:
     development = manifest()
     held_out = manifest()
     held_out["source"]["split"] = "held_out"
-    with pytest.raises(ValueError, match="requires split_context"):
+    with pytest.raises(ValueError, match="requires at least one development"):
         export_manifest(held_out, tmp_path / "held-out.json")
+    with pytest.raises(ValueError, match="requires at least one development"):
+        export_manifest(held_out, tmp_path / "held-out.json", split_context=[])
 
     held_out["source"]["video_sha256"] = "d" * 64
     held_out["source"]["run_sha256"] = "e" * 64
     export_manifest(held_out, tmp_path / "held-out.json", split_context=[development])
 
     held_out["source"]["video_sha256"] = development["source"]["video_sha256"]
-    held_out["source"]["run_sha256"] = development["source"]["run_sha256"]
-    with pytest.raises(ValueError, match="multiple splits"):
+    with pytest.raises(ValueError, match="video assigned to multiple splits"):
         export_manifest(held_out, tmp_path / "leaky.json", split_context=[development])
+
+    held_out["source"]["video_sha256"] = "d" * 64
+    held_out["source"]["run_sha256"] = development["source"]["run_sha256"]
+    with pytest.raises(ValueError, match="run assigned to multiple splits"):
+        export_manifest(held_out, tmp_path / "leaky-run.json", split_context=[development])
