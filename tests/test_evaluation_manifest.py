@@ -61,12 +61,17 @@ def test_malformed_manifest_shapes_return_diagnostics():
     assert any("invalid status" in e for e in validate_manifest(value))
 
 def test_unknown_fields_are_rejected_at_runtime():
-    value = manifest(); value["extra"] = True
-    assert any("manifest has unknown fields" in e for e in validate_manifest(value))
-    value = manifest(); value["frames"][0]["review"]["extra"] = True
-    assert any("review has unknown fields" in e for e in validate_manifest(value))
-    value = manifest(); value["frames"][0]["annotations"]["page"] = {"status": "unknown", "extra": True}
-    assert any("annotations.page has unknown fields" in e for e in validate_manifest(value))
+    mutations = [
+        (lambda value: value.update(extra=True), "manifest has unknown fields"),
+        (lambda value: value["source"].update(extra=True), "source has unknown fields"),
+        (lambda value: value["frames"][0].update(extra=True), "frames[0] has unknown fields"),
+        (lambda value: value["frames"][0]["mapping"].update(extra=True), "mapping has unknown fields"),
+        (lambda value: value["frames"][0]["review"].update(extra=True), "review has unknown fields"),
+        (lambda value: value["frames"][0]["annotations"].update(page={"status": "unknown", "extra": True}), "annotations.page has unknown fields"),
+    ]
+    for mutate, message in mutations:
+        value = manifest(); mutate(value)
+        assert any(message in error for error in validate_manifest(value))
 
 def test_split_validation_blocks_source_and_neighbor_leakage():
     first = manifest(); second = manifest()
@@ -104,6 +109,7 @@ def test_schema_enums_match_runtime_contract():
     assert set(schema["properties"]["source"]["properties"]["split"]["enum"]) == {"development", "held_out"}
     assert schema["additionalProperties"] is False
     assert schema["properties"]["source"]["additionalProperties"] is False
+    assert schema["properties"]["frames"]["items"]["additionalProperties"] is False
     assert frame_properties["mapping"]["additionalProperties"] is False
     assert frame_properties["review"]["additionalProperties"] is False
     assert frame_properties["annotations"]["additionalProperties"]["additionalProperties"] is False
