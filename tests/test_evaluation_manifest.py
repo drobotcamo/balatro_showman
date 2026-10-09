@@ -116,3 +116,10 @@ def test_held_out_export_requires_and_checks_development_split_context(tmp_path:
     held_out["source"]["run_sha256"] = development["source"]["run_sha256"]
     with pytest.raises(ValueError, match="run assigned to multiple splits"):
         export_manifest(held_out, tmp_path / "leaky-run.json", split_context=[development])
+
+def test_development_export_checks_supplied_sibling_manifests(tmp_path: Path):
+    sibling = manifest()
+    current = manifest()
+    current["frames"] = [{**current["frames"][0], "frame_id": "duplicate-unit"}]
+    with pytest.raises(ValueError, match="duplicate source frame across manifests"):
+        export_manifest(current, tmp_path / "development.json", split_context=[sibling])

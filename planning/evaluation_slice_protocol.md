@@ -13,9 +13,10 @@ sticker, and OCR text when visible. Each value carries its observation status:
 Raw values and normalized values are separate; oracle values are validation
 references only and are never copied into observations.
 
-Frames use zero-based source coordinates and retain the canonical transform to
-the source pixel space. Source video/run hashes and the alignment hash are
-required. Malformed mappings, duplicate frame IDs or source frame indices, contradictory annotations,
+Frame indices are zero-based in the exact source video identified by its hash;
+mapping coordinates are source pixels and retain the canonical transform from
+the canonical view. Source video/run hashes and the alignment hash are required.
+Malformed mappings, duplicate frame IDs or source frame indices, contradictory annotations,
 and incomplete review are export diagnostics, not silently repaired rows.
 
 ## Splits and review
@@ -24,9 +25,11 @@ Assign splits at source-video/run level. A video or run identity may occur in
 only one split; neighboring source frames cannot cross partitions. Held-out
 exports require at least one development split-context manifest; callers must
 provide the complete development-manifest inventory for a meaningful leakage
-check. The exporter rejects reused video/run identities across the provided
-manifests. The standalone `validate_split_assignments()` helper can additionally
-check a collection. Synthetic backgrounds are excluded. A second reviewer must mark
+check. Development exporters should pass sibling manifests through
+`split_context` when other development slices exist. The exporter rejects reused
+video/run identities and duplicate or neighboring frame assignments across the
+provided manifests. The standalone `validate_split_assignments()` helper can
+check a collection before batch processing. Synthetic backgrounds are excluded. A second reviewer must mark
 every exported frame reviewed; disagreements remain explicit until resolved.
 The development pilot reports coverage, disagreement, missingness, and
 exclusions. Held-out criteria are frozen only after this pilot and explicit

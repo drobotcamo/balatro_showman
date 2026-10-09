@@ -146,13 +146,14 @@ def pilot_report(manifest: dict[str, Any]) -> dict[str, Any]:
 
 def export_manifest(manifest: dict[str, Any], destination: Path, split_context: list[dict[str, Any]] | None = None) -> None:
     errors = validate_manifest(manifest)
-    if isinstance(manifest, dict) and isinstance(manifest.get("source"), dict) and manifest["source"].get("split") == "held_out":
+    is_held_out = isinstance(manifest, dict) and isinstance(manifest.get("source"), dict) and manifest["source"].get("split") == "held_out"
+    if is_held_out:
         if not split_context:
             errors.append("held-out export requires at least one development split_context manifest")
-        else:
-            if not any(isinstance(context, dict) and isinstance(context.get("source"), dict) and context["source"].get("split") == "development" for context in split_context):
-                errors.append("held-out split_context must include development manifests")
-            errors.extend(validate_split_assignments([*split_context, manifest]))
+        elif not any(isinstance(context, dict) and isinstance(context.get("source"), dict) and context["source"].get("split") == "development" for context in split_context):
+            errors.append("held-out split_context must include development manifests")
+    if split_context is not None:
+        errors.extend(validate_split_assignments([*split_context, manifest]))
     if errors: raise ValueError("invalid evaluation manifest: " + "; ".join(errors))
     result = dict(manifest)
     result["frames"] = sorted(manifest["frames"], key=lambda f: (f["frame_index"], f["frame_id"]))
