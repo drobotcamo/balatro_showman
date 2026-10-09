@@ -44,3 +44,17 @@ held-out or acceptance evidence requiring that review.
 
 The manifest is an external, deterministic artifact distinct from provenance
 manifests, SQLite run bundles, and broad Phase 9 exports.
+
+## Export command
+
+Run from the repository root:
+
+```text
+python -m planning.evaluation_manifest input.json output.json
+python -m planning.evaluation_manifest held-out-input.json held-out-output.json --split-context development-slice.json
+```
+
+Repeat `--split-context` for each development manifest in the inventory. For a
+single development manifest with no sibling slices, omit context; when sibling
+development slices exist, provide them so duplicate-frame and source leakage
+checks run before export.
