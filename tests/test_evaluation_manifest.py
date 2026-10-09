@@ -49,6 +49,10 @@ def test_malformed_manifest_shapes_return_diagnostics():
     value["frames"] = None
     assert any("frames must be an array" in e for e in validate_manifest(value))
     assert pilot_report({"frames": None})["frames"] == 0
+    value = manifest(); value["frames"][0]["annotations"] = {1: {"status": "unknown"}}
+    assert any("field names must be strings" in e for e in validate_manifest(value))
+    value["frames"][0]["annotations"] = {"page": {"status": []}}
+    assert any("invalid status" in e for e in validate_manifest(value))
 
 def test_split_validation_blocks_source_and_neighbor_leakage():
     first = manifest(); second = manifest()
@@ -75,3 +79,19 @@ def test_schema_enums_match_runtime_contract():
     assert set(frame_properties["annotations"]["propertyNames"]["enum"]) == SUPPORTED_FIELDS
     assert set(frame_properties["annotations"]["additionalProperties"]["properties"]["status"]["enum"]) == STATUSES
     assert set(schema["properties"]["source"]["properties"]["split"]["enum"]) == {"development", "held_out"}
+
+def test_held_out_export_requires_and_checks_development_split_context(tmp_path: Path):
+    development = manifest()
+    held_out = manifest()
+    held_out["source"]["split"] = "held_out"
+    with pytest.raises(ValueError, match="requires split_context"):
+        export_manifest(held_out, tmp_path / "held-out.json")
+
+    held_out["source"]["video_sha256"] = "d" * 64
+    held_out["source"]["run_sha256"] = "e" * 64
+    export_manifest(held_out, tmp_path / "held-out.json", split_context=[development])
+
+    held_out["source"]["video_sha256"] = development["source"]["video_sha256"]
+    held_out["source"]["run_sha256"] = development["source"]["run_sha256"]
+    with pytest.raises(ValueError, match="multiple splits"):
+        export_manifest(held_out, tmp_path / "leaky.json", split_context=[development])
