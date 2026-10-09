@@ -1,7 +1,7 @@
 # Work Checkpoint
 Updated: 2026-10-08
 Issue: #82
-PR: none
+PR: #143
 Branch: issue-82-handoff-20261008
 Worktree: C:\Users\camgr\Documents\code_projects\balatro_showman-viewer
 Objective: Finish the bounded first-slice annotation/QA/export work in #82 and resolve the remaining object-family coverage from the existing pilot frames.
