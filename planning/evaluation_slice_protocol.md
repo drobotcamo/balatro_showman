@@ -15,7 +15,7 @@ references only and are never copied into observations.
 
 Frames use zero-based source coordinates and retain the canonical transform to
 the source pixel space. Source video/run hashes and the alignment hash are
-required. Malformed mappings, duplicate frame IDs, contradictory annotations,
+required. Malformed mappings, duplicate frame IDs or source frame indices, contradictory annotations,
 and incomplete review are export diagnostics, not silently repaired rows.
 
 ## Splits and review

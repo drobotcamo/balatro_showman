@@ -69,6 +69,15 @@ def test_split_validation_blocks_source_and_neighbor_leakage():
     assert any("source video assigned" in e for e in errors)
     assert any("neighboring source frames cross splits" in e for e in errors)
 
+def test_rejects_duplicate_source_frame_indices():
+    value = manifest()
+    value["frames"][1]["frame_index"] = value["frames"][0]["frame_index"]
+    assert any("duplicate source frame_index" in e for e in validate_manifest(value))
+    first = manifest(); second = manifest()
+    first["frames"] = [first["frames"][0]]
+    second["frames"] = [{**second["frames"][0], "frame_id": "other"}]
+    assert any("duplicate source frame across manifests" in e for e in validate_split_assignments([first, second]))
+
 def test_split_validation_allows_distant_frames_only_if_same_source_split():
     first = manifest(); second = manifest()
     first["frames"] = [{**first["frames"][0], "frame_index": 1}]
