@@ -50,10 +50,14 @@ but cross-use card-instance lineage is not claimed.
 
 ### Mail-In Rebate discarded-rank frequency
 
-RunBundle snapshots show 66 discard intervals with at least one `j_mail` in
-`CurrentJokers`, containing 281 card participations. Each card is counted once
-per discard interval even when two Mail-In Rebate Jokers are present. The
-observed rank histogram is:
+RunBundle snapshots show 66 records whose `source_action` and `action_taken` are
+both `DiscardHand` and whose pre-action `CurrentJokers` contains at least one
+`j_mail`. The producer contract records the decision state before the callback
+and preserves the player's real action in `action_taken`; these are recorded
+discard actions, not arbitrary highlighted-hand states. Their `PendingCards`
+contain 281 card participations. Each selected card entry is counted once per
+discard action even when two Mail-In Rebate Jokers are present. The observed
+rank histogram is:
 
 | Rank | Participations | Rank | Participations |
 | --- | ---: | --- | ---: |
