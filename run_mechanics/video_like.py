@@ -218,14 +218,33 @@ def _reconcile_video_like(
             mult_after=None,
             diagnostic=tuple(dict.fromkeys(effect.diagnostic + input_uncertainties + contradiction_conflicts)),
         )
-    status = "ambiguous" if any(token.startswith(("ambiguous:", "contradictory:")) for token in conflicts) else (
-        "unknown" if effect.mult_after is None or adapted.post_mult is None else "consistent"
-    )
+    if any(token.startswith(("ambiguous:", "contradictory:")) for token in conflicts):
+        status = "ambiguous"
+    elif effect.mult_after is None or adapted.post_mult is None:
+        status = "unknown"
+    elif effect.condition == "met" and effect.status == "inferred":
+        status = "consistent"
+    elif effect.condition == "not_met":
+        status = "consistent_no_effect"
+    elif effect.condition == "baseline_reestablished":
+        status = "consistent_baseline"
+    else:
+        status = "unknown"
     readable = []
+    specialized = {
+        token.split(":", 1)[1]
+        for token in conflicts
+        if token.startswith(("missing:", "unknown:", "ambiguous:"))
+    }
     for code in effect.diagnostic:
         if code.startswith("invalidates:") or code.startswith("contradictory:"):
             continue
         dependency = code.split(":", 1)[-1]
+        if dependency in specialized or (
+            dependency == "eligibility_inputs"
+            and specialized.intersection({"visible_action", "visual_identity", "visual_timing"})
+        ):
+            continue
         if "sell_value" in dependency:
             reason = "the victim sell-value tooltip or a complete independently evidenced pricing derivation is unavailable"
             affected = "victim sell value, Dagger growth, Dagger Mult, and downstream growth queries"

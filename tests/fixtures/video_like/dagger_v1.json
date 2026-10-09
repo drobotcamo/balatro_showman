@@ -134,6 +134,28 @@
         "post_mult": null,
         "victim_absent_after": null
       }
+    },
+    {
+      "case_id": "no_victim_no_effect",
+      "source": {"kind": "synthetic_video_like", "visual_order": ["pre", "action", "aftermath"]},
+      "observation": {
+        "run_id": "video-like-run-7",
+        "round_id": "round-1",
+        "interval_id": "known-zero-1",
+        "order": 1,
+        "timing_status": "ordered_visual_sequence",
+        "identity_status": "unambiguous",
+        "dagger_track_id": "track-dagger-a",
+        "mult_before": 6,
+        "ordered_joker_tracks": ["track-dagger-a"],
+        "dagger_getting_sliced": false,
+        "victim_eternal": null,
+        "victim_getting_sliced": null,
+        "victim_sell_value_tooltip": null,
+        "action_visible": "select_blind",
+        "post_mult": 6,
+        "victim_absent_after": false
+      }
     }
   ]
 }

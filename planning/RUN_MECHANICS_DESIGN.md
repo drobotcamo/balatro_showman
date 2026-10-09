@@ -376,8 +376,8 @@ video-like** fixture, not a captured-video dataset, model prediction, held-out
 sample, or evaluation result. Its frozen input and perturbation protocol is
 `planning/VIDEO_LIKE_DAGGER_PROTOCOL_V1.md`. It instantiates the already-approved illustrative
 Dagger values (Mult 6, observed sell-value tooltip $4, expected Mult 14) and
-includes missing tooltip, missing action, ambiguous identity, and contradictory
-aftermath cases. Its `source`/`visual_order` annotations describe hypothetical
+includes missing tooltip, missing action, ambiguous identity/timing, contradictory
+aftermath, and a distinct known-no-victim zero case. Its `source`/`visual_order` annotations describe hypothetical
 visible intervals; they are not frame references. `timing_status` distinguishes
 an ordered visual sequence from ambiguous/missing event timing; even the ordered
 case does not claim a verified frame-to-oracle alignment.

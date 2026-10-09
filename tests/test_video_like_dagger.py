@@ -95,6 +95,36 @@ def test_visual_timing_order_does_not_claim_verified_frame_alignment(cases):
     assert cases["tooltip_observed_positive"]["observation"]["timing_status"] == "ordered_visual_sequence"
 
 
+def test_known_no_victim_is_zero_but_not_a_missing_price(cases):
+    no_victim = run_video_like_record(cases["no_victim_no_effect"])
+    missing_tooltip = run_video_like_record(cases["tooltip_missing"])
+    assert no_victim["status"] == "consistent_no_effect"
+    assert no_victim["effect"].growth == 0
+    assert no_victim["effect"].condition == "not_met"
+    assert no_victim["effect"].confirmed_sacrifice is False
+    assert missing_tooltip["effect"].growth is None
+    assert missing_tooltip["effect"].status == "unknown"
+
+
+@pytest.mark.parametrize(
+    ("case_id", "dependency"),
+    [
+        ("tooltip_missing", "sell_value_inputs"),
+        ("action_missing", "visible_action"),
+        ("identity_ambiguous", "visual_identity"),
+        ("timing_ambiguous", "visual_timing"),
+        ("contradictory_aftermath", "visible_aftermath"),
+    ],
+)
+def test_diagnostics_name_interval_rule_track_dependency_and_impact(cases, case_id, dependency):
+    result = run_video_like_record(cases[case_id])
+    matching = [line for line in result["readable_diagnostics"] if f"dependency={dependency};" in line]
+    assert len(matching) == 1
+    line = matching[0]
+    for field in ("interval=", "rule=", "instance=", "affected=", "reason="):
+        assert field in line
+
+
 def test_invalid_tooltip_value_is_rejected(cases):
     row = copy.deepcopy(cases["tooltip_observed_positive"])
     row["observation"]["victim_sell_value_tooltip"] = 0

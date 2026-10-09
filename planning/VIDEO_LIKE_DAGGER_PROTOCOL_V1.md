@@ -42,6 +42,7 @@ Conflicting post-Mult is `ambiguous`; neither value is selected as the result.
 | Case/check | Required outcome |
 | --- | --- |
 | Tooltip $4, Dagger Mult 6, eligible neighbor, observed select-blind action, visible aftermath 14 | Same reducer returns growth 8 and Mult 14; removal remains pending unless separately observed. |
+| Unambiguous ordered row shows no right-hand victim | Known no-effect with growth 0; distinct from missing sell value. |
 | Missing tooltip and no complete pricing derivation | Unknown causal sell value/growth/effect; never zero. A separately observed post-Mult/state delta stays distinct and may re-establish a later baseline. |
 | Missing action | Unknown eligibility/effect. |
 | Ambiguous visual identity | Ambiguous attribution and no exact growth. |
