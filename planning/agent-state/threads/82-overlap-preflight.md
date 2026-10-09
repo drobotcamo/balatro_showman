@@ -1,7 +1,7 @@
 # Work Checkpoint
 Updated: 2026-10-09
 Issue: #82
-PR: none
+PR: #150 (https://github.com/drobotcamo/balatro_showman/pull/150)
 Branch: issue-82-overlap-handoff-20261009
 Worktree: C:\Users\camgr\AppData\Local\Temp\opencode\issue82-overlap-handoff
 Objective: Resolve the remaining first-slice source-overlap and capture-readiness questions before asking the user to record additional held-out sources.
