@@ -192,13 +192,19 @@ def export_manifest(manifest: dict[str, Any], destination: Path, split_context: 
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(result, sort_keys=True, indent=2) + "\n", encoding="utf-8")
 
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"non-standard JSON numeric constant: {value}")
+
+def _read_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"), parse_constant=_reject_json_constant)
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("input", type=Path); parser.add_argument("output", type=Path)
     parser.add_argument("--split-context", type=Path, action="append", default=[], help="sibling split manifests used to validate source/frame separation")
     args = parser.parse_args()
-    manifest = json.loads(args.input.read_text(encoding="utf-8"))
-    split_context = [json.loads(path.read_text(encoding="utf-8")) for path in args.split_context]
+    manifest = _read_json(args.input)
+    split_context = [_read_json(path) for path in args.split_context]
     export_manifest(manifest, args.output, split_context=split_context if args.split_context else None)
     return 0
 

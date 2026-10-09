@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from planning.evaluation_manifest import export_manifest, pilot_report, validate_manifest, validate_split_assignments
+from planning.evaluation_manifest import _read_json, export_manifest, pilot_report, validate_manifest, validate_split_assignments
 
 
 def manifest():
@@ -51,6 +51,12 @@ def test_rejects_nested_nonfinite_annotation_values():
     assert any("non-finite" in e for e in validate_manifest(value))
     value["frames"][0]["mapping"]["x"] = 10 ** 400
     assert any("mapping is malformed" in e for e in validate_manifest(value))
+
+def test_json_input_rejects_nonstandard_numeric_constants(tmp_path: Path):
+    source = tmp_path / "nonstandard.json"
+    source.write_text('{"score": NaN}', encoding="utf-8")
+    with pytest.raises(ValueError, match="non-standard JSON numeric constant: NaN"):
+        _read_json(source)
 
 def test_malformed_manifest_shapes_return_diagnostics():
     value = manifest(); value["frames"][0]["review"] = None
@@ -136,6 +142,10 @@ def test_manifest_schema_accepts_valid_manifest_and_rejects_invalid_instances():
     valid = manifest()
     assert not validate_manifest(valid)
     assert validator.is_valid(valid)
+    finite_boundary = manifest()
+    finite_boundary["frames"][0]["annotations"]["page"] = {"status": "observed", "raw": float.fromhex("0x1.fffffffffffffp+1023")}
+    assert not validate_manifest(finite_boundary)
+    assert validator.is_valid(finite_boundary)
 
     mutations = [
         lambda value: value.update(extra=True),
@@ -148,6 +158,8 @@ def test_manifest_schema_accepts_valid_manifest_and_rejects_invalid_instances():
         lambda value: value["frames"][0]["annotations"].update(page={"status": "unknown", "normalized": "shop"}),
         lambda value: value["frames"][0]["annotations"].update(page={"status": "observed", "raw": "shop", "oracle": "shop"}),
         lambda value: value["frames"][0]["annotations"].update(page={"status": "observed", "raw": "shop", "contradictory": True}),
+        lambda value: value["frames"][0]["annotations"].update(page={"status": "observed", "raw": 10 ** 400}),
+        lambda value: value["frames"][0]["mapping"].update(x=10 ** 400),
         lambda value: value["frames"][0].pop("review"),
         lambda value: value["frames"][0]["review"].pop("disagreement"),
     ]
