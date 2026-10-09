@@ -180,7 +180,7 @@ def export_manifest(manifest: dict[str, Any], destination: Path, split_context: 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("input", type=Path); parser.add_argument("output", type=Path)
-    parser.add_argument("--split-context", type=Path, action="append", default=[], help="development/other split manifests used to validate held-out separation")
+    parser.add_argument("--split-context", type=Path, action="append", default=[], help="sibling split manifests used to validate source/frame separation")
     args = parser.parse_args()
     manifest = json.loads(args.input.read_text(encoding="utf-8"))
     split_context = [json.loads(path.read_text(encoding="utf-8")) for path in args.split_context]
