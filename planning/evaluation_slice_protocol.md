@@ -35,12 +35,14 @@ The development pilot reports coverage, disagreement, missingness, and
 exclusions. Held-out criteria are frozen only after this pilot and explicit
 approval.
 
-The development pilot review was performed by the agent using this work session;
-`qa-2a` was supplied as the second-reviewer label but did not independently
-inspect the frames. `review.status` and pilot `reviewed`/`coverage` metrics are
-self-reported claims, not verified reviewer identity or independent QA. The
-pilot therefore does not establish independent human QA and must not be used as
-held-out or acceptance evidence requiring that review.
+The initial development pilot listed `qa-2a`, who did not inspect the frames.
+After correcting two frame-to-step links, the user independently reviewed the
+eight-frame contact sheet and confirmed the displayed page/action matches. The
+manifest records this as `user-confirmed-in-thread`. That visual check confirms
+the listed page/action correspondence at the sampled frames; timestamp alignment
+still selects the nearest frame and does not prove the exact action instant.
+`review.status` and pilot `reviewed`/`coverage` metrics remain self-reported
+claims, not identity-verified QA. This pilot is not held-out evidence.
 
 The manifest is an external, deterministic artifact distinct from provenance
 manifests, SQLite run bundles, and broad Phase 9 exports.
