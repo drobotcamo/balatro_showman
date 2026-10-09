@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from planning.evaluation_manifest import export_manifest, pilot_report, validate_manifest
+from planning.evaluation_manifest import export_manifest, pilot_report, validate_manifest, validate_split_assignments
 
 
 def manifest():
@@ -41,3 +41,37 @@ def test_rejects_oracle_promotion_and_boolean_dimensions():
 def test_rejects_nested_nonfinite_annotation_values():
     value = manifest(); value["frames"][0]["annotations"]["page"] = {"status": "observed", "raw": {"score": float("nan")}}
     assert any("non-finite" in e for e in validate_manifest(value))
+
+def test_malformed_manifest_shapes_return_diagnostics():
+    value = manifest(); value["frames"][0]["review"] = None
+    assert any("review must be an object" in e for e in validate_manifest(value))
+    assert validate_manifest(None) == ["manifest must be an object"]
+    value["frames"] = None
+    assert any("frames must be an array" in e for e in validate_manifest(value))
+    assert pilot_report({"frames": None})["frames"] == 0
+
+def test_split_validation_blocks_source_and_neighbor_leakage():
+    first = manifest(); second = manifest()
+    first["source"]["split"] = "development"
+    second["source"]["split"] = "held_out"
+    second["frames"] = [{**second["frames"][0], "frame_index": 3}]
+    errors = validate_split_assignments([first, second])
+    assert any("source video/run assigned" in e for e in errors)
+    assert any("neighboring source frames cross splits" in e for e in errors)
+
+def test_split_validation_allows_distant_frames_only_if_same_source_split():
+    first = manifest(); second = manifest()
+    first["frames"] = [{**first["frames"][0], "frame_index": 1}]
+    second["frames"] = [{**second["frames"][1], "frame_index": 100}]
+    assert validate_split_assignments([first, second]) == []
+
+def test_schema_enums_match_runtime_contract():
+    from planning.evaluation_manifest import SCHEMA_VERSION, STATUSES, SUPPORTED_FIELDS
+
+    schema_path = Path(__file__).resolve().parents[1] / "planning" / "evaluation_manifest.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    assert schema["properties"]["schema_version"]["const"] == SCHEMA_VERSION
+    frame_properties = schema["properties"]["frames"]["items"]["properties"]
+    assert set(frame_properties["annotations"]["propertyNames"]["enum"]) == SUPPORTED_FIELDS
+    assert set(frame_properties["annotations"]["additionalProperties"]["properties"]["status"]["enum"]) == STATUSES
+    assert set(schema["properties"]["source"]["properties"]["split"]["enum"]) == {"development", "held_out"}
