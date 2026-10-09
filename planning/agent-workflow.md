@@ -25,6 +25,20 @@ scope boundary, owner and actual prerequisite. Find equivalents before creating
 one. Numeric issues and checkpoint filenames are normal; historical four-letter
 aliases in `planning/issue-tags.json` remain valid. Allocation is optional.
 
+Separate implementation acceptance from evidence acceptance when an outcome has
+both. Implementation acceptance covers the code, schema, tooling, or fixture
+artifact and its runnable checks. Evidence acceptance covers external inputs,
+human review, provenance, split/leakage audits, and claims made from those
+inputs. A passing implementation check does not establish an evidence claim,
+and an evidence limitation does not justify repeating completed implementation
+work.
+
+Classify artifacts as `fixture/tooling`, `development pilot`, `held-out
+evaluation`, or `reconstruction result`. Keep the class, source identity,
+reviewer identity, hashes, and limitations with the artifact. When only external
+evidence remains, name one concrete next evidence action and owner; do not create
+another implementation PR merely to keep the issue active.
+
 Use one accountable lead for an agreed outcome. Split only independently useful,
 reviewable work or a real external blocker, not design/test/review/settlement
 ceremony. One active production outcome is the default; research and review can
@@ -55,8 +69,10 @@ Do not delete unfamiliar worktrees or discard changes to resolve uncertainty.
    same PR/issue; close only when acceptance is addressed or explicitly deferred.
 6. If only a genuine human/external blocker remains, or context is exhausted
    after independent acceptance work, leave the factual unfinished-work
-   checkpoint specified below. A checkpoint resumes this issue; it is not
-   completion.
+    checkpoint specified below. A checkpoint resumes this issue; it is not
+    completion. If implementation is complete but evidence is not, hand off only
+    the unmet evidence action; do not reopen settled code work without a new
+    defect.
 
 ### `/work` Continuation
 
