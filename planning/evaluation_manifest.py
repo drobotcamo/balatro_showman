@@ -60,7 +60,8 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
             errors.append(f"{prefix}.review must be an object")
             review = {}
         reviewers = review.get("reviewers")
-        if review.get("status") != "reviewed" or not isinstance(reviewers, list) or any(not isinstance(r, str) or not r for r in reviewers) or len(set(reviewers)) < 2: errors.append(f"{prefix} is not independently reviewed")
+        valid_reviewers = isinstance(reviewers, list) and all(isinstance(reviewer, str) and reviewer for reviewer in reviewers)
+        if review.get("status") != "reviewed" or not valid_reviewers or len(set(reviewers)) < 2: errors.append(f"{prefix} is not independently reviewed")
         annotations = frame.get("annotations")
         if not isinstance(annotations, dict):
             continue

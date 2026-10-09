@@ -25,6 +25,8 @@ def test_rejects_unreviewed_and_duplicate():
 def test_unhashable_reviewer_is_a_validation_error():
     value = manifest(); value["frames"][0]["review"]["reviewers"] = [{}]
     assert any("not independently reviewed" in e for e in validate_manifest(value))
+    value["frames"][0]["review"]["reviewers"] = [["qa1"], ["qa2"]]
+    assert any("not independently reviewed" in e for e in validate_manifest(value))
 
 def test_invalid_mapping_is_not_repaired(tmp_path: Path):
     value = manifest(); value["frames"][0]["mapping"]["width"] = 0
