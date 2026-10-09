@@ -263,19 +263,18 @@ function love.load()
   bridge.emit("DiscardHand")
   local rebate = {config = {center = {key = "j_mail"}}, ability = {extra = 5}, unique_val = 8002}
   local rebate2 = {config = {center = {key = "j_mail"}}, ability = {extra = 5}, unique_val = 8005}
-  local function playing_card(token, rank)
-    return {unique_val = token, base = {value = rank}, debuff = false,
-      get_id = function(self)
-        if self.base.value == "8" then return 8 end
-        if self.base.value == "9" then return 9 end
-        return 7
-      end}
+  local function playing_card(token, rank, effective_id)
+    local rank_ids = { ["8"] = 8, ["9"] = 9, ["7"] = 7, ["3"] = 3 }
+    return {unique_val = token, base = {value = rank, id = rank_ids[rank]}, debuff = false,
+      get_id = function(self) return effective_id or self.base.id end}
   end
   local card8 = playing_card(8003, "8")
   Card.calculate_joker(rebate, {discard = true, other_card = card8})
   Card.calculate_joker(rebate, {discard = true, other_card = card8})
   local card7 = playing_card(8004, "7")
   Card.calculate_joker(rebate, {discard = true, other_card = card7})
+  local rankless3 = playing_card(8009, "3", -37134)
+  Card.calculate_joker(rebate, {discard = true, other_card = rankless3})
   bridge.tick()
   local rebate_reference = read_file(io_root .. "\\mechanics_reference_"
     .. mechanics_run_id:gsub("[^%w_-]", "_") .. "_000000000005_mechanics.json")
@@ -285,6 +284,8 @@ function love.load()
       or not rebate_reference:find('"trigger_multiplicity":2', 1, true)
       or not rebate_reference:find('"direct_contribution":10', 1, true)
       or not rebate_reference:find('"discarded_rank":"7"', 1, true)
+      or not rebate_reference:find('"discarded_rank_id":3', 1, true)
+      or not rebate_reference:find('"discarded_effective_rank_id":-37134', 1, true)
       or not rebate_reference:find('"direct_contribution":0', 1, true) then
     return fail("Mail-In Rebate references missed target/rank, multiplicity, zero participation or contribution: "
       .. tostring(rebate_reference))
