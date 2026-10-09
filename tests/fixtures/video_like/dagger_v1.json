@@ -1,0 +1,161 @@
+{
+  "dataset_id": "dagger-video-like-v1",
+  "dataset_status": "synthetic_video_like_not_actual_video",
+  "description": "Small observation-channel fixture for Dagger sell intervals. Values instantiate the owner-approved illustrative 6 + 2x4 example; no captured frames, predictions, or oracle fields are represented as visual evidence.",
+  "cases": [
+    {
+      "case_id": "tooltip_observed_positive",
+      "source": {"kind": "synthetic_video_like", "visual_order": ["pre", "tooltip", "aftermath"]},
+      "observation": {
+        "run_id": "video-like-run-1",
+        "round_id": "round-1",
+        "interval_id": "positive-1",
+        "order": 1,
+        "timing_status": "ordered_visual_sequence",
+        "identity_status": "unambiguous",
+        "dagger_track_id": "track-dagger-a",
+        "mult_before": 6,
+        "ordered_joker_tracks": ["track-dagger-a", "track-victim-a"],
+        "dagger_getting_sliced": false,
+        "victim_eternal": false,
+        "victim_getting_sliced": false,
+        "victim_sell_value_tooltip": 4,
+        "action_visible": "select_blind",
+        "post_mult": 14,
+        "victim_absent_after": true
+      }
+    },
+    {
+      "case_id": "tooltip_missing",
+      "source": {"kind": "synthetic_video_like", "visual_order": ["pre", "action", "aftermath"]},
+      "observation": {
+        "run_id": "video-like-run-2",
+        "round_id": "round-2",
+        "interval_id": "missing-tooltip-1",
+        "order": 2,
+        "timing_status": "ordered_visual_sequence",
+        "identity_status": "unambiguous",
+        "dagger_track_id": "track-dagger-a",
+        "mult_before": 6,
+        "ordered_joker_tracks": ["track-dagger-a", "track-victim-b"],
+        "dagger_getting_sliced": false,
+        "victim_eternal": false,
+        "victim_getting_sliced": false,
+        "victim_sell_value_tooltip": null,
+        "action_visible": "select_blind",
+        "post_mult": null,
+        "victim_absent_after": true
+      }
+    },
+    {
+      "case_id": "action_missing",
+      "source": {"kind": "synthetic_video_like", "visual_order": ["pre", "unobserved-action", "aftermath"]},
+      "observation": {
+        "run_id": "video-like-run-3",
+        "round_id": "round-1",
+        "interval_id": "missing-action-1",
+        "order": 1,
+        "timing_status": "ordered_visual_sequence",
+        "identity_status": "unambiguous",
+        "dagger_track_id": "track-dagger-a",
+        "mult_before": 6,
+        "ordered_joker_tracks": ["track-dagger-a", "track-victim-a"],
+        "dagger_getting_sliced": false,
+        "victim_eternal": false,
+        "victim_getting_sliced": false,
+        "victim_sell_value_tooltip": 4,
+        "action_visible": null,
+        "post_mult": null,
+        "victim_absent_after": null
+      }
+    },
+    {
+      "case_id": "identity_ambiguous",
+      "source": {"kind": "synthetic_video_like", "visual_order": ["pre", "action", "aftermath"]},
+      "observation": {
+        "run_id": "video-like-run-4",
+        "round_id": "round-1",
+        "interval_id": "ambiguous-identity-1",
+        "order": 1,
+        "timing_status": "ordered_visual_sequence",
+        "identity_status": "ambiguous",
+        "dagger_track_id": "track-dagger-ambiguous",
+        "mult_before": 6,
+        "ordered_joker_tracks": ["track-dagger-ambiguous", "track-victim-a"],
+        "dagger_getting_sliced": false,
+        "victim_eternal": false,
+        "victim_getting_sliced": false,
+        "victim_sell_value_tooltip": 4,
+        "action_visible": "select_blind",
+        "post_mult": null,
+        "victim_absent_after": null
+      }
+    },
+    {
+      "case_id": "contradictory_aftermath",
+      "source": {"kind": "synthetic_video_like", "visual_order": ["pre", "tooltip", "aftermath"]},
+      "observation": {
+        "run_id": "video-like-run-5",
+        "round_id": "round-1",
+        "interval_id": "contradictory-1",
+        "order": 1,
+        "timing_status": "ordered_visual_sequence",
+        "identity_status": "unambiguous",
+        "dagger_track_id": "track-dagger-a",
+        "mult_before": 6,
+        "ordered_joker_tracks": ["track-dagger-a", "track-victim-a"],
+        "dagger_getting_sliced": false,
+        "victim_eternal": false,
+        "victim_getting_sliced": false,
+        "victim_sell_value_tooltip": 4,
+        "action_visible": "select_blind",
+        "post_mult": 13,
+        "victim_absent_after": true
+      }
+    },
+    {
+      "case_id": "timing_ambiguous",
+      "source": {"kind": "synthetic_video_like", "visual_order": ["pre-or-action-unknown", "aftermath"]},
+      "observation": {
+        "run_id": "video-like-run-6",
+        "round_id": "round-1",
+        "interval_id": "ambiguous-timing-1",
+        "order": 1,
+        "timing_status": "ambiguous",
+        "identity_status": "unambiguous",
+        "dagger_track_id": "track-dagger-a",
+        "mult_before": 6,
+        "ordered_joker_tracks": ["track-dagger-a", "track-victim-a"],
+        "dagger_getting_sliced": false,
+        "victim_eternal": false,
+        "victim_getting_sliced": false,
+        "victim_sell_value_tooltip": 4,
+        "action_visible": "select_blind",
+        "post_mult": null,
+        "victim_absent_after": null
+      }
+    },
+    {
+      "case_id": "no_victim_no_effect",
+      "source": {"kind": "synthetic_video_like", "visual_order": ["pre", "action", "aftermath"]},
+      "observation": {
+        "run_id": "video-like-run-7",
+        "round_id": "round-1",
+        "interval_id": "known-zero-1",
+        "order": 1,
+        "timing_status": "ordered_visual_sequence",
+        "identity_status": "unambiguous",
+        "dagger_track_id": "track-dagger-a",
+        "mult_before": 6,
+        "ordered_joker_tracks": ["track-dagger-a"],
+        "dagger_getting_sliced": false,
+        "victim_eternal": null,
+        "victim_getting_sliced": null,
+        "victim_sell_value_tooltip": null,
+        "action_visible": "select_blind",
+        "post_mult": 6,
+        "victim_absent_after": false
+      }
+    }
+  ]
+}

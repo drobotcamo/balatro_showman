@@ -408,6 +408,11 @@ class Sacrifice:
     baseline_after: int | None = None
     mult_before_channel: str | None = None
     baseline_channel: str | None = None
+    observed_victim_sell_value: int | None = None
+    observed_action: str | None = None
+    observed_timing_status: str | None = None
+    observed_identity_status: str | None = None
+    observed_post_mult: int | None = None
 
 
 @dataclass(frozen=True)
@@ -464,12 +469,35 @@ def reduce_sacrifices(events: Iterable[Sacrifice]) -> list[DaggerEffect]:
         before = current_by_instance[instance_key] if has_prior_state else event.dagger_mult_before
         event_fields = {"run_id", "round_id", "interval_id", "dagger_instance_id"}
         event_channels = {field: {"observation", "derived", "source"} for field in event_fields}
+        if event.observed_action is not None:
+            if event.observed_action != "select_blind":
+                raise ValueError(f"unsupported observed Dagger trigger action: {key}")
+            event_fields.add("observed_action")
+            event_channels["observed_action"] = {"observation"}
+        if event.observed_timing_status is not None:
+            if event.observed_timing_status not in {"ordered_visual_sequence", "ambiguous", "unknown"}:
+                raise ValueError(f"unsupported observed timing status: {key}")
+            event_fields.add("observed_timing_status")
+            event_channels["observed_timing_status"] = {"observation"}
+        if event.observed_identity_status is not None:
+            if event.observed_identity_status not in {"unambiguous", "ambiguous", "unknown"}:
+                raise ValueError(f"unsupported observed identity status: {key}")
+            event_fields.add("observed_identity_status")
+            event_channels["observed_identity_status"] = {"observation"}
+        if event.observed_post_mult is not None:
+            if type(event.observed_post_mult) is not int or event.observed_post_mult < 0:
+                raise ValueError(f"invalid observed post-Mult: {key}")
+            event_fields.add("observed_post_mult")
+            event_channels["observed_post_mult"] = {"observation"}
         if event.dagger_mult_before is not None:
             event_fields.add("dagger_mult_before")
             event_channels["dagger_mult_before"] = {"observation", "derived"}
         if event.baseline_after is not None:
             event_fields.add("baseline_after")
             event_channels["baseline_after"] = {"observation"}
+        if event.observed_victim_sell_value is not None:
+            event_fields.add("observed_victim_sell_value")
+            event_channels["observed_victim_sell_value"] = {"observation"}
         if not _field_evidence_valid(event.field_evidence, event_catalog, event_fields, event_channels):
             raise ValueError(f"Dagger interval evidence does not resolve to its fields: {key}")
         event_evidence = tuple(
@@ -527,10 +555,22 @@ def reduce_sacrifices(events: Iterable[Sacrifice]) -> list[DaggerEffect]:
             status, condition, confirmed, growth, victim_value = "unknown", "unknown", True, None, None
             diagnostic = ("missing:dagger_mult_before", "invalidates:dagger_mult_and_future_growth")
         elif event.sell_inputs is None:
-            after = None
-            mult_resolution, removal_status = "unknown", "pending"
-            status, condition, confirmed, growth, victim_value = "unknown", "unknown", True, None, None
-            diagnostic = ("missing:sell_value_inputs", "invalidates:dagger_mult_and_future_growth")
+            observed_sell_value = event.observed_victim_sell_value
+            if (
+                isinstance(observed_sell_value, int)
+                and not isinstance(observed_sell_value, bool)
+                and observed_sell_value >= 1
+            ):
+                victim_value = observed_sell_value
+                growth = 2 * victim_value
+                after = before + growth
+                mult_resolution, removal_status = "resolved", "pending"
+                status, condition, confirmed, diagnostic = "inferred", "met", True, ()
+            else:
+                after = None
+                mult_resolution, removal_status = "unknown", "pending"
+                status, condition, confirmed, growth, victim_value = "unknown", "unknown", True, None, None
+                diagnostic = ("missing:sell_value_inputs", "invalidates:dagger_mult_and_future_growth")
         else:
             sell = construct_sell_value(event.sell_inputs)
             if sell.value is None:
@@ -544,10 +584,54 @@ def reduce_sacrifices(events: Iterable[Sacrifice]) -> list[DaggerEffect]:
                 after = before + growth
                 mult_resolution, removal_status = "resolved", "pending"
                 status, condition, confirmed, diagnostic = "inferred", "met", True, ()
-        current_by_instance[instance_key] = after
+                if event.observed_victim_sell_value is not None and event.observed_victim_sell_value != sell.value:
+                    after = None
+                    mult_resolution = "unknown"
+                    status = "ambiguous"
+                    condition = "contradictory_observed_sell_value"
+                    growth = None
+                    victim_value = None
+                    diagnostic = ("contradictory:observed_and_derived_sell_value", "invalidates:dagger_mult_and_future_growth")
+            if (
+                sell.value is None
+                and isinstance(event.observed_victim_sell_value, int)
+                and not isinstance(event.observed_victim_sell_value, bool)
+                and event.observed_victim_sell_value >= 1
+            ):
+                victim_value = event.observed_victim_sell_value
+                growth = 2 * victim_value
+                after = before + growth
+                mult_resolution, removal_status = "resolved", "pending"
+                status, condition, confirmed, diagnostic = "inferred", "met", True, ()
+        if event.observed_victim_sell_value is not None and (
+            not isinstance(event.observed_victim_sell_value, int)
+            or isinstance(event.observed_victim_sell_value, bool)
+            or event.observed_victim_sell_value < 1
+        ):
+            after = None
+            mult_resolution, removal_status = "unknown", "pending"
+            status, condition, confirmed = "unsupported", "invalid_observed_sell_value", True
+            growth, victim_value = None, None
+            diagnostic = ("invalid:observed_victim_sell_value", "invalidates:dagger_mult_and_future_growth")
+        state_after = after
+        if (
+            event.observed_post_mult is not None
+            and event.observed_identity_status == "unambiguous"
+            and event.observed_timing_status == "ordered_visual_sequence"
+        ):
+            # Retain a directly observed state baseline even when the causal
+            # sell-value/growth explanation is unknown or contradictory.
+            state_after = event.observed_post_mult
+        current_by_instance[instance_key] = state_after
         input_evidence = tuple(
             evidence_id
             for _, evidence_ids in (event.sell_inputs.field_evidence if event.sell_inputs else ())
+            for evidence_id in evidence_ids
+        )
+        observed_value_evidence = tuple(
+            evidence_id
+            for field, evidence_ids in event.field_evidence
+            if field == "observed_victim_sell_value"
             for evidence_id in evidence_ids
         )
         eligibility_evidence = tuple(
@@ -560,7 +644,7 @@ def reduce_sacrifices(events: Iterable[Sacrifice]) -> list[DaggerEffect]:
             eligibility.victim_instance_id, mult_resolution, removal_status,
             condition, status, True, confirmed,
             victim_value, growth, before, after, diagnostic,
-            tuple(dict.fromkeys(event_evidence + eligibility_evidence + input_evidence)),
+            tuple(dict.fromkeys(event_evidence + eligibility_evidence + input_evidence + observed_value_evidence)),
             event.rule_revision,
         ))
     return effects

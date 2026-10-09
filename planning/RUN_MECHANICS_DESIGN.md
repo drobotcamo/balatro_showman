@@ -212,10 +212,47 @@ All three Mult deltas equal `2 × victim.sell_cost`. The matching Dagger
 instance ID is `47973`. At the resolved sample the victim is still in the
 Joker row; the following player-action snapshot no longer lists it. This agrees
 with the loaded source trace that resolves Mult before the victim leaves the
-area. It does not claim that rendered animation order was verified in the video;
-frame-to-step alignment remains unverified. Strict bundle validation reports
-85 records and valid integrity. The session, step, reference, and video hashes
-are retained in the #123 record and `planning/LEARNINGS.md`.
+area. The session, step, reference, and video hashes are retained in the #123
+record and `planning/LEARNINGS.md`.
+
+#### Issue #127 actual-video observation diagnostic
+
+On 2026-10-06, the user visually confirmed the reviewed sample contains the
+three Dagger consumptions. For each marker-derived frame candidate, the samples
+at −3, 0, and +3 frames show the corresponding pre-action screen and Dagger
+Mult; exact candidate frame indices are 2404, 4569, and 5738. The next-step
+candidates 2582, 4767, and 5876 show the post-update Mult. This establishes
+rendered pre-action correspondence within ±3 frames for these three intervals
+only; it does not establish timing for other steps in the recording. Decoded
+presentation timestamps at the three pre-action candidates differ from marker-
+derived elapsed time by −5.197 ms, +7.840 ms, and +4.782 ms, within the selected
+±50 ms tolerance; PTS cadence around these frames alternates 16/17 ms. The reviewed
+visual endpoints and the isolated reference are:
+
+| Reference step | Pre-frame → next-step frame | Video-observed Mult | Reference Mult / delta | Video-only causal result |
+| ---: | ---: | ---: | ---: | --- |
+| 12 | 2404 → 2582 | 0 → 6 | 0 → 6 / +6 | unknown: sell tooltip not observed |
+| 26 | 4569 → 4767 | 6 → 14 | 6 → 14 / +8 | unknown: sell tooltip not observed |
+| 36 | 5738 → 5876 | 14 → 22 | 14 → 22 / +8 | unknown: sell tooltip not observed |
+
+The same video-only adapter was run on the six visually read endpoint fields,
+with no tooltip sell value and no reference-channel data in its inputs. Its
+causal effects abstained on all three aligned intervals (`N=3`, `E=3`, `A=3`,
+`P=0`, `I=0`; `P/E=0`, `A/E=1`, and `C/P` undefined). Separately observed Mult
+endpoints match 6/6 fields and endpoint deltas match 3/3 isolated reference
+deltas. The latter are a validation comparison, not predictions from engine data.
+The `N/E/A/P/I/C` reporting notation follows `planning/FIRST_SLICE_PROTOCOL_V2.md`
+for descriptive accounting only; its first-slice thresholds do not apply to this
+Dagger development sample.
+The adapter carries each unambiguous, ordered observed post-Mult as the next
+run-track baseline, while preserving the prior causal effect as unknown. This is
+one user-reviewed development recording, not model accuracy, held-out scoring,
+or a support/threshold pass. The source-derived victim prices `$3, $4, $4` remain
+reference-only; no sell-value tooltip was read in the selected visual samples.
+This Dagger-specific diagnostic uses #123's recording and mechanics reference;
+the separate #82 first-slice candidates remain unaligned and are not used here.
+It does not claim CV model output or pass #82. Detailed evidence and command
+output are in the #127 issue/PR record and `planning/LEARNINGS.md`.
 
 The owner delegated the boundary choice; D039 selects the three-stage account:
 victim marked/queued, Dagger Mult updated, victim removed. Do not treat the
@@ -331,6 +368,49 @@ visible before/after values may support observed state facts, while a missing
 sell value, instance match, or precise interval leaves the attributed growth
 inferred/unknown. No raw video or external debug export is copied into the
 repository.
+
+### Issue #127 video-like observation fixture
+
+`tests/fixtures/video_like/dagger_v1.json` is a small, versioned **synthetic
+video-like** fixture, not a captured-video dataset, model prediction, held-out
+sample, or evaluation result. Its frozen input and perturbation protocol is
+`planning/VIDEO_LIKE_DAGGER_PROTOCOL_V1.md`. It instantiates the already-approved illustrative
+Dagger values (Mult 6, observed sell-value tooltip $4, expected Mult 14) and
+includes missing tooltip, missing action, ambiguous identity/timing, contradictory
+aftermath, and a distinct known-no-victim zero case. Its `source`/`visual_order` annotations describe hypothetical
+visible intervals; they are not frame references. `timing_status` distinguishes
+an ordered visual sequence from ambiguous/missing event timing; even the ordered
+case does not claim a verified frame-to-oracle alignment.
+
+`run_mechanics/video_like.py` projects the allowlisted `observation` envelope
+into the existing `reduce_sacrifices` reducer. A visible sell-value tooltip is
+accepted as an observed input; if complete source-derived pricing inputs are also
+given, the two values must agree. If pricing cannot be fully derived, a valid
+visible tooltip can still support the interval's growth inference. Track keys are
+visual observation identities and may persist across ordered intervals only when
+continuity is supported; they are not evidence-backed persistent game-instance
+IDs. Missing action, identity, or sell-value evidence remains unknown. Separately
+observed post-Mult and its endpoint delta remain observed state evidence and may
+re-establish a later reducer baseline without resolving the earlier causal effect.
+A contradictory visible post-Mult invalidates the exact reducer result instead of
+selecting either value. Unknown observation
+fields (including engine IDs/answers) are rejected; a sibling
+`engine_reference` payload is intentionally ignored and may only be used by a
+separate comparison step.
+
+Run the diagnostic fixture with:
+
+```text
+python -m run_mechanics.video_like
+python -m pytest -q tests/test_video_like_dagger.py
+```
+
+The synthetic fixture verifies the observation boundary and reducer behavior; it
+does not establish CV accuracy, actual-video alignment, source eligibility, or an
+evaluation threshold. The separate #127 diagnostic above establishes alignment
+and descriptive agreement only for its three reviewed intervals. Other intervals
+in the recording and the distinct #82 first-slice candidates remain unaligned;
+the diagnostic does not score a CV model or pass an evaluation gate.
 
 ### Dagger positive growth (illustrative)
 

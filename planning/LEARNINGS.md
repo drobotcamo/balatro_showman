@@ -83,6 +83,47 @@ under its Decisions section. This file is a knowledge base, not a task log.
   separate 96-step Dagger loss has no original marker; neither is repaired or
   silently associated with a video.
 
+## 2026-10-06: Three Dagger video intervals show matching Mult endpoints
+
+- Context: Issue #127's actual-video diagnostic on the user-associated
+  `1662755302000-5667` recording; video SHA-256
+  `ee7b7dd1c88435349b37fe89b2b4156fcd31c2b2de130ef2c586496a5ca984d5`. The user
+  visually confirmed the sampled sequence contains three Dagger sacrifice/trigger
+  intervals.
+- Observation: At 60 FPS the recording marker maps reference steps 12, 26, and
+  36 to candidate frames 2404, 4569, and 5738. Extracted frames at each candidate
+  and ±3 frames show stable pre-action Dagger Mult 0, 6, and 14; next-step
+  candidates 2582, 4767, and 5876 show 6, 14, and 22. The isolated mechanics
+  reference records respectively `0→6 (+6)`, `6→14 (+8)`, and `14→22 (+8)`.
+  Decoded presentation timestamps at the three pre-action candidates differ from
+  marker-derived elapsed time by −5.197 ms, +7.840 ms, and +4.782 ms. Frame PTS
+  deltas are 16/17 ms around the candidates; the sole 33 ms gap is at the video
+  tail, outside these intervals.
+  The visible endpoint and interval-delta fields therefore match 6/6 and 3/3
+  sampled comparisons. The same video-only adapter, run without tooltip prices,
+  returns unknown causal effects for all three intervals while retaining visible
+  deltas +6/+8/+8; it never copies engine answers or victim prices into inputs.
+- Implication: For these three user-reviewed intervals only, rendered
+  pre-action correspondence is confirmed within ±3 frames. Directly observed
+  Mult endpoints can validate state and support a separate observed delta, while
+  missing tooltip/pricing evidence still makes the reducer's causal sell/growth
+  result abstain. The observed post-state can re-establish a later baseline
+  without making the prior causal effect known. This is one development recording,
+  not CV accuracy, held-out evaluation, a coverage pass, or alignment of the rest
+  of the video.
+- Verification/source: read-only bundle summary reports `valid` integrity, 85 records; `python
+  planning/align_oracle_video.py
+  "F:\OBS_RECORDINGS\oracle_runs_issue123\1662755302000-5667\steps.ndjson"`
+  maps steps 12/26/36 to 2404/4569/5738 and the following steps 13/27/37 to
+  2582/4767/5876. FFprobe decoded 6765 frame PTS values, with 2254 intervals of
+  16 ms, 4509 of 17 ms, and one terminal 33 ms gap. `python -m run_bundle
+  mechanics-reference --db "F:\OBS_RECORDINGS\issue123_dagger_reference.sqlite"
+  --run 1662755302000-5667 --step-id <step-id>` reports valid isolated records.
+  In-memory adapter output: `(step-12, unknown, 0, null, +6)`, `(step-26,
+  unknown, 6, null, +8)`, `(step-36, unknown, 14, null, +8)` where fields are
+  interval, causal-effect status, pre-Mult, inferred post-Mult, visible endpoint
+  delta. Extracted review frames remain in the local temp directory, not Git.
+
 ## 2026-10-04: Existing Dagger video is not an aligned engine-reference capture
 
 - Context: Issue #123 inspection of the Dagger footage identified in

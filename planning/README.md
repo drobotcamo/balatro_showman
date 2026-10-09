@@ -30,6 +30,7 @@ distinct. Analysis is a product now; learning is an optional downstream consumer
 | Provenance and reducer boundary | `PHASE0_INVENTORY.md`, `PERSISTENT_STATE_OWNERSHIP.md` |
 | Decisions, findings and commands | `DECISIONS.md`, `LEARNINGS.md`, `TOOLING.md` |
 | Mechanics interface, Dagger source findings and checks | `RUN_MECHANICS_DESIGN.md`, `dagger_sell_value.md`, `schemas/run_mechanics_v0_1.schema.json`, `mechanics_contract_check.py`, `../run_mechanics/dagger.py` |
+| #127 video-like Dagger inputs | `VIDEO_LIKE_DAGGER_PROTOCOL_V1.md`, `../tests/fixtures/video_like/dagger_v1.json`, `../run_mechanics/video_like.py` |
 
 Component contracts cover vocabulary/geometry, visual generation/inference,
 composition/reduction/events, evidence/storage and analytics. #122 publishes the
