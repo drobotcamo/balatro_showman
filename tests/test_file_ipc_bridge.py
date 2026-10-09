@@ -230,7 +230,8 @@ class FileIpcBridgeTests(unittest.TestCase):
             "trigger": "mail_in_rebate", "occurrence_id": "rebate:no-rank", "interval_id": "mechanics:1",
             "rule_revision": "balatro-test:mail-in-rebate-v1",
             "rebate_instance_token": "rebate-1", "discarded_instance_token": "stone-card",
-            "target_rank_id": 8, "target_rank": "8", "discarded_rank_id": -37134,
+            "target_rank_id": 8, "target_rank": "8", "discarded_rank_id": 3,
+            "discarded_effective_rank_id": -37134,
             "discarded_rank": "3", "debuffed": False, "bonus_per_trigger": 5,
             "trigger_multiplicity": 0, "direct_contribution": 0,
             "pre_capture_timestamp_ns": 100, "resolved_capture_timestamp_ns": 200,
@@ -238,6 +239,12 @@ class FileIpcBridgeTests(unittest.TestCase):
         }]
         self.assertEqual(
             _validate_mechanics_reference({"mechanics_reference": no_rank}), no_rank
+        )
+        legacy_no_rank = json.loads(json.dumps(no_rank))
+        legacy_no_rank["mechanics_effects"][0].pop("discarded_effective_rank_id")
+        legacy_no_rank["mechanics_effects"][0]["discarded_rank_id"] = -37134
+        self.assertEqual(
+            _validate_mechanics_reference({"mechanics_reference": legacy_no_rank}), legacy_no_rank
         )
         invalid_formula = json.loads(json.dumps(record))
         invalid_formula["mechanics_effects"][0]["direct_contribution"] = 11

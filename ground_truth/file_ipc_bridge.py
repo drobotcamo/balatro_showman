@@ -184,19 +184,32 @@ def _validate_mechanics_reference(snapshot: dict[str, Any]) -> dict[str, Any] | 
                         isinstance(number, bool) or not isinstance(number, (int, float))
                         or not math.isfinite(number) or number < 0):
                     raise ValueError(f"{label}.{field} must be a non-negative finite number or null")
-            discarded_get_id = effect.get("discarded_rank_id")
-            if discarded_get_id is not None and (
-                    isinstance(discarded_get_id, bool) or not isinstance(discarded_get_id, int)):
-                raise ValueError(f"{label}.discarded_rank_id must be an integer or null")
             for field in ("target_rank_id", "trigger_multiplicity"):
                 number = effect.get(field)
                 if number is not None and type(number) is not int:
                     raise ValueError(f"{label}.{field} must be an integer or null")
+            if effect.get("target_rank_id") is not None and effect["target_rank_id"] < 0:
+                raise ValueError(f"{label}.target_rank_id must be non-negative")
+            if effect.get("discarded_effective_rank_id") is not None:
+                if type(effect["discarded_rank_id"]) is not int or effect["discarded_rank_id"] < 0:
+                    raise ValueError(f"{label}.discarded_rank_id must be a non-negative actual rank id")
+                if type(effect["discarded_effective_rank_id"]) is not int:
+                    raise ValueError(f"{label}.discarded_effective_rank_id must be an integer or null")
+            elif (effect.get("discarded_rank_id") is not None
+                    and type(effect["discarded_rank_id"]) is not int):
+                raise ValueError(f"{label}.discarded_rank_id must be an integer or null")
             if effect.get("debuffed") is not None and type(effect["debuffed"]) is not bool:
                 raise ValueError(f"{label}.debuffed must be boolean or null")
             status = effect.get("status")
             if status not in {"observed", "unknown"}:
                 raise ValueError(f"{label}.status must be observed or unknown")
+            if ("discarded_effective_rank_id" in effect
+                    and effect["discarded_effective_rank_id"] is not None
+                    and type(effect["discarded_effective_rank_id"]) is not int):
+                raise ValueError(f"{label}.discarded_effective_rank_id must be an integer or null")
+            if (status == "observed" and "discarded_effective_rank_id" in effect
+                    and effect["discarded_effective_rank_id"] is None):
+                raise ValueError(f"{label} observed result is missing discarded_effective_rank_id")
             fields = (*string_fields, "target_rank_id", "discarded_rank_id", "debuffed",
                       "bonus_per_trigger", "trigger_multiplicity", "direct_contribution")
             if status == "observed":
@@ -204,7 +217,8 @@ def _validate_mechanics_reference(snapshot: dict[str, Any]) -> dict[str, Any] | 
                     raise ValueError(f"{label} observed result is missing a required value")
                 if effect["direct_contribution"] != effect["bonus_per_trigger"] * effect["trigger_multiplicity"]:
                     raise ValueError(f"{label}.direct_contribution contradicts multiplicity")
-                if effect["discarded_rank_id"] != effect["target_rank_id"] or effect["debuffed"]:
+                effective_rank_id = effect.get("discarded_effective_rank_id", effect["discarded_rank_id"])
+                if effective_rank_id != effect["target_rank_id"] or effect["debuffed"]:
                     if effect["direct_contribution"] != 0:
                         raise ValueError(f"{label} non-qualifying participation must have zero contribution")
     return value

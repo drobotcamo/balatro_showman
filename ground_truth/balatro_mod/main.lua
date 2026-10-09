@@ -1280,10 +1280,11 @@ local function encode_rebate_reference(row)
     .. ',"discarded_instance_token":' .. j_scalar(row.card_token)
     .. ',"target_rank_id":' .. j_scalar(row.target_rank_id)
     .. ',"target_rank":' .. j_scalar(row.target_rank)
-    -- In this producer revision, discarded_rank_id is Card:get_id(), the value
-    -- the game compares to the target. SMODS no-rank cards may return a random
-    -- negative sentinel; discarded_rank remains the card's actual base value.
+    -- Keep the actual base rank separate from Card:get_id(), which the game
+    -- compares with the target. SMODS no-rank cards can return a random negative
+    -- sentinel even while base.id/base.value still retain the actual rank.
     .. ',"discarded_rank_id":' .. j_scalar(row.discarded_rank_id)
+    .. ',"discarded_effective_rank_id":' .. j_scalar(row.discarded_effective_rank_id)
     .. ',"discarded_rank":' .. j_scalar(row.discarded_rank)
     .. ',"debuffed":' .. j_scalar(row.debuffed)
     .. ',"bonus_per_trigger":' .. j_scalar(row.bonus_per_trigger)
@@ -1507,7 +1508,8 @@ local function capture_rebate_invocation(self, context, original, ...)
     card_token = card_token,
     target_rank_id = try(function() return target.id end),
     target_rank = try(function() return target.rank end),
-    discarded_rank_id = try(function() return other:get_id() end),
+    discarded_rank_id = try(function() return other.base.id end),
+    discarded_effective_rank_id = try(function() return other:get_id() end),
     discarded_rank = try(function() return other.base.value end),
     debuffed = try(function() return other.debuff end),
     bonus_per_trigger = try(function() return self.ability.extra end),
@@ -1524,11 +1526,12 @@ local function capture_rebate_invocation(self, context, original, ...)
   active_rebate_invocation = parent
   if not ok then error(results, 0) end
   row.resolved_timestamp_ns = capture_timestamp_ns()
-  local qualifying = row.target_rank_id ~= nil and row.discarded_rank_id ~= nil
-    and row.target_rank_id == row.discarded_rank_id and not row.debuffed
+  local qualifying = row.target_rank_id ~= nil and row.discarded_effective_rank_id ~= nil
+    and row.target_rank_id == row.discarded_effective_rank_id and not row.debuffed
   local inputs_complete = row.rebate_token ~= nil and row.card_token ~= nil
     and row.target_rank_id ~= nil and row.target_rank ~= nil
-    and row.discarded_rank_id ~= nil and row.discarded_rank ~= nil
+    and row.discarded_rank_id ~= nil and row.discarded_effective_rank_id ~= nil
+    and row.discarded_rank ~= nil
     and row.debuffed ~= nil and type(row.bonus_per_trigger) == "number"
   if not qualifying then
     row.direct_contribution = 0
