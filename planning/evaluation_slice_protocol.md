@@ -45,10 +45,12 @@ still selects the nearest frame and does not prove the exact action instant.
 `review.status` and pilot `reviewed`/`coverage` metrics remain self-reported
 claims, not identity-verified QA. This pilot is not held-out evidence.
 
-The JSON Schema validates the manifest's JSON structure and field constraints.
-The runtime validator also checks row uniqueness and cross-manifest split
-invariants that JSON Schema cannot express. Input files are parsed as strict
-JSON; non-standard `NaN`/`Infinity` constants are rejected before validation.
+The JSON Schema validates the manifest's JSON structure and field constraints;
+it is not equivalent to the runtime validator. Runtime validation also rejects
+duplicate frame IDs/indices and checks cross-manifest split invariants that JSON
+Schema cannot express. Exporters must use the runtime validator, not the schema
+alone. Input files are parsed as strict JSON; non-standard `NaN`/`Infinity`
+constants are rejected before validation.
 
 The manifest is an external, deterministic artifact distinct from provenance
 manifests, SQLite run bundles, and broad Phase 9 exports.

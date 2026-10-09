@@ -169,6 +169,21 @@ def test_manifest_schema_accepts_valid_manifest_and_rejects_invalid_instances():
         assert validate_manifest(candidate), index
         assert not validator.is_valid(candidate), index
 
+def test_runtime_enforces_duplicate_frame_keys_beyond_json_schema():
+    from jsonschema import Draft202012Validator
+
+    schema_path = Path(__file__).resolve().parents[1] / "planning" / "evaluation_manifest.schema.json"
+    validator = Draft202012Validator(json.loads(schema_path.read_text(encoding="utf-8")))
+    value = manifest()
+    value["frames"][1]["frame_id"] = value["frames"][0]["frame_id"]
+    assert any("duplicate frame_id" in error for error in validate_manifest(value))
+    assert validator.is_valid(value)
+
+    value = manifest()
+    value["frames"][1]["frame_index"] = value["frames"][0]["frame_index"]
+    assert any("duplicate source frame_index" in error for error in validate_manifest(value))
+    assert validator.is_valid(value)
+
 def test_held_out_export_requires_and_checks_development_split_context(tmp_path: Path):
     development = manifest()
     held_out = manifest()
