@@ -64,10 +64,13 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
         annotations = frame.get("annotations")
         if not isinstance(annotations, dict):
             continue
+        if any(not isinstance(field, str) for field in annotations):
+            errors.append(f"{prefix}.annotations field names must be strings")
+            continue
         unsupported = set(annotations) - SUPPORTED_FIELDS
         if unsupported: errors.append(f"{prefix} has unsupported fields: {','.join(sorted(unsupported))}")
         for field, value in annotations.items():
-            if not isinstance(value, dict) or value.get("status") not in STATUSES: errors.append(f"{prefix}.annotations.{field} has invalid status")
+            if not isinstance(value, dict) or not isinstance(value.get("status"), str) or value["status"] not in STATUSES: errors.append(f"{prefix}.annotations.{field} has invalid status")
             elif value.get("status") == "observed" and "raw" not in value: errors.append(f"{prefix}.annotations.{field} lacks raw value")
             if isinstance(value, dict) and "normalized" in value and "raw" not in value: errors.append(f"{prefix}.annotations.{field} normalized value lacks raw value")
             if isinstance(value, dict) and any(key in value for key in ("oracle", "ground_truth", "reference_value")): errors.append(f"{prefix}.annotations.{field} contains oracle/reference data")
@@ -130,8 +133,13 @@ def pilot_report(manifest: dict[str, Any]) -> dict[str, Any]:
     exclusions = sum(1 for f in frames if isinstance(f, dict) and f.get("excluded") is True)
     return {"frames": len(frames), "reviewed": reviewed, "coverage": reviewed / len(frames) if frames else 0.0, "disagreements": disagreements, "missing_or_unavailable_values": missing, "exclusions": exclusions}
 
-def export_manifest(manifest: dict[str, Any], destination: Path) -> None:
+def export_manifest(manifest: dict[str, Any], destination: Path, split_context: list[dict[str, Any]] | None = None) -> None:
     errors = validate_manifest(manifest)
+    if isinstance(manifest, dict) and isinstance(manifest.get("source"), dict) and manifest["source"].get("split") == "held_out":
+        if split_context is None:
+            errors.append("held-out export requires split_context manifests")
+        else:
+            errors.extend(validate_split_assignments([*split_context, manifest]))
     if errors: raise ValueError("invalid evaluation manifest: " + "; ".join(errors))
     result = dict(manifest)
     result["frames"] = sorted(manifest["frames"], key=lambda f: (f["frame_index"], f["frame_id"]))
@@ -141,8 +149,11 @@ def export_manifest(manifest: dict[str, Any], destination: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("input", type=Path); parser.add_argument("output", type=Path)
+    parser.add_argument("--split-context", type=Path, action="append", default=[], help="development/other split manifests used to validate held-out separation")
     args = parser.parse_args()
-    export_manifest(json.loads(args.input.read_text(encoding="utf-8")), args.output)
+    manifest = json.loads(args.input.read_text(encoding="utf-8"))
+    split_context = [json.loads(path.read_text(encoding="utf-8")) for path in args.split_context]
+    export_manifest(manifest, args.output, split_context=split_context if args.split_context else None)
     return 0
 
 if __name__ == "__main__": raise SystemExit(main())
