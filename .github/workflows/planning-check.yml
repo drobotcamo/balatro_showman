@@ -42,7 +42,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: python -m pip install "SQLAlchemy>=2.0,<3" "alembic>=1.13,<2" "pytest>=9,<10"
+      - run: python -m pip install "SQLAlchemy>=2.0,<3" "alembic>=1.13,<2" "pytest>=9,<10" "jsonschema>=4.26,<5"
       - run: python -m pytest -q tests/test_file_ipc_bridge.py tests/test_balatro_mod.py tests/test_run_bundle*.py
+      - run: python -m pytest -q tests/test_evaluation_manifest.py
       - run: python3 tools/issue_tags.py check
       - run: python3 planning/check_contracts.py

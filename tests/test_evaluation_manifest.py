@@ -126,6 +126,37 @@ def test_schema_enums_match_runtime_contract():
     assert finite_number["minimum"] == -finite_number["maximum"]
     assert frame_properties["annotations"]["additionalProperties"]["properties"]["raw"]["$ref"] == "#/$defs/jsonValue"
 
+def test_manifest_schema_accepts_valid_manifest_and_rejects_invalid_instances():
+    from jsonschema import Draft202012Validator
+
+    schema_path = Path(__file__).resolve().parents[1] / "planning" / "evaluation_manifest.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    Draft202012Validator.check_schema(schema)
+    validator = Draft202012Validator(schema)
+    valid = manifest()
+    assert not validate_manifest(valid)
+    assert validator.is_valid(valid)
+
+    mutations = [
+        lambda value: value.update(extra=True),
+        lambda value: value["source"].update(video_sha256="invalid"),
+        lambda value: value["source"].update(width=True),
+        lambda value: value["frames"][0]["mapping"].update(width=0),
+        lambda value: value["frames"][0].update(synthetic_background=True),
+        lambda value: value["frames"][0]["annotations"].update(unrecognized={"status": "unknown"}),
+        lambda value: value["frames"][0]["annotations"].update(page={"status": "observed"}),
+        lambda value: value["frames"][0]["annotations"].update(page={"status": "unknown", "normalized": "shop"}),
+        lambda value: value["frames"][0]["annotations"].update(page={"status": "observed", "raw": "shop", "oracle": "shop"}),
+        lambda value: value["frames"][0]["annotations"].update(page={"status": "observed", "raw": "shop", "contradictory": True}),
+        lambda value: value["frames"][0].pop("review"),
+        lambda value: value["frames"][0]["review"].pop("disagreement"),
+    ]
+    for index, mutate in enumerate(mutations):
+        candidate = manifest()
+        mutate(candidate)
+        assert validate_manifest(candidate), index
+        assert not validator.is_valid(candidate), index
+
 def test_held_out_export_requires_and_checks_development_split_context(tmp_path: Path):
     development = manifest()
     held_out = manifest()

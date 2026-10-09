@@ -107,7 +107,7 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
             if isinstance(value, dict):
                 unknown = set(value) - {"status", "raw", "normalized", "contradictory", "oracle", "ground_truth", "reference_value"}
                 if unknown: errors.append(f"{prefix}.annotations.{field} has unknown fields: {','.join(sorted(map(str, unknown)))}")
-            elif value.get("status") == "observed" and "raw" not in value: errors.append(f"{prefix}.annotations.{field} lacks raw value")
+            if isinstance(value, dict) and value.get("status") == "observed" and "raw" not in value: errors.append(f"{prefix}.annotations.{field} lacks raw value")
             if isinstance(value, dict) and "normalized" in value and "raw" not in value: errors.append(f"{prefix}.annotations.{field} normalized value lacks raw value")
             if isinstance(value, dict) and any(key in value for key in ("oracle", "ground_truth", "reference_value")): errors.append(f"{prefix}.annotations.{field} contains oracle/reference data")
             if isinstance(value, dict) and _has_nonfinite(value): errors.append(f"{prefix}.annotations.{field} contains non-finite number")
