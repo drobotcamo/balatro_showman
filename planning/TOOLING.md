@@ -7,7 +7,9 @@ This is a maintained runbook, not a log of every command ever attempted.
 
 - Platform: Windows
 - Shell: PowerShell 7+
-- Repository root: `C:\Users\camgr\Documents\code_projects\balatro_showman`
+- Repository root: the active checkout/worktree (`git rev-parse --show-toplevel`);
+  `C:\Users\camgr\Documents\code_projects\balatro_showman` is one historical
+  checkout, not necessarily the current worktree.
 - Python environment: repository `.venv` when available; `py -3` as fallback
 
 ### Python interpreter
@@ -81,62 +83,19 @@ Conformance gaps (coarse actions, empty `persistent_state`, missing
 
 ### Record a live oracle run
 
-The Lua producer writes snapshots to `%APPDATA%\Balatro\agent_io`; the
-repository bridge consumes them, acknowledges each action, and writes one run
-directory containing `session.json` and `steps.ndjson`.
-This recipe exercises oracle delivery, not verified video capture. Before
-inviting a user to make a video or associating a run with one, follow the
-existing-evidence inventory, staged live preflight and applicable human
-checkpoint in `planning/RUN_BUNDLE_OPERATIONS.md`. Verify the loaded runtime;
-the dated paths and producer build here are not current-state evidence.
-For a new capture with automatic bundle intake, use `python -m showman record`
-with `--bundle-db` as described in `docs/capture/README.md`; the standalone
-bridge recipe below is for oracle-directory diagnostics without bundle intake.
+The current command and default location are in `docs/capture/README.md` →
+“Record a new session” and `docs/capture/archive.md` → “Capture going
+forward.” Use `planning/RUN_BUNDLE_OPERATIONS.md` for the staged live preflight
+and recording-association checkpoint. These guides require the installed and
+loaded producer checks, one IPC consumer, an already migrated catalog and
+paired `captures`/`catalog.sqlite` paths. Never infer that a run was imported
+because a directory exists.
 
-1. Install the producer revision using the reversible, hash-checked procedure
-   in `planning/BRIDGE_SPIKE.md` → Installation. It keeps the previous mod tree
-   outside `Mods`, avoiding duplicate mod IDs. Restart Balatro completely and
-   verify both the source/installed SHA-256 and the loaded build in the latest
-   Lovely log before starting a capture.
-2. From the repository root, start the recorder before starting a run:
-
-   ```powershell
-   py -3 ground_truth\file_ipc_bridge.py `
-     --out-dir "F:\OBS_RECORDINGS\oracle_runs"
-   ```
-
-   The default IPC directory is `%APPDATA%\Balatro\agent_io`. Use
-   `--io-dir` only when the game uses a different directory. Leave this
-   process running while playing; stop it with Ctrl+C after the run ends.
-3. Start a new Balatro run and play through the states being evaluated. For
-   shop/pack offering coverage, enter the shop and open at least one booster
-   pack. A clean audit requires the run to end in a win or loss so
-   `run_end_<run_id>.json` supplies the terminal request watermark; the bridge
-   finalizes `session.json` after every request through that watermark persists.
-4. Find the new child directory under the `--out-dir` path. Its name is the
-   producer `run_id`, for example `1790821374-5833`.
-5. Audit it from the repository root:
-
-   ```powershell
-   py -3 planning\audit_oracle_runs.py `
-     "F:\OBS_RECORDINGS\oracle_runs\<run_id>"
-   ```
-
-   For offering coverage, confirm `oracle run integrity OK`,
-   `offering_objects_total > 0`, all expected names in
-   `offering_zones_present`, an empty `offering_zones_missing`, and
-   `offering_position_missing: 0`.
-
-The bridge records the producer's `action_taken`; it does not choose actions.
-If the run is stopped before win/loss, inspect `steps.ndjson` directly for
-partial evidence, but expect the integrity audit to reject a null session
-outcome. External run directories are evidence only and must not be committed.
-When finished testing, restore the backed-up mod file if the staged producer
-was not intended to remain installed.
-
-Known machine-specific evidence: the verified capture used Balatro
-`1.0.1o-FULL`, Steamodded `26.926.0~dev-a`, Lovely `0.10.0`, and output under
-`F:\OBS_RECORDINGS\oracle_runs` on 2026-09-30/2026-10-01.
+The `F:\OBS_RECORDINGS\oracle_runs` root and the standalone bridge command in
+older Issue #6 procedures describe historical evidence. They are not the
+destination for a new operational catalog capture. The 2026-09-30/2026-10-01
+captures used Balatro `1.0.1o-FULL`, Steamodded `26.926.0~dev-a` and Lovely
+`0.10.0`; recheck the loaded runtime before any new capture.
 
 Add commands here only after they have been run successfully in this repository.
 Each recipe must state its working directory, inputs, expected result, and known

@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -114,6 +116,14 @@ def test_inventory_excludes_new_live_root(tmp_path):
     live.mkdir(parents=True)
     (live / "session.json").write_text(json.dumps({"run_id": "new", "n_steps": 5}), encoding="utf-8")
     assert archive.inventory(tmp_path)["count"] == 1
+
+
+def test_archive_help_reaches_the_real_subcommands():
+    result = subprocess.run([sys.executable, "-m", "showman", "archive", "--help"],
+                            capture_output=True, text=True)
+    assert result.returncode == 0
+    assert "sync-associations" in result.stdout
+    assert "stage-video" in result.stdout
 
 
 def test_direct_recorder_registers_versioned_capture_without_guessing_installed_commit(

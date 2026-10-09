@@ -4,12 +4,14 @@ Showman Capture records and inspects gameplay evidence for Balatro Showman.
 Start with an existing artifact or the synthetic demo. Live capture requires
 the game bridge and OBS setup; inspection does not.
 
-**Operational archive:** The default on this Windows machine is
+**Operational archive:** The designated location on this Windows machine is
 `F:\OBS_RECORDINGS\showman-archive` with one `catalog.sqlite` and
 `captures/<run-id>/` evidence directories. See [archive and naming
 rules](archive.md) before choosing a recording destination, moving evidence,
-or launching a catalog-backed review. Set `SHOWMAN_ARCHIVE_ROOT` explicitly;
-the tools do not infer a drive or redirect an existing recorder/OBS process.
+or launching a catalog-backed review. `showman archive` requires
+`SHOWMAN_ARCHIVE_ROOT` or `--root`; `showman record` always requires explicit
+`--out-dir` and `--bundle-db` for catalog intake. Neither command infers the
+drive or redirects an existing recorder/OBS process.
 
 ## First ten minutes
 
@@ -19,13 +21,15 @@ the tools do not infer a drive or redirect an existing recorder/OBS process.
 2. Read the [vocabulary](vocabulary.md). Identify whether your input is a video,
    capture directory, SQLite bundle, or annotations document.
 3. Select Python 3.11+ in an environment with the declared dependencies.
-   Check it with `python --version` and `python -m showman --help`. On this
+   Check it with `py -3 --version` and `py -3 -m showman --help`. On this
    Windows machine `py -3` works; the repository `.venv` has historically pointed
    to a missing interpreter. See [Tooling](../../planning/TOOLING.md).
-4. Run the demo below, then inspect its first record and provenance. A successful
-   demo establishes local capture/storage access, not a working game installation.
-5. For real evidence, inspect status and diagnostics before making any claim.
-   Read the [API reference](reference.md) for result and exit-code meanings.
+4. For real evidence, follow [archive setup](archive.md) to set
+   `SHOWMAN_ARCHIVE_ROOT` and run `py -3 -m showman archive list`; inspect run
+   status and diagnostics. Read the [API reference](reference.md) for results
+   and exit codes.
+5. For an isolated storage check without a game, run the synthetic demo below.
+   It proves local access, not a working game installation or recording.
 
 If dependencies are absent, create/use your chosen environment and install the
 versions declared in `pyproject.toml` (`SQLAlchemy>=2.0,<3`, `alembic>=1.13,<2`).
@@ -107,7 +111,11 @@ python -m showman capture audit <capture-directory>
 findings separately. It can reject a useful unfinished slice for lacking a full
 run outcome. Preserve that limit rather than inventing a terminal outcome.
 
-## Create a store and import an existing capture
+## Standalone bundles outside the operational archive
+
+The following commands are for a separate fixture, recovery investigation or
+explicitly selected legacy bundle. They are **not** the procedure for recording
+into the F-drive catalog; use [archive staging](archive.md) for that.
 
 ```text
 python -m showman store init --db <new-bundle.sqlite>
@@ -130,37 +138,42 @@ intake. See the reference for source-neutral adapter intake.
 
 ## Record a new session
 
-Complete the approved runtime/preparation procedure in
+Check the approved runtime/preparation procedure in
 [Bridge installation](../../planning/BRIDGE_SPIKE.md#installation-reversible)
 and [runtime reference](../../planning/BALATRO_RUNTIME.md). Verify the installed
 producer hash, loaded build, runtime/mod configuration, single consumer, IO
 directory, destination, and recording settings. Preserve stale queue/marker
-evidence rather than deleting it. The producer currently targets the documented
+evidence rather than deleting it. Installing or restarting is a separate,
+reversible, authorized action; an existing healthy producer need not be
+reinstalled. The producer currently targets the documented
 Windows Balatro/Steamodded/Lovely runtime; portable Python inspection does not
 establish another game's runtime support.
 
-Initialize the destination bundle once, then start the Recorder:
+After the current recorder is verified stopped and the terminal watermark is
+drained, check the installed and *loaded* producer build, OBS hook, destination,
+FPS, queue and single-consumer ownership using the [live preflight](../../planning/RUN_BUNDLE_OPERATIONS.md#existing-evidence-and-capture-preflight).
+Do not stop or retarget a live process to follow this example. On this machine,
+the archive already exists; set its root and use **both** destination arguments:
 
-For new captures after the current live recorder is stopped and its queue
-drained, use the archive's existing `catalog.sqlite` and `captures` directory
-together as described in [archive.md](archive.md). Do not start a second
-consumer or change OBS's video destination as part of this command.
-
-```text
-python -m showman record --io-dir <agent_io> --out-dir <capture-root> --bundle-db <bundle.sqlite>
+```powershell
+$env:SHOWMAN_ARCHIVE_ROOT = 'F:\OBS_RECORDINGS\showman-archive'
+py -3 -m showman archive list
+py -3 -m showman record --io-dir (Join-Path $env:APPDATA 'Balatro\agent_io') `
+  --out-dir (Join-Path $env:SHOWMAN_ARCHIVE_ROOT 'captures') `
+  --bundle-db (Join-Path $env:SHOWMAN_ARCHIVE_ROOT 'catalog.sqlite')
 ```
 
-`--bundle-db` is optional. Without it, capture directories are still written.
-With it, complete terminal sessions import automatically; there is no per-run
-confirmation prompt. An import failure is logged as pending and retried, not
-converted into a successful stored run. Verify the database after capture.
-Only a run written directly under the archive's `captures` directory and
-imported into that archive's `catalog.sqlite` is automatically registered for
-`archive list`; other configured bundles still use the normal inspector.
-The recorder stamps `capture_build` on newly created sessions: a bridge/producer
-Git commit only if the captured implementation bytes match that commit, plus
-the installed producer SHA-256 when available. `unknown` for an older or
-modified build must not be replaced with a guessed revision.
+`--bundle-db` is optional for isolated diagnostics but omitting it means there
+is **no** automatic catalog intake. Complete terminal sessions imported into
+the paired archive path are registered in `archive list`; an active session is
+still only in its capture directory. Import failures stay pending for retry,
+not successful stored runs. After a terminal signal and queue drain, verify
+both `archive list` and `showman inspect validate --db
+"$env:SHOWMAN_ARCHIVE_ROOT\catalog.sqlite" --run <run-id> --strict`.
+The recorder stamps `capture_build` on new sessions: clean-checkout bridge and
+installed-producer Git revisions where verified, plus the installed producer
+SHA-256 when available. The loaded game build needs its separate log check;
+older or modified builds must not acquire a guessed revision.
 
 Load `ground_truth/obs_recording_start.py` in OBS Tools > Scripts. Use a fully
 expanded absolute IO path, the actual recording FPS, and a recording-ID prefix.
@@ -188,6 +201,11 @@ source evidence or substitute a stale shared-directory marker.
 python -m showman associate --db <bundle.sqlite> --run <run-id> --marker <marker.json> --video <video.mkv> --confirmed-by <human-identity>
 python -m showman align <capture-directory>/steps.ndjson
 ```
+
+For the catalog, use `--db "$env:SHOWMAN_ARCHIVE_ROOT\catalog.sqlite"` in
+PowerShell. After an explicit confirmed association, run
+`py -3 -m showman archive sync-associations` to refresh its video lookup; an
+OBS marker by itself does not make a run available to `archive review`.
 
 Association presents the observed run/lifecycle, marker validation, policy, and
 present items on stderr. The human must type `confirm`, `decline`, or
@@ -238,7 +256,7 @@ populate observations from oracle values.
 ## Checks for changes to these surfaces
 
 ```text
-python -m pytest -q tests/test_run_bundle_showman_cli.py tests/test_file_ipc_bridge.py tests/test_run_bundle*.py tests/test_recording_association.py tests/test_align_oracle_video.py tests/test_eval_manifest.py
+python -m pytest -q tests/test_showman_archive.py tests/test_run_bundle_showman_cli.py tests/test_file_ipc_bridge.py tests/test_run_bundle*.py tests/test_recording_association.py tests/test_align_oracle_video.py tests/test_eval_manifest.py
 python planning/check_contracts.py
 git diff --check
 ```

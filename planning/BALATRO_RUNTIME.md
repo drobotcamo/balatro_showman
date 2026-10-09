@@ -1,10 +1,16 @@
 # Local Balatro Runtime Reference
 
-Updated: 2026-10-02
+Evidence snapshots: 2026-10-02 through 2026-10-09. Recheck the live machine.
 
 This file records verified paths on the current development machine. Paths are
 machine-specific and are references for agents, not repository dependencies.
 Do not copy saves, logs, dumps, mods, or game assets into this repository.
+The sections below are **dated observations**, not a live process, OBS or
+destination configuration. For new recording paths and catalog intake use
+`docs/capture/README.md` and `docs/capture/archive.md`; follow
+`planning/RUN_BUNDLE_OPERATIONS.md` for a fresh preflight. In particular, an
+Issue #82 recorder and OBS were active when the archive was staged; do not use
+this file's old “no new start event” snapshot to infer their present state.
 
 ## Verified paths
 
@@ -17,7 +23,7 @@ Do not copy saves, logs, dumps, mods, or game assets into this repository.
 | Steamodded config | `C:\\Users\\camgr\\AppData\\Roaming\\Balatro\\config\\Steamodded.jkr` | Config file present |
 | Profiles and saves | `C:\\Users\\camgr\\AppData\\Roaming\\Balatro\\1` | `profile.jkr`, `save.jkr`, `meta.jkr` present |
 
-## Current runtime and recording configuration
+## Runtime and recording configuration observed 2026-10-02
 
 - Game version in the latest generated Lovely game dump: `1.0.1o-FULL`
 - The installed `Balatro.exe` reports file/product version `11.5 r1`/`11.5`; this
@@ -58,7 +64,7 @@ The 2026-10-02 18:08:28 launch log also reports a Handy atlas key collision and
 several Lovely pattern warnings. Do not silently change the mod set for capture;
 record the selected configuration and any observed warnings as provenance.
 
-## Capture readiness
+## Capture readiness observed 2026-10-02
 
 The checked-in queue producer is build `issue81-file-queue-1`, manifest
 `0.2.0`, SHA-256

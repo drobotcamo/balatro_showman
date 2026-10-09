@@ -16,6 +16,14 @@ against a Lua ground-truth oracle. `planning/README.md` is the planning index.
   and an OBS marker is not a confirmed video association. Never retarget an
   active recorder/OBS or move its evidence. Inventory, hash-check and preserve
   historical originals when staging into the catalog.
+- For a new run, follow `docs/capture/README.md` → “Record a new session” →
+  `docs/capture/archive.md` → “Capture going forward” →
+  `planning/RUN_BUNDLE_OPERATIONS.md` → “Existing Evidence And Capture
+  Preflight.” Use `planning/BRIDGE_SPIKE.md` for installation/loaded-build
+  checks, `planning/BALATRO_RUNTIME.md` for dated machine evidence, and
+  `docs/capture/video-review.md` for video QA. The copy-paste recorder command
+  is in the capture README; dated issue-specific roots in older runbooks are
+  evidence locations, not new destinations.
 - Resuming work: read the relevant
   `planning/agent-state/threads/<issue-number-or-tag>-<short-name>.md`.
 - Changing a component: read its contract in `planning/components/` first.

@@ -30,16 +30,27 @@ python -m run_bundle <command> --db <bundle.sqlite> ...
 separate engine-answer channel. `validate --strict` requests strict diagnostics; inspection never
 repairs evidence or changes lifecycle state.
 
-Database setup is separate and mutating:
+Database setup is separate and mutating. For an **explicitly approved** upgrade
+of the existing catalog, the archive command backs it up before invoking
+Alembic:
 
-```text
-alembic upgrade head
+```powershell
+py -3 -m showman archive upgrade --root 'F:\OBS_RECORDINGS\showman-archive'
 ```
 
-Run it only when creating or upgrading a bundle under the storage procedure in
-`planning/RUN_BUNDLE_STORAGE.md`. Do not run migrations as part of inspection.
+Do not run a bare `alembic upgrade head`: `alembic.ini` contains a generic
+relative filename that is not the F-drive catalog. For a standalone bundle,
+set its `sqlalchemy.url` deliberately under the storage procedure in
+`planning/RUN_BUNDLE_STORAGE.md`. Do not migrate during inspection or merely
+to start a recording; the catalog was already initialized and migrated.
 
 ## Automatic File-IPC Intake
+
+For a new operational capture, use `docs/capture/README.md` → “Record a new
+session” and the paired `showman-archive/captures` and `catalog.sqlite` paths.
+The generic bridge command below describes the lower-level interface and does
+not itself register a new session in the archive catalog when pointed elsewhere.
+Do not start it alongside a running `showman record` consumer.
 
 After migrating the destination once, configure the recorder with the existing
 file source and bundle. The bridge never runs migrations:

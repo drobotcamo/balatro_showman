@@ -40,7 +40,7 @@ not independent visual QA or scored annotation.
 | --- | --- | --- |
 | Operational database | `showman-archive/catalog.sqlite` | One default catalog, schema migration tracked by Alembic. Do not put it under the recorder's capture directory. |
 | Capture segment | `showman-archive/captures/<producer-run-id>/session.json`, `steps.ndjson`, optional `mechanics_reference.ndjson` and diagnostics | Preserve raw bytes and original producer ID. The directory name is a locator, not a whole-play ID. |
-| Original video | `showman-archive/videos/<OBS-generated-filename>.mkv` | Retain OBS's filename; rely on an explicit recording ID, confirmed association, video hash and/or reviewed grouping rather than renaming by run ID. |
+| Video | `showman-archive/videos/<OBS-generated-filename>.mkv` | Historical members are checked copies of confirmed originals; future members may be new OBS originals after a separately verified settings change. Retain the native filename and track identity by confirmation and hash, not by run ID. |
 | QA derivative | `showman-archive/reviews/<review-id>/` | Keep hash-linked source references and unscored status. |
 | Older bundles/sources | Their existing paths under `F:\OBS_RECORDINGS` | Keep while their absolute links and active users exist. No inferred rename or deletion. |
 
@@ -53,15 +53,14 @@ the capture directory (for example `NOTE.txt`) are copied and verified too.
 
 ## Capture going forward
 
-Do not retarget a running recorder or OBS process. Once the operator has stopped
-recording and the producer terminal watermark has drained, verify the intended
-IPC path and only one recorder, the installed/loaded Lua build and source hash,
-OBS script/FPS/destination, and the existing queue as described in
-`planning/RUN_BUNDLE_OPERATIONS.md`. With an already migrated catalog, use:
-
-```powershell
-py -3 -m showman record --io-dir 'C:\Users\camgr\AppData\Roaming\Balatro\agent_io' --out-dir "$env:SHOWMAN_ARCHIVE_ROOT\captures" --bundle-db "$env:SHOWMAN_ARCHIVE_ROOT\catalog.sqlite"
-```
+Do not retarget a running recorder or OBS process. Read the
+[capture guide's new-session recipe](README.md#record-a-new-session) and the
+[staged live preflight](../../planning/RUN_BUNDLE_OPERATIONS.md#existing-evidence-and-capture-preflight).
+Once the operator has stopped recording and the producer terminal watermark
+has drained, verify the intended IPC path and only one recorder, the
+installed/loaded Lua build and source hash, OBS script/FPS/destination and the
+existing queue. Then use the capture README's PowerShell recorder command,
+which pairs this archive's `captures` directory with its `catalog.sqlite`.
 
 Terminal imports into this path automatically register their locations in the
 catalog. An active session remains on disk before it is imported. Failed intake

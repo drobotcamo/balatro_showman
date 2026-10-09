@@ -1,9 +1,14 @@
 # Run-bundle storage
 
-Issue #44 stores each operational bundle in SQLite using SQLAlchemy 2.x. Alembic
-owns schema creation and upgrades: `alembic upgrade head` (set
-`sqlalchemy.url` to the bundle URL) is the production setup command. SQLite
-transactions are short and atomic; one writer is expected, while readers may
+Issue #44 stores operational bundles in SQLite using SQLAlchemy 2.x. Alembic
+owns schema creation and upgrades. For a standalone bundle,
+`alembic upgrade head` requires an explicitly configured `sqlalchemy.url`.
+For the designated F-drive catalog, use `showman archive init` only for a new
+root or `showman archive upgrade` for an authorized upgrade; the latter backs
+up the database first. Never run bare Alembic using `alembic.ini`'s relative
+example URL or initialize over the existing archive.
+
+SQLite transactions are short and atomic; one writer is expected, while readers may
 use SQLite's normal snapshot/read isolation. Evidence records are canonical
 JSON UTF-8 bytes, or unmodified raw bytes, hashed with SHA-256. Final outcomes
 reject further evidence writes; validation reports and persists integrity

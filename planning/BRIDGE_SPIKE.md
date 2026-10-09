@@ -124,11 +124,14 @@ do not execute Balatro's actual save restoration or menu callbacks.
 
    ```powershell
    Get-CimInstance Win32_Process |
-     Where-Object { $_.CommandLine -like '*ground_truth.file_ipc_bridge*' } |
+     Where-Object { $_.CommandLine -match '(ground_truth[./\\]file_ipc_bridge|\bshowman\s+record\b)' } |
      Select-Object ProcessId, CommandLine
    ```
 
-   If no bridge process is listed, start the documented client in Smoke test.
+   If no consumer is listed, follow `docs/capture/README.md` → “Record a new
+   session” for a future authorized capture and use the paired archive paths.
+   The Smoke test below writes to `%TEMP%` without catalog intake; it is only
+   an isolated diagnostic, not the live recording command.
    If exactly one expected, healthy client already owns this IPC directory,
    reuse it and verify its output directory and process state; do not start a
    duplicate. If a listed process is stale, conflicting, or its ownership/path
@@ -162,15 +165,16 @@ do not execute Balatro's actual save restoration or menu callbacks.
    Get-FileHash "ground_truth\balatro_mod\main.lua", "$target\main.lua" -Algorithm SHA256
    ```
 
-   Restart Balatro completely and verify the latest Lovely log reports build
-   `issue123-dagger-reference-1`. The producer hash and loaded build are separate
-   checks. To roll back, close Balatro, move the new active directory out of
-   `Mods`, and move the timestamped backup back to the active target. Keep the
-   backup; do not delete it as part of an update.
+   Restart Balatro completely and verify the latest Lovely log reports the
+   expected build from the currently installed `main.lua` (the checked-in
+   revision here prints `issue129-hermit-rebate-reference-1`). The producer hash
+   and loaded build are separate checks. To roll back, close Balatro, move the
+   new active directory out of `Mods`, and move the timestamped backup back to
+   the active target. Keep the backup; do not delete it as part of an update.
 
 3. Launch Balatro and confirm the Lovely log reports the mod loaded:
    search `$env:APPDATA\Balatro\Mods\lovely\log\` for
-   `[balatro_showman_bridge] loaded; build=issue123-dagger-reference-1; io_dir=...`.
+   `[balatro_showman_bridge] loaded; build=<installed-build>; io_dir=...`.
    On a separate diagnostic run, trigger one action and inspect its persisted
    record in that run's `steps.ndjson` after the bridge acknowledges it (or
    inspect the queued `request_<run>_<id>.json` if still present). It must contain
@@ -181,17 +185,19 @@ do not execute Balatro's actual save restoration or menu callbacks.
    diagnostic run as the intended video run: if its consumer session already
    exists, a later OBS marker will not attach to it. Preserve its evidence.
 
-## Smoke test
+## Smoke test (isolated diagnostic, no catalog intake)
 
-1. Ensure one expected bridge client owns the shared IPC directory, using the
-   process inspection in Installation. Start the repository client only if no
-   client is already running and starting it is authorized. Write output outside
-   the repository:
+1. Check whether a client already owns the shared IPC directory using the
+   process inspection in Installation. Start the diagnostic client only if no
+   consumer is already running and starting it is authorized. This command
+   writes outside the repository to a new scratch directory; it does not
+   import to `showman-archive/catalog.sqlite`:
 
    ```powershell
+   $scratch = Join-Path $env:TEMP ("showman-ipc-smoke-" + [guid]::NewGuid().ToString("N"))
    py -3 -m ground_truth.file_ipc_bridge `
      --io-dir "$env:APPDATA\Balatro\agent_io" `
-     --out-dir "$env:TEMP\balatro_showman_runs"
+     --out-dir "$scratch"
    ```
 
 2. Start a run. `SelectBlind`, play/discard, and shop actions each publish a
@@ -200,7 +206,8 @@ do not execute Balatro's actual save restoration or menu callbacks.
 3. End the run for real (failing the first blind is a quick `loss`). The
    producer writes `run_end_<run>.json` with `last_request_id`; the client waits
    for all requests through that watermark before finalizing `session.json`.
-4. Report the field values from `steps.ndjson` and `session.json` in Issue #6.
+4. Report the field values from `steps.ndjson` and `session.json` on the
+   assigned issue (Issue #6 was the historical spike).
    Keep saves, logs, dumps, and game assets local.
 
 ## Monitor an approved live run
@@ -286,7 +293,7 @@ review; they are not silently clamped. Poll/IPC latency is not measured by this
 mapping; inspect rendered pre-action frames against oracle observations and
 report actual timing error before claiming the ±3-frame criterion is met.
 
-## Status
+## Historical spike status (not capture readiness)
 
 The producer is verified against the installed runtime (Balatro `1.0.1o-FULL`,
 Steamodded `26.926.0~dev-a`, Lovely `0.10.0`) by a real capture (50 steps
@@ -320,6 +327,7 @@ A capture from the installed `live/3.0.0` producer exists
 (`F:\OBS_RECORDINGS\oracle_runs_live3\`, 50 steps, one session unfinalized
 after a mid-run exit to the main menu — the producer only finalizes on game
 over); it validated legality/mask-basis/counter emission but pre-dates the
-deck/stake/bosses_used runtime fixes, so a fresh capture with the re-copied
-mod is the remaining validation. Steamodded's debug socket is not used as a
-transport.
+deck/stake/bosses_used runtime fixes. The later capture and reference results
+are in `planning/BALATRO_RUNTIME.md` and `planning/LEARNINGS.md`; do not treat
+this 2026-09-30 status as a current request for another capture. Steamodded's
+debug socket is not used as a transport.
