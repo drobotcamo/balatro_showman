@@ -30,7 +30,8 @@ check. Development exporters should pass sibling manifests through
 video/run identities and duplicate or neighboring frame assignments across the
 provided manifests. The standalone `validate_split_assignments()` helper can
 check a collection before batch processing. Synthetic backgrounds are excluded. A second reviewer must mark
-every exported frame reviewed; disagreements remain explicit until resolved.
+every exported frame reviewed; each frame records a boolean disagreement
+disposition (`true` for unresolved disagreement, `false` otherwise).
 The development pilot reports coverage, disagreement, missingness, and
 exclusions. Held-out criteria are frozen only after this pilot and explicit
 approval.

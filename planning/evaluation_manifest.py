@@ -93,7 +93,7 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
         if review.get("status") != "reviewed" or not valid_reviewers or len(set(reviewers)) < 2: errors.append(f"{prefix} is not independently reviewed")
         unknown = set(review) - {"reviewers", "status", "disagreement"}
         if unknown: errors.append(f"{prefix}.review has unknown fields: {','.join(sorted(map(str, unknown)))}")
-        if "disagreement" in review and not isinstance(review["disagreement"], bool): errors.append(f"{prefix}.review.disagreement must be boolean")
+        if not isinstance(review.get("disagreement"), bool): errors.append(f"{prefix}.review.disagreement must be boolean")
         annotations = frame.get("annotations")
         if not isinstance(annotations, dict):
             continue

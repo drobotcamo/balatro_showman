@@ -7,7 +7,7 @@ from planning.evaluation_manifest import export_manifest, pilot_report, validate
 
 
 def manifest():
-    frame = lambda fid, index, annotations: {"frame_id": fid, "frame_index": index, "mapping": {"x": 0, "y": 0, "width": 10, "height": 10}, "canonical_to_source": [1, 0, 0, 0, 1, 0], "annotations": annotations, "review": {"reviewers": ["qa1", "qa2"], "status": "reviewed"}}
+    frame = lambda fid, index, annotations: {"frame_id": fid, "frame_index": index, "mapping": {"x": 0, "y": 0, "width": 10, "height": 10}, "canonical_to_source": [1, 0, 0, 0, 1, 0], "annotations": annotations, "review": {"reviewers": ["qa1", "qa2"], "status": "reviewed", "disagreement": False}}
     return {"schema_version": "evaluation-slice-1.0", "protocol": "v1", "source": {"video_sha256": "a" * 64, "run_sha256": "b" * 64, "alignment_sha256": "c" * 64, "split": "development", "width": 1920, "height": 1080}, "frames": [frame("f2", 2, {"page": {"status": "unknown"}}), frame("f1", 1, {})]}
 
 def test_export_is_sorted_and_stable(tmp_path: Path):
@@ -65,6 +65,8 @@ def test_malformed_manifest_shapes_return_diagnostics():
     assert any("invalid status" in e for e in validate_manifest(value))
     value = manifest(); value["frames"][0].pop("review")
     assert any("review is required" in e for e in validate_manifest(value))
+    value = manifest(); value["frames"][0]["review"].pop("disagreement")
+    assert any("review.disagreement must be boolean" in e for e in validate_manifest(value))
 
 def test_unknown_fields_are_rejected_at_runtime():
     mutations = [
@@ -118,6 +120,7 @@ def test_schema_enums_match_runtime_contract():
     assert schema["properties"]["frames"]["items"]["additionalProperties"] is False
     assert frame_properties["mapping"]["additionalProperties"] is False
     assert frame_properties["review"]["additionalProperties"] is False
+    assert "disagreement" in frame_properties["review"]["required"]
     assert frame_properties["annotations"]["additionalProperties"]["additionalProperties"] is False
     finite_number = schema["$defs"]["finiteNumber"]
     assert finite_number["minimum"] == -finite_number["maximum"]
