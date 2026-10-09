@@ -160,6 +160,43 @@ instance. It lacks a zero-balance Hermit use and a second Rebate source. Visual
 reducer comparison and user inspection of the query report remain open. The video
 has not been explicitly associated or frame-aligned.
 
+## Issue #82 held-out capture preflight (2026-10-09)
+
+After user authorization, the checked-in producer from `master` `ab90a1d` was
+installed reversibly. Its `main.lua` SHA-256 is
+`8450805261FD37DD7CF3C7EA381CBAA7C5F2189EE3216FBC2F7DAB03D6E79ADB`, matching
+the installed file. The previous active mod is preserved at
+`%APPDATA%\Balatro\bridge-backups\balatro_showman_bridge-issue82-preflight-20261009-132159`.
+Balatro was restarted and the fresh Lovely log reports
+`build=issue129-hermit-rebate-reference-1` with the fully expanded
+`%APPDATA%\Balatro\agent_io` path. Runtime versions remain Balatro `1.0.1o-FULL`,
+Lovely `0.10.0`, and Steamodded `26.926.0~dev-a`.
+
+OBS profile `Untitled` is MKV, 1920×1080, 60 FPS, AMD H.264 hardware encoding,
+and `F:\OBS_RECORDINGS` (about 854 GB free on the inspected fixed volume). Its
+loaded `obs_recording_start.py` has SHA-256
+`61813AD32CAEE4A1CB85709C892F2D63A4C50DB76D4D39E8D174B0FE1E82DA63`, matching
+the configured script path. The script settings use the fully expanded IPC path,
+60 FPS and prefix `issue82`. The manually started OBS instance loaded the hook;
+no new start event has been emitted, so the current-prefix handshake remains
+unverified. Keep the game at the menu until OBS recording has started and the
+new marker is observed; the preserved `recording_start_marker.json` still holds
+the prior Issue #81 marker until then.
+
+One `python -m showman record --io-dir "%APPDATA%\Balatro\agent_io" --out-dir
+"F:\OBS_RECORDINGS\oracle_runs_issue82"` consumer is running, with no bundle DB
+configured. Its output root was absent before startup and is now created. No
+queued request files were present when inspected. A future new run must first
+receive the current OBS marker; do not use Continue for a new independent source.
+It belongs to predeclared group `first-slice-heldout-20261003-A`. The Issue #129
+recorder run was finalized, audited (`oracle run integrity OK`) and valid in its
+bundle before that consumer was stopped.
+
+Validation at `ab90a1d`: `python -m unittest tests.test_balatro_mod
+tests.test_file_ipc_bridge` → 50 tests passed; `python planning/check_contracts.py`
+→ `planning contracts OK`; `git diff --check` → clean. These checks do not
+verify the next OBS event or any held-out recording.
+
 ## External references
 
 - Steamodded repository/source metadata is available in `smods-main/README.md`,
