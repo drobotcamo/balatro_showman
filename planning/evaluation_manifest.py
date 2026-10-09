@@ -79,10 +79,11 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
     return errors
 
 def validate_split_assignments(manifests: list[dict[str, Any]]) -> list[str]:
-    """Reject source reuse across splits and adjacent source frames in different splits."""
+    """Reject video/run reuse across splits and adjacent source frames across partitions."""
     errors: list[str] = []
-    source_splits: dict[tuple[str, str], str] = {}
-    frame_splits: dict[tuple[str, str, int], str] = {}
+    video_splits: dict[str, str] = {}
+    run_splits: dict[str, str] = {}
+    frame_splits: dict[tuple[str, int], str] = {}
     for manifest_index, manifest in enumerate(manifests):
         if not isinstance(manifest, dict):
             errors.append(f"manifests[{manifest_index}] must be an object")
@@ -92,34 +93,38 @@ def validate_split_assignments(manifests: list[dict[str, Any]]) -> list[str]:
         if not isinstance(source, dict) or not isinstance(frames, list):
             errors.append(f"manifests[{manifest_index}] requires source object and frames array")
             continue
+        validation_errors = validate_manifest(manifest)
+        errors.extend(f"manifests[{manifest_index}]: {error}" for error in validation_errors)
         video_sha = source.get("video_sha256")
         run_sha = source.get("run_sha256")
         split = source.get("split")
         if not all(isinstance(value, str) and value for value in (video_sha, run_sha, split)):
             errors.append(f"manifests[{manifest_index}] has invalid source split identity")
             continue
-        source_key = (video_sha, run_sha)
-        previous_split = source_splits.setdefault(source_key, split)
+        previous_split = video_splits.setdefault(video_sha, split)
         if previous_split != split:
-            errors.append(f"source video/run assigned to multiple splits: {video_sha}/{run_sha}")
+            errors.append(f"source video assigned to multiple splits: {video_sha}")
+        previous_split = run_splits.setdefault(run_sha, split)
+        if previous_split != split:
+            errors.append(f"source run assigned to multiple splits: {run_sha}")
         for frame_index, frame in enumerate(frames):
             if not isinstance(frame, dict):
                 continue
             index = frame.get("frame_index")
             if isinstance(index, bool) or not isinstance(index, int) or index < 0:
                 continue
-            frame_key = (video_sha, run_sha, index)
+            frame_key = (video_sha, index)
             previous = frame_splits.setdefault(frame_key, split)
             if previous != split:
-                errors.append(f"source frame assigned to multiple splits: {video_sha}/{run_sha} frame {index}")
-    by_source: dict[tuple[str, str], list[tuple[int, str]]] = {}
-    for (video_sha, run_sha, frame_index), split in frame_splits.items():
-        by_source.setdefault((video_sha, run_sha), []).append((frame_index, split))
-    for source_key, assignments in by_source.items():
+                errors.append(f"source frame assigned to multiple splits: {video_sha} frame {index}")
+    by_video: dict[str, list[tuple[int, str]]] = {}
+    for (video_sha, frame_index), split in frame_splits.items():
+        by_video.setdefault(video_sha, []).append((frame_index, split))
+    for video_sha, assignments in by_video.items():
         assignments.sort()
         for (left_index, left_split), (right_index, right_split) in zip(assignments, assignments[1:]):
             if right_index - left_index <= 1 and left_split != right_split:
-                errors.append(f"neighboring source frames cross splits: {source_key[0]}/{source_key[1]} frames {left_index},{right_index}")
+                errors.append(f"neighboring source frames cross splits: {video_sha} frames {left_index},{right_index}")
     return errors
 
 def pilot_report(manifest: dict[str, Any]) -> dict[str, Any]:
@@ -136,9 +141,11 @@ def pilot_report(manifest: dict[str, Any]) -> dict[str, Any]:
 def export_manifest(manifest: dict[str, Any], destination: Path, split_context: list[dict[str, Any]] | None = None) -> None:
     errors = validate_manifest(manifest)
     if isinstance(manifest, dict) and isinstance(manifest.get("source"), dict) and manifest["source"].get("split") == "held_out":
-        if split_context is None:
-            errors.append("held-out export requires split_context manifests")
+        if not split_context:
+            errors.append("held-out export requires at least one development split_context manifest")
         else:
+            if not any(isinstance(context, dict) and isinstance(context.get("source"), dict) and context["source"].get("split") == "development" for context in split_context):
+                errors.append("held-out split_context must include development manifests")
             errors.extend(validate_split_assignments([*split_context, manifest]))
     if errors: raise ValueError("invalid evaluation manifest: " + "; ".join(errors))
     result = dict(manifest)
