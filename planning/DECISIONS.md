@@ -606,6 +606,24 @@ without improving provenance. Source-backed derivation remains preferred when
 available, and contradictions remain explicit. Source: Issue #127 video-like
 fixture and user direction on 2026-10-06.
 
+### D043 — accepted — Separate implementation acceptance from evidence acceptance
+
+Work items that combine a software artifact with an external evaluation must
+track the two acceptance surfaces separately. Implementation acceptance requires
+the artifact, focused runnable checks, review, and CI appropriate to its tier.
+Evidence acceptance requires the declared external inputs, provenance and split
+checks, human-review identity where applicable, artifact hashes, and the
+protocol-specific claim. Classify evidence as fixture/tooling, development
+pilot, held-out evaluation, or reconstruction result. A green implementation
+check does not pass an evidence gate, and an evidence blocker does not reopen
+completed implementation work without a new defect. If the surfaces have
+different owners or independent value, use separate bounded work items.
+
+This generalizes the repeated #82 pattern without changing #82's acceptance
+criteria or any evaluation threshold. Alternative considered: keep one issue
+and one undifferentiated completion state, rejected because it caused repeated
+implementation PRs while the remaining blocker was external evidence.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the
