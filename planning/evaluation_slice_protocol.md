@@ -20,12 +20,19 @@ and incomplete review are export diagnostics, not silently repaired rows.
 
 ## Splits and review
 
-Split at source-video/run level. Neighboring frames from one source cannot be
-split across partitions. Synthetic backgrounds are excluded. A second reviewer
-must mark every exported frame reviewed; disagreements remain explicit until
-resolved. The development pilot reports coverage, disagreement, missingness,
-and exclusions. Held-out criteria are frozen only after this pilot and explicit
+Assign splits at source-video/run level. Neighboring frames from one source
+cannot be split across partitions. This single-manifest exporter does not
+perform cross-manifest leakage checks; those are a separate evaluation
+operation. Synthetic backgrounds are excluded. A second reviewer must mark
+every exported frame reviewed; disagreements remain explicit until resolved.
+The development pilot reports coverage, disagreement, missingness, and
+exclusions. Held-out criteria are frozen only after this pilot and explicit
 approval.
+
+The development pilot review was performed by the agent using this work session;
+`qa-2a` was supplied as the second-reviewer label but did not independently
+inspect the frames. The pilot therefore does not establish independent human QA
+and must not be used as held-out or acceptance evidence requiring that review.
 
 The manifest is an external, deterministic artifact distinct from provenance
 manifests, SQLite run bundles, and broad Phase 9 exports.
