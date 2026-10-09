@@ -182,6 +182,12 @@ class RunBundle:
         }
         bundle_records = [{"kind": "step", "payload": record} for record in records]
         if mechanics_reference_raw is not None:
+            from ground_truth.file_ipc_bridge import (
+                MECHANICS_REFERENCE_VERSION,
+                MECHANICS_REFERENCE_VERSION_V2,
+                _validate_mechanics_reference,
+            )
+
             valid_step_ids = {record.get("step_id", f"{metadata['run_id']}:{record['request_id']}")
                               for record in records}
             reference_keys = set()
@@ -195,7 +201,9 @@ class RunBundle:
                 except json.JSONDecodeError as exc:
                     raise BundleError(f"invalid mechanics reference JSON on line {line_number}") from exc
                 if (not isinstance(reference, dict)
-                        or reference.get("schema_version") != "dagger-reference/1.0"
+                        or reference.get("schema_version") not in {
+                            MECHANICS_REFERENCE_VERSION, MECHANICS_REFERENCE_VERSION_V2
+                        }
                         or reference.get("run_id") != metadata["run_id"]
                         or not isinstance(reference.get("step_id"), str)
                         or reference["step_id"] not in valid_step_ids):
@@ -204,7 +212,6 @@ class RunBundle:
                 if key in reference_keys:
                     raise BundleError(f"duplicate mechanics reference phase on line {line_number}")
                 reference_keys.add(key)
-                from ground_truth.file_ipc_bridge import _validate_mechanics_reference
                 try:
                     _validate_mechanics_reference({"mechanics_reference": reference})
                 except ValueError as exc:

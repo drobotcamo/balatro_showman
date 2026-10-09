@@ -172,16 +172,38 @@ def test_mechanics_reference_import_and_read_are_separate_from_steps(tmp_path):
             "mult_before": 62, "mult_after": 70, "mult_delta": 8,
             "pre_capture_timestamp_ns": 123, "resolved_capture_timestamp_ns": 456}],
     }
+    mechanics = {
+        "schema_version": "dagger-reference/2.0", "run_id": "dagger", "step_id": "dagger:1",
+        "capture_phase": "resolved_mechanics", "capture_timestamp_ns": 600,
+        "producer_revision": "issue129-hermit-rebate-reference-1",
+        "runtime": {"balatro": "1.0.1o-FULL", "steamodded": "test", "lovely": "test"},
+        "jokers": [], "mechanics_effects": [
+            {"trigger": "hermit_use", "occurrence_id": "hermit:1", "interval_id": "dagger:1",
+             "rule_revision": "balatro-test:hermit-use-v1", "source_instance_token": "hermit-1",
+             "dollars_before": 12, "dollars_after": 24, "ability_extra": 20,
+             "direct_contribution": 12, "pre_capture_timestamp_ns": 500,
+             "resolved_capture_timestamp_ns": 550, "status": "observed"},
+            {"trigger": "mail_in_rebate", "occurrence_id": "rebate:1", "interval_id": "dagger:1",
+             "rule_revision": "balatro-test:mail-in-rebate-v1", "rebate_instance_token": "mail-1",
+             "discarded_instance_token": "stone-1", "target_rank_id": 8, "target_rank": "8",
+             "discarded_rank_id": 3, "discarded_effective_rank_id": -37134,
+             "discarded_rank": "3", "debuffed": False, "bonus_per_trigger": 5,
+             "trigger_multiplicity": 0, "direct_contribution": 0,
+             "pre_capture_timestamp_ns": 500, "resolved_capture_timestamp_ns": 550,
+             "status": "observed"},
+        ],
+    }
     (source / "mechanics_reference.ndjson").write_text(
-        json.dumps(reference) + "\n" + json.dumps(resolved) + "\n", encoding="utf-8")
+        json.dumps(reference) + "\n" + json.dumps(resolved) + "\n"
+        + json.dumps(mechanics) + "\n", encoding="utf-8")
 
-    assert RunBundle(url).import_oracle_directory(source)["record_count"] == 3
+    assert RunBundle(url).import_oracle_directory(source)["record_count"] == 4
     inspector = RunBundleInspector(url)
     assert inspector.find_records("dagger", kind="step")["data"][0]["payload"] == step
     assert all(item["kind"] != "mechanics_reference" for item in inspector.find_records("dagger")["data"])
     assert all(item["kind"] != "mechanics_reference" for item in inspector.evidence("dagger")["data"])
     result = inspector.mechanics_reference("dagger", step_id="dagger:1")
-    assert [item["payload"] for item in result["data"]] == [reference, resolved]
+    assert [item["payload"] for item in result["data"]] == [reference, resolved, mechanics]
     assert inspector.mechanics_reference("dagger", step_id="dagger:missing")["status"] == "missing"
     (source / "mechanics_reference.ndjson").write_text(
         json.dumps({**reference, "capture_timestamp_ns": 124}) + "\n", encoding="utf-8")
