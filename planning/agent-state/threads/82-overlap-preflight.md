@@ -1,7 +1,7 @@
 # Work Checkpoint
 Updated: 2026-10-09
 Issue: #82
-PR: none
+PR: #155 (https://github.com/drobotcamo/balatro_showman/pull/155)
 Branch: issue-82-heldout-scope-checkpoint-20261009
 Worktree: C:\Users\camgr\.t3\worktrees\balatro_showman\t3code-f51748d4
 Objective: Complete the frozen-v2 held-out export and source overlap review without claiming under-supported metrics.
