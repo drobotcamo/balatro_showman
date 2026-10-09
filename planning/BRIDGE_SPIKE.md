@@ -203,6 +203,24 @@ do not execute Balatro's actual save restoration or menu callbacks.
 4. Report the field values from `steps.ndjson` and `session.json` in Issue #6.
    Keep saves, logs, dumps, and game assets local.
 
+## Monitor an approved live run
+
+Keep the bridge consumer running while the user plays, and monitor the expected
+external output without occupying a foreground command until the run ends. Use a
+background watcher or short, nonblocking polls against the known output root.
+Establish the baseline before play so a new session is not confused with an older
+run. Report sparse progress only when useful; continue responding to the user
+while the watcher waits.
+
+Treat the run as ready for inspection only after `session.json` has a terminal
+outcome and the declared request watermark is persisted. For mechanics-reference
+runs, also wait until the declared reference watermark is resolved. An empty IPC
+queue, a quiet game, or an unchanged step count is not completion. Once the
+terminal session is finalized, inspect the discovered run, run strict RunBundle
+validation, and report the result without asking the user to identify the run by
+its opaque ID. A watcher timeout means “still waiting”; it must not finalize the
+run or infer an outcome.
+
 ## Video alignment procedure
 
 For current live recording, use the OBS started-event hook below and the

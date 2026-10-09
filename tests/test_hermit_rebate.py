@@ -201,6 +201,9 @@ def test_missing_rebate_inputs_and_reference_leak_stay_unknown_or_rejected():
     assert report["earnings_by_round_and_target_rank"] == []
     assert report["unknown_occurrence_ids"] == [effect.occurrence_id]
     assert tuple(report["occurrences"][0]["evidence_ids"]) == effect.evidence_ids
+    assert report["discarded_rank_frequency_status"] == "known"
+    assert report["most_frequent_discarded_rank_while_owned"] == ["8"]
+    assert report["most_frequent_qualifying_rank"] is None
 
     leaked = hermit("leaked", 1, 10, 20, 10)
     ref_catalog = tuple(replace(record, channel="reference") for record in leaked.evidence_catalog)

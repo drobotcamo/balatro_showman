@@ -505,6 +505,19 @@ def rebate_report(effects: Iterable[RebateEffect], coverage: CoverageWindow) -> 
     qualifying_ranks = Counter(qualifying_cards.values())
     discarded_ranks = Counter(discarded_cards.values())
     coverage_complete = coverage_ok
+    discarded_rank_frequency_known = (
+        coverage_complete and bool(rows) and not contradictory_card_ranks
+        and all(
+            row.discarded_rank_id is not None
+            and row.evidence_ids
+            and not any(diagnostic in {
+                "forbidden:reference_evidence",
+                "missing_or_invalid:field_evidence",
+                "contradictory:rank_id_and_label",
+            } for diagnostic in row.diagnostics)
+            for row in rows
+        )
+    )
     unknown_coverage = (
         not coverage_complete or not rows or contradictory_card_ranks
         or any(row.status != "inferred" for row in rows)
@@ -519,7 +532,12 @@ def rebate_report(effects: Iterable[RebateEffect], coverage: CoverageWindow) -> 
         "qualifying_discard_count_by_rank": dict(sorted(qualifying_ranks.items())),
         "discarded_card_count_by_rank_while_owned": dict(sorted(discarded_ranks.items())),
         "most_frequent_qualifying_rank": None if unknown_coverage else winners(qualifying_ranks),
-        "most_frequent_discarded_rank_while_owned": None if unknown_coverage else winners(discarded_ranks),
+        "most_frequent_discarded_rank_while_owned": (
+            winners(discarded_ranks) if discarded_rank_frequency_known else None
+        ),
+        "discarded_rank_frequency_status": (
+            "known" if discarded_rank_frequency_known else "unknown"
+        ),
         "coverage": "complete" if coverage_complete else "incomplete",
         "coverage_evidence_ids": list(coverage_evidence_ids),
         "diagnostics": list(coverage_diagnostics) + (

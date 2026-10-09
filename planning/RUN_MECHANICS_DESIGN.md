@@ -569,13 +569,17 @@ repeated Rebate calls, mixed ranks and known-zero participation with stubs. The
 owner-authorized producer was installed and launched on 2026-10-09. Live run
 `923049899800-1565` completed with 514 steps and a win; strict RunBundle
 validation is valid with 1,117 records. Its isolated sidecar has 15 Hermit uses
-and 315 Rebate/card participations. This establishes live producer capture and
-reader operation, not reconstruction quality: the run has no zero-balance Hermit
-use or second Rebate source, and no visual-input reducer comparison or
-user-inspected report has been completed. Run
-`python -m run_mechanics.hermit_rebate` for a printable synthetic report of the
-named queries. It labels the data synthetic and reference verification as not
-run; it is not an engine-reference scenario.
+and 315 Rebate/card participations. The second run, `15595792437600-8332`, is a
+347-step loss with strict RunBundle validation valid at 763 records. The
+RunBundle query analysis is recorded in
+`planning/issue129-runbundle-query-report.md`: Hermit totals `$40` from action
+snapshots and matches all three separate reference occurrences; discarded-rank
+frequencies are fully observed and match the reference histogram. Rebate earnings
+and qualifying-rank reconstruction remain unknown because action snapshots omit
+target/effective rank and trigger-attribution inputs. Sidecar answers are listed
+separately as validation targets, not reducer inputs. Run
+`python -m run_mechanics.hermit_rebate` for the existing synthetic fixture; it
+labels its data synthetic and reference verification `not_run`.
 
 ## Other staged examples pending consultation
 
