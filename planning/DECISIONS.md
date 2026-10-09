@@ -585,6 +585,27 @@ no-target outcome. Source: user direction and acceptance of denominator/weightin
 recommendations during Issue #124 execution, 2026-10-05; source trace in
 `planning/dagger_sell_value.md` and D039.
 
+### D042 — accepted — An observed Dagger sell tooltip is independent input evidence
+
+For a video-only Dagger interval, a legible victim sell-value tooltip may supply
+the observed sell value directly, with evidence linked to that field. This is a
+direct observation, not an engine-reference value or an estimate from a card
+identity. If all source-derived pricing inputs are available, compare the
+derived sell value with the visible tooltip; disagreement makes the interval's
+sell value, growth, and downstream Mult unknown/ambiguous. If pricing inputs are
+incomplete, the visible tooltip may still support the Dagger calculation. A
+missing/occluded tooltip and incomplete pricing derivation remain unknown. The
+input adapter rejects privileged fields inside the observation envelope and
+never promotes adjacent reference data to visual evidence.
+
+Alternative: require every visible sell value to be recomputed from card identity
+and all pricing modifiers. Rejected for this video-only path because the exact
+sell value can be legibly observed even when a prior modifier or source identity
+cannot be reconstructed; discard that direct evidence would lower coverage
+without improving provenance. Source-backed derivation remains preferred when
+available, and contradictions remain explicit. Source: Issue #127 video-like
+fixture and user direction on 2026-10-06.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the

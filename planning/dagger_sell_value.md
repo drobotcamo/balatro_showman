@@ -104,8 +104,14 @@ This is enough to exercise a source calculation against separate engine outputs,
 but the ordinary steps are oracle payloads, not video observations. They cannot
 be passed into video-only reconstruction. Using the same sell-cost inputs from
 the reference sidecar would be circular. Independent reconstruction validation
-still needs aligned visual evidence; the video association is confirmed, but
-frame-to-step alignment is not.
+must not pass the reference-sidecar inputs into the video-only path. On 2026-10-06,
+the user reviewed the three marker-derived pre-action frames and confirmed the
+three Dagger consumptions; measured visual correspondence within ±3 frames is
+established for steps 12, 26, and 36 only. Their visible Mult endpoint deltas
+match the isolated reference, while the video-only reducer correctly abstains on
+causal sell/growth because the sampled frames do not show a sell-value tooltip.
+See the scoped diagnostic and limits in `planning/RUN_MECHANICS_DESIGN.md` and
+`planning/LEARNINGS.md`; other frames/steps remain unaligned.
 
 The checked-in engine-step fixture runs those three intervals through the same
 `reduce_sacrifices` used by the tests. It derives victim sell values `$3, $4, $4`,
