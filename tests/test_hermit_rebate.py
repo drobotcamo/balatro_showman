@@ -49,7 +49,7 @@ def hermit(occurrence, order, dollars, cap, interval_delta):
 
 
 def rebate(occurrence, order, *, rebate_id="rebate-1", card_id, target_id=8,
-           target="8", rank_id=8, rank="8", debuffed=False, bonus=5,
+           target="8", rank_id=8, effective_rank_id=None, rank="8", debuffed=False, bonus=5,
            multiplicity=1, interval_delta=5, interval_id=None, round_id=None):
     values = {
         "run_id": "run-1", "round_id": round_id or f"round-{order}",
@@ -58,7 +58,9 @@ def rebate(occurrence, order, *, rebate_id="rebate-1", card_id, target_id=8,
             "run-1", interval_id or f"discard-{order}", rebate_id, card_id
         ), "rebate_instance_id": rebate_id,
         "discarded_instance_id": card_id, "target_rank_id": target_id,
-        "target_rank": target, "discarded_rank_id": rank_id, "discarded_rank": rank,
+        "target_rank": target, "discarded_rank_id": rank_id,
+        "discarded_effective_rank_id": rank_id if effective_rank_id is None else effective_rank_id,
+        "discarded_rank": rank,
         "debuffed": debuffed, "bonus_per_trigger": bonus,
         "trigger_multiplicity": multiplicity, "interval_money_delta": interval_delta,
     }
@@ -140,6 +142,19 @@ def test_rebate_rank_snapshot_and_target_rank_changes_are_distinct():
     assert [(row.target_rank, row.discarded_rank, row.direct_contribution) for row in effects] == [
         ("8", "8", 5), ("9", "9", 5)
     ]
+
+
+def test_rebate_no_rank_get_id_sentinel_is_zero_not_a_rank_match():
+    event = rebate(
+        "stone-card", 1, card_id="stone", target_id=3, target="3",
+        rank_id=3, effective_rank_id=-37134, rank="3", multiplicity=0, interval_delta=0,
+    )
+    effect = reduce_rebate_discards([event])[0]
+    assert effect.discarded_rank_id == 3
+    assert effect.discarded_effective_rank_id == -37134
+    assert effect.qualifying is False
+    assert effect.direct_contribution == 0
+    assert effect.status == "inferred"
 
 
 def test_multiple_rebate_instances_earn_independently_but_frequency_counts_card_once():

@@ -225,6 +225,20 @@ class FileIpcBridgeTests(unittest.TestCase):
         self.assertEqual(
             _validate_mechanics_reference({"mechanics_reference": record}), record
         )
+        no_rank = json.loads(json.dumps(record))
+        no_rank["mechanics_effects"] = [{
+            "trigger": "mail_in_rebate", "occurrence_id": "rebate:no-rank", "interval_id": "mechanics:1",
+            "rule_revision": "balatro-test:mail-in-rebate-v1",
+            "rebate_instance_token": "rebate-1", "discarded_instance_token": "stone-card",
+            "target_rank_id": 8, "target_rank": "8", "discarded_rank_id": -37134,
+            "discarded_rank": "3", "debuffed": False, "bonus_per_trigger": 5,
+            "trigger_multiplicity": 0, "direct_contribution": 0,
+            "pre_capture_timestamp_ns": 100, "resolved_capture_timestamp_ns": 200,
+            "status": "observed",
+        }]
+        self.assertEqual(
+            _validate_mechanics_reference({"mechanics_reference": no_rank}), no_rank
+        )
         invalid_formula = json.loads(json.dumps(record))
         invalid_formula["mechanics_effects"][0]["direct_contribution"] = 11
         with self.assertRaisesRegex(ValueError, "Hermit formula"):

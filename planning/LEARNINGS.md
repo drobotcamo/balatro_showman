@@ -24,17 +24,22 @@ under its Decisions section. This file is a knowledge base, not a task log.
   clamps the current resolved dollars to the configured amount. `card.lua:2825-2834`
   evaluates Mail-In Rebate for one `context.other_card`, requiring a non-debuffed
   card whose `get_id()` matches the current-round target. The target rank/id is
-  reset in `functions/common_events.lua:2288-2300`.
+  reset in `functions/common_events.lua:2288-2300`. On the installed Steamodded
+  stack, `card.lua:1174-1179` makes `get_id()` return a random negative sentinel
+  when `SMODS.has_no_rank` applies, even if `base.value` retains a rank label.
 - Implication: use the delayed Hermit effect balance, retain every Rebate/card
   participation (including zero), preserve the triggering card's identity/rank
-  and target rank, and separate direct effects from interval money deltas. This
+  and target rank, distinguish actual rank from effective trigger rank, and
+  separate direct effects from interval money deltas. This
   source trace does not establish behavior for arbitrary mods or live reference
   data. At initial source review #123's sidecar was Dagger-only; the separately
   approved #129 extension now adds versioned Hermit/Rebate reference records,
   but no live scenario has been captured with that producer.
 - Verification/source: embedded Lua source inspected read-only; focused
   `tests/test_hermit_rebate.py` exercises caps, zero, unknowns, identity,
-  multiplicity, ties and aggregation. Engine-reference verification remains open.
+  multiplicity, ties and aggregation; the v2 sidecar validator accepts the
+  observed negative no-rank sentinel while retaining zero contribution.
+  Engine-reference verification remains open.
 
 ## 2026-10-05: Dagger victim sell value is a current-cost derivation
 

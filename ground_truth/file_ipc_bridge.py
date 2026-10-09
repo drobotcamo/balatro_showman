@@ -177,14 +177,18 @@ def _validate_mechanics_reference(snapshot: dict[str, Any]) -> dict[str, Any] | 
                 item = effect.get(field)
                 if item is not None and (not isinstance(item, str) or not item):
                     raise ValueError(f"{label}.{field} must be a non-empty string or null")
-            for field in ("target_rank_id", "discarded_rank_id", "bonus_per_trigger",
+            for field in ("target_rank_id", "bonus_per_trigger",
                           "trigger_multiplicity", "direct_contribution"):
                 number = effect.get(field)
                 if number is not None and (
                         isinstance(number, bool) or not isinstance(number, (int, float))
                         or not math.isfinite(number) or number < 0):
                     raise ValueError(f"{label}.{field} must be a non-negative finite number or null")
-            for field in ("target_rank_id", "discarded_rank_id", "trigger_multiplicity"):
+            discarded_get_id = effect.get("discarded_rank_id")
+            if discarded_get_id is not None and (
+                    isinstance(discarded_get_id, bool) or not isinstance(discarded_get_id, int)):
+                raise ValueError(f"{label}.discarded_rank_id must be an integer or null")
+            for field in ("target_rank_id", "trigger_multiplicity"):
                 number = effect.get(field)
                 if number is not None and type(number) is not int:
                     raise ValueError(f"{label}.{field} must be an integer or null")

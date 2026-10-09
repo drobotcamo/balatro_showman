@@ -535,6 +535,13 @@ action interval's net money delta. Stable occurrence keys plus duplicate rejecti
 make reruns idempotent without collapsing different cards, Joker instances, or
 triggers.
 
+The reference producer preserves both the displayed base rank label and the
+`Card:get_id()` value used by the source condition. Steamodded's `SMODS.has_no_rank`
+path can make `get_id()` return a negative random sentinel even when `base.value`
+still names a rank. The negative value is a known nonmatch, not an invalid rank;
+reconstructed participation must keep actual rank separate from effective
+condition rank and abstain when the latter is unknown.
+
 Queries report Hermit direct money for the run; Mail-In Rebate earnings by target
 rank and round; most frequent qualifying discarded rank; and most frequent rank
 discarded while Rebate was owned. Frequency counts card-instance participations,

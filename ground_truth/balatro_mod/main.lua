@@ -1280,6 +1280,9 @@ local function encode_rebate_reference(row)
     .. ',"discarded_instance_token":' .. j_scalar(row.card_token)
     .. ',"target_rank_id":' .. j_scalar(row.target_rank_id)
     .. ',"target_rank":' .. j_scalar(row.target_rank)
+    -- In this producer revision, discarded_rank_id is Card:get_id(), the value
+    -- the game compares to the target. SMODS no-rank cards may return a random
+    -- negative sentinel; discarded_rank remains the card's actual base value.
     .. ',"discarded_rank_id":' .. j_scalar(row.discarded_rank_id)
     .. ',"discarded_rank":' .. j_scalar(row.discarded_rank)
     .. ',"debuffed":' .. j_scalar(row.debuffed)

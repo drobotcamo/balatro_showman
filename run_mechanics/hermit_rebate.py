@@ -281,7 +281,9 @@ class RebateDiscard:
 
     Rows include nonqualifying/debuffed cards and zero-contribution cases. The
     specific discarded card identity is retained so distinct matching cards do
-    not collapse into one rank-only event.
+    not collapse into one rank-only event. `discarded_rank_id` is the card's
+    actual base rank; `discarded_effective_rank_id` models `Card:get_id()` for
+    the trigger condition and may be a negative no-rank sentinel.
     """
 
     run_id: str
@@ -295,6 +297,7 @@ class RebateDiscard:
     target_rank: str | None
     discarded_rank_id: int | None
     discarded_rank: str | None
+    discarded_effective_rank_id: int | None
     debuffed: bool | None
     bonus_per_trigger: int | None
     trigger_multiplicity: int | None
@@ -316,6 +319,7 @@ class RebateEffect:
     target_rank: str | None
     discarded_rank_id: int | None
     discarded_rank: str | None
+    discarded_effective_rank_id: int | None
     qualifying: bool | None
     direct_contribution: int | None
     trigger_multiplicity: int | None
@@ -355,14 +359,16 @@ def reduce_rebate_discards(events: Iterable[RebateDiscard]) -> list[RebateEffect
         fields = {"run_id", "round_id", "interval_id", "occurrence_id", "rebate_instance_id",
                   "discarded_instance_id"}
         for name in ("target_rank_id", "target_rank", "discarded_rank_id", "discarded_rank",
-                     "debuffed", "bonus_per_trigger", "trigger_multiplicity", "interval_money_delta"):
+                     "discarded_effective_rank_id", "debuffed", "bonus_per_trigger",
+                     "trigger_multiplicity", "interval_money_delta"):
             if getattr(event, name) is not None:
                 fields.add(name)
         catalog = _catalog(event.evidence_catalog)
         valid = _valid_evidence(event.field_evidence, catalog, fields)
         links = dict(event.field_evidence) if isinstance(event.field_evidence, tuple) else {}
         evidence = tuple(dict.fromkeys(eid for ids in links.values() for eid in ids))
-        missing = [name for name in ("target_rank_id", "discarded_rank_id", "debuffed",
+        missing = [name for name in ("target_rank_id", "discarded_rank_id",
+                                       "discarded_effective_rank_id", "debuffed",
                                       "bonus_per_trigger", "trigger_multiplicity")
                    if getattr(event, name) is None]
         if not valid:
@@ -389,6 +395,7 @@ def reduce_rebate_discards(events: Iterable[RebateDiscard]) -> list[RebateEffect
         elif (
             type(event.target_rank_id) is not int
             or type(event.discarded_rank_id) is not int
+            or type(event.discarded_effective_rank_id) is not int
             or type(event.debuffed) is not bool
             or type(event.bonus_per_trigger) is not int
             or type(event.trigger_multiplicity) is not int
@@ -398,7 +405,7 @@ def reduce_rebate_discards(events: Iterable[RebateDiscard]) -> list[RebateEffect
             qualifying, contribution, status = None, None, "unsupported"
             diagnostics = ("invalid:rebate_rule_input",)
         else:
-            qualifying = event.discarded_rank_id == event.target_rank_id and not event.debuffed
+            qualifying = event.discarded_effective_rank_id == event.target_rank_id and not event.debuffed
             contribution = (
                 event.bonus_per_trigger * event.trigger_multiplicity if qualifying else 0
             )
@@ -407,7 +414,8 @@ def reduce_rebate_discards(events: Iterable[RebateDiscard]) -> list[RebateEffect
             event.run_id, event.round_id, event.interval_id, event.occurrence_id,
             event.rebate_instance_id, event.discarded_instance_id,
             event.target_rank_id, event.target_rank, event.discarded_rank_id,
-            event.discarded_rank, qualifying, contribution, event.trigger_multiplicity,
+            event.discarded_rank, event.discarded_effective_rank_id,
+            qualifying, contribution, event.trigger_multiplicity,
             event.interval_money_delta, status, evidence, diagnostics, event.rule_revision,
         ))
     return effects
@@ -584,6 +592,7 @@ def synthetic_demo_report() -> dict:
             ),
             "rebate_instance_id": "rebate-instance-1", "discarded_instance_id": card_id,
             "target_rank_id": 8, "target_rank": "8", "discarded_rank_id": rank_id,
+            "discarded_effective_rank_id": rank_id,
             "discarded_rank": rank, "debuffed": False, "bonus_per_trigger": 5,
             "trigger_multiplicity": 1 if rank_id == 8 else 0, "interval_money_delta": 5 if rank_id == 8 else 0,
         }
