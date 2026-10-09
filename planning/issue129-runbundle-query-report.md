@@ -34,7 +34,19 @@ and `:329`. Their pre-use balances are `$38`, `$54`, and `$0`; the next action
 snapshots show `$58`, `$74`, and `$0`. Applying the pinned source formula
 `max(0, min(dollars_before, 20))` yields direct contributions `$20`, `$20`, and
 `$0`, totaling `$40`. Each interval delta agrees with the direct contribution.
-The three separate engine-reference occurrences report the same amounts.
+The configured amount of `$20` follows the pinned vanilla Hermit definition and
+source rule; it is not read from the reference sidecar. The three separate
+engine-reference occurrences report the same amounts.
+
+| Use step | Balance before | Following step / balance after | Configured amount | Direct contribution | Interval delta |
+| --- | ---: | --- | ---: | ---: | ---: |
+| `:308` | $38 | `:309` / $58 | $20 | $20 | +$20 |
+| `:311` | $54 | `:312` / $74 | $20 | $20 | +$20 |
+| `:329` | $0 | `:330` / $0 | $20 | $0 | $0 |
+
+The report identifies each use by its action step. The action snapshots do not
+carry a stable consumable engine-instance token, so the run total is supported
+but cross-use card-instance lineage is not claimed.
 
 ### Mail-In Rebate discarded-rank frequency
 
@@ -53,8 +65,11 @@ observed rank histogram is:
 | 7 | 27 | Ace | 9 |
 | 8 | 23 | | |
 
-The separate reference sidecar produces the same 281-card histogram. Both
-channels therefore identify ranks `3` and `4` as tied at 29.
+The reference sidecar contains 542 raw Joker/card rows because a discarded card
+can occur once for each owned Rebate instance. To compare like units, deduplicate
+by `(interval_id, discarded_instance_token)`, yielding 281 card participations.
+The resulting rank histogram matches the RunBundle table exactly. Both channels
+therefore identify ranks `3` and `4` as tied at 29.
 
 ### Unknown Rebate queries and reference-only expected answers
 
