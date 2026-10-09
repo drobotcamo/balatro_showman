@@ -34,8 +34,10 @@ approval.
 
 The development pilot review was performed by the agent using this work session;
 `qa-2a` was supplied as the second-reviewer label but did not independently
-inspect the frames. The pilot therefore does not establish independent human QA
-and must not be used as held-out or acceptance evidence requiring that review.
+inspect the frames. `review.status` and pilot `reviewed`/`coverage` metrics are
+self-reported claims, not verified reviewer identity or independent QA. The
+pilot therefore does not establish independent human QA and must not be used as
+held-out or acceptance evidence requiring that review.
 
 The manifest is an external, deterministic artifact distinct from provenance
 manifests, SQLite run bundles, and broad Phase 9 exports.
