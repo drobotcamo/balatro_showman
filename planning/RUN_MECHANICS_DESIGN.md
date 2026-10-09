@@ -1,8 +1,9 @@
 # Run Mechanics Design v0.1
 
 Status: design direction and v0.1 initial interface/examples approved by the owner
-on 2026-10-04. Later staged examples and applicable exact trigger-order trace
-remain open.
+on 2026-10-04. Hermit/Mail-In Rebate semantics were approved for #129 on
+2026-10-09. Engine-reference capture coverage for those mechanics remains an
+explicit acceptance dependency.
 
 Issue #122 defines the interface between video evidence, reconstructed run state,
 derived mechanics effects, engine-reference data, and downstream queries. This is
@@ -502,20 +503,92 @@ fixtures, plus malformed cross-references, actual document-level answer-key
 references, reference-channel mixing, and ambiguous exact timing. These fixtures
 exercise interface semantics, not game behavior.
 
-## Staged examples pending consultation
+## Approved #129 examples: Hermit and Mail-In Rebate
 
-The owner approved including all examples in the design, but explicitly requested
-consultation on their concrete inputs, effects, state changes, and query outputs.
-These are staged extensions, not prerequisites for the initial Dagger boundary:
+The user approved the concrete #129 semantics on 2026-10-09 (approval recorded on
+Issue #129). This approval covers these two mechanics only; it does not approve
+Certificate/Death lineage or other staged extensions.
 
-1. **Unknown dependency:** a mechanic such as Idol's selected rank when the
-   selection is not visually available, including abstention and diagnostics.
-2. **Hermit and Mail-In Rebate:** trigger/use conditions, money contribution,
-   multiplicity/participation, reset boundary, and direct/upstream queries.
-3. **Certificate → Death → later Gold Seal earnings:** Certificate-created
-   identity/property history, Death copying onto the existing target, later
-   Gold Seal earnings, provenance and attribution policies.
-4. **Missing evidence and ambiguous identity:** show unsupported joins, unknown
+### Hermit uses
+
+Emit one evidence-linked occurrence for each use, keyed to its run, action
+interval, and consumable instance. The source formula is
+`max(0, min(dollars_at_effect_resolution, configured_amount))`; retain the money
+before and after the direct call and configured amount as inputs. The source schedules the money
+change in a delayed callback, so the relevant balance is at effect resolution, not
+an assumed earlier STEP boundary. Record the direct Hermit contribution separately
+from the full interval money delta, which may contain other effects. Repeated uses
+remain separate occurrences; a known cap/zero result is zero, while a missing
+formula input makes the run total unknown.
+
+### Mail-In Rebate participation
+
+Record each discarded playing-card instance for each Mail-In Rebate instance
+observed as owned during that discard interval. Preserve the specific card ID,
+its actual rank and the target rank captured for the triggering round. Keep
+nonqualifying/debuffed participations and known zero contributions, not just
+successful payouts. Each Joker/card trigger is distinct; record trigger
+multiplicity and per-trigger amount explicitly. A qualifying non-debuffed discard
+contributes configured dollars times observed trigger multiplicity; do not infer
+multiplicity from STEP boundaries. Separate this direct contribution from the
+action interval's net money delta. Stable occurrence keys plus duplicate rejection
+make reruns idempotent without collapsing different cards, Joker instances, or
+triggers.
+
+The reference producer preserves both the displayed base rank label and the
+`Card:get_id()` value used by the source condition. Steamodded's `SMODS.has_no_rank`
+path can make `get_id()` return a negative random sentinel even when `base.value`
+still names a rank. The negative value is a known nonmatch, not an invalid rank;
+reconstructed participation must keep actual rank separate from effective
+condition rank and abstain when the latter is unknown.
+
+Queries report Hermit direct money for the run; Mail-In Rebate earnings by target
+rank and round; most frequent qualifying discarded rank; and most frequent rank
+discarded while Rebate was owned. Frequency counts card-instance participations,
+not trigger multiplicity. Return all tied ranks in sorted rank order. Aggregates
+retain occurrence/evidence details and ownership/round coverage; incomplete
+participation or attribution yields unknown totals/frequencies, never zero.
+
+### Source trace and evidence boundary
+
+The installed embedded Balatro source is identified by executable SHA-256
+`0d75fe164accf3312734d4b37ac98788dd15f0b8e4f9bb8b7f90c4e59de93f47`.
+In `card.lua:1385-1391`, Hermit queues a delayed callback and calls
+`ease_dollars(max(0, min(G.GAME.dollars, self.ability.extra)), true)` inside it.
+In `card.lua:2825-2834`, Mail-In Rebate checks one `context.other_card`, rejects a
+debuffed card, compares `get_id()` with `G.GAME.current_round.mail_card.id`, and
+calls `ease_dollars(self.ability.extra)`. The target's display rank/id is selected
+by `reset_mail_rank` in `functions/common_events.lua:2288-2300`; the round target
+must be captured as a point-in-time input. These lines establish the vanilla rule
+shape, not complete multiplicity/order semantics for arbitrary mod stacks.
+
+The checked-in #123 producer/reader extension records Hermit and Rebate values
+in `dagger-reference/2.0` sidecars while preserving Dagger `1.0` compatibility.
+Its LÖVE fixture and Python validator exercise delayed Hermit resolution,
+repeated Rebate calls, mixed ranks and known-zero participation with stubs. The
+owner-authorized producer was installed and launched on 2026-10-09. Live run
+`923049899800-1565` completed with 514 steps and a win; strict RunBundle
+validation is valid with 1,117 records. Its isolated sidecar has 15 Hermit uses
+and 315 Rebate/card participations. The second run, `15595792437600-8332`, is a
+347-step loss with strict RunBundle validation valid at 763 records. The
+RunBundle query analysis is recorded in
+`planning/issue129-runbundle-query-report.md`: Hermit totals `$40` from action
+snapshots and matches all three separate reference occurrences; discarded-rank
+frequencies are fully observed and match the reference histogram. Rebate earnings
+and qualifying-rank reconstruction remain unknown because action snapshots omit
+target/effective rank and trigger-attribution inputs. Sidecar answers are listed
+separately as validation targets, not reducer inputs. Run
+`python -m run_mechanics.hermit_rebate` for the existing synthetic fixture; it
+labels its data synthetic and reference verification `not_run`.
+
+## Other staged examples pending consultation
+
+1. **Unknown dependency:** Idol's selected rank when it is not visually available,
+   including abstention and diagnostics.
+2. **Certificate → Death → later Gold Seal earnings:** Certificate-created
+   identity/property history, Death copying onto an existing target, later Gold
+   Seal earnings, provenance and attribution policies.
+3. **Missing evidence and ambiguous identity:** unsupported joins, unknown
    coverage, and no fabricated precision.
 
 For each, consult the owner on exact required inputs, observable/inferable/
@@ -541,8 +614,10 @@ Remaining gates after approval of the initial v0.1 interface:
 - Inspect the applicable game/mod source to establish exact trigger order and
   present that trace for owner verification. This is arduous work and is not
   complete in this design draft.
-- Before #129, review Hermit and Mail-In Rebate uses, participation, multiplicity,
-  direct contributions, and net deltas.
+- #129's approved Hermit/Mail-In Rebate semantics and the v2 reference-capture
+  extension are implemented. Live engine-reference scenarios, query comparison,
+  and the user-inspected report remain required before the issue can claim
+  reference-verified acceptance.
 - Before #130, review Certificate creation, Death copying onto an existing target,
   and later Gold Seal provenance/validity; add deduplication, overlapping upstream
   views, and ambiguous-identity checks before consumers claim support.
@@ -553,6 +628,7 @@ Remaining gates after approval of the initial v0.1 interface:
 - Add later-stage checks for timing conflicts and contribution double-counting.
 - Freeze the evaluation protocol with owner approval before held-out measurement.
 
-The initial v0.1 schema and example boundary is approved. Later staged examples,
-exact order-sensitive behavior, and evaluation criteria remain gated; this
-approval is not a claim that those items are complete.
+The initial v0.1 schema and example boundary and #129's two semantics are approved.
+Other staged examples, exact order-sensitive behavior, engine-reference capture
+for #129 and evaluation criteria remain gated; these approvals are not claims
+that those items are complete.

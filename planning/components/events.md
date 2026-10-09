@@ -35,8 +35,9 @@ known. #122 defines shared derived-effect semantics; #124 starts with Dagger.
 - Events reference source frames and state versions.
 - STEP anchors are not a complete trigger stream. Queued resolution has an
   explicit interval; stored Mult growth is not scoring Mult contribution.
-- #129 extends uses/contributions; #130 adds temporal lineage before those slices
-  claim support. Direct/upstream views overlap and do not imply counterfactual gain.
+- #129 adds the owner-approved Hermit/Rebate uses and participation in
+  `RUN_MECHANICS_DESIGN.md`. #130 adds temporal lineage. Direct/upstream views
+  overlap and do not imply counterfactual gain.
 - Rules are deterministic for a fixed input and configuration.
 - Event confidence is propagated from detection/OCR/composition confidence, not
   asserted independently.

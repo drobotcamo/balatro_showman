@@ -30,16 +30,18 @@ mechanics_reference_<run>_<id>_resolved.json ─▶ isolated Dagger answer-key r
 - Mechanics reference: the producer includes a pre-action Dagger snapshot in the
   queued request and may later emit a separate
   `mechanics_reference_<run_id>_<request_id>_resolved.json` after the game update
-  observes queued Dagger Mult growth. The client stores both phases in
-  `mechanics_reference.ndjson`, outside `steps.ndjson`; the generic observation
-  adapters never receive these records. The reference file is retained until the
-  matching step is durable, then acknowledged. It is keyed by the original step
-  and phase, so resolved aftermath requires no intervening player action. A new
-  run-end signal declares the number of emitted resolved references and any
-  still pending Dagger watches. The consumer waits for the declared count before
-  automatic bundle import; pending watches remain diagnosed and do not claim
-  complete reference intake. Sidecar updates replace a complete file atomically
-  so an interrupted write preserves the prior reference records for replay.
+  observes queued Dagger Mult growth. Producer revision
+  `issue129-hermit-rebate-reference-1` also emits
+  `mechanics_reference_<run_id>_<request_id>_mechanics.json` after observing
+  direct Hermit use resolution and Mail-In Rebate Joker/card invocations. The
+  versioned `dagger-reference/2.0` envelope keeps those records in the isolated
+  sidecar. The client stores all phases in `mechanics_reference.ndjson`, outside
+  `steps.ndjson`; generic observation adapters never receive these records.
+  Records are keyed by the original step and phase, so delayed aftermath needs
+  no intervening player action. The run-end signal declares resolved and pending
+  counts for Dagger and mechanics references. The consumer waits for declared
+  counts before automatic bundle import; unresolved watches do not imply complete
+  intake. Each sidecar file is published atomically.
 
 ## Lua producer
 
@@ -82,6 +84,18 @@ contract only; it is never the granularized step schema `3.0.0`):
   engine identity, Mult, sell cost, runtime revision, and source step/timing.
   The consumer removes this object from step payloads and stores it in the
   isolated reference sidecar. Missing identity or values remain null.
+- `producer/1.0.0` with `issue129-hermit-rebate-reference-1`: preserves Dagger
+  records and emits sidecar schema `dagger-reference/2.0`. Hermit is observed
+  inside its delayed event at the direct `ease_dollars` call. Mail-In Rebate is
+  observed per `Card.calculate_joker` discard invocation; repeated direct calls
+  for one Joker/card/interval are aggregated with explicit multiplicity.
+  Actual base rank and effective `Card:get_id()` are distinct; negative no-rank
+  sentinels remain known nonmatches. Nonqualifying, zero, and unknown-input rows
+  are retained. The checked-in LÖVE fixture exercises these hooks with stubs.
+  Live run `923049899800-1565` verified
+  89 mechanics-reference sidecars and imported with 1,117 valid records; its
+  no-rank sentinel rows motivated the reader compatibility fix. Reducer
+  comparison to video observations and user inspection remain open.
 
 ## Repository check
 
@@ -188,6 +202,24 @@ do not execute Balatro's actual save restoration or menu callbacks.
    for all requests through that watermark before finalizing `session.json`.
 4. Report the field values from `steps.ndjson` and `session.json` in Issue #6.
    Keep saves, logs, dumps, and game assets local.
+
+## Monitor an approved live run
+
+Keep the bridge consumer running while the user plays, and monitor the expected
+external output without occupying a foreground command until the run ends. Use a
+background watcher or short, nonblocking polls against the known output root.
+Establish the baseline before play so a new session is not confused with an older
+run. Report sparse progress only when useful; continue responding to the user
+while the watcher waits.
+
+Treat the run as ready for inspection only after `session.json` has a terminal
+outcome and the declared request watermark is persisted. For mechanics-reference
+runs, also wait until the declared reference watermark is resolved. An empty IPC
+queue, a quiet game, or an unchanged step count is not completion. Once the
+terminal session is finalized, inspect the discovered run, run strict RunBundle
+validation, and report the result without asking the user to identify the run by
+its opaque ID. A watcher timeout means “still waiting”; it must not finalize the
+run or infer an outcome.
 
 ## Video alignment procedure
 

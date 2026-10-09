@@ -3,6 +3,15 @@ local function fail(message)
   love.event.quit(1)
 end
 
+function love.errorhandler(message)
+  local trace = debug.traceback(tostring(message), 2)
+  return function()
+    io.stderr:write("producer fixture exception: " .. trace .. "\n")
+    love.event.quit(1)
+    return trace
+  end
+end
+
 function love.load()
   local source = love.filesystem.getSourceBaseDirectory()
   local root = source:gsub("\\", "/"):gsub("/tests$", "")
@@ -29,7 +38,35 @@ function love.load()
     STATES = { GAME_OVER = 99 },
     GAME = { won = false },
     FUNCS = {},
+    E_MANAGER = {events = {}},
     VERSION = "fixture",
+  }
+  function G.E_MANAGER:add_event(event)
+    self.events[#self.events + 1] = event
+    return event
+  end
+  _G.ease_dollars = function(amount)
+    G.GAME.dollars = G.GAME.dollars + amount
+  end
+  _G.Card = {
+    use_consumeable = function(self)
+      if self.config.center.key == "c_hermit" then
+        G.E_MANAGER:add_event({func = function()
+          if not _G.skip_hermit_effect then
+            ease_dollars(math.max(0, math.min(G.GAME.dollars, self.ability.extra)))
+          end
+          return true
+        end})
+      end
+    end,
+    calculate_joker = function(self, context)
+      if self.config.center.key == "j_mail" and context.discard
+          and context.other_card:get_id() == G.GAME.current_round.mail_card.id
+          and not context.other_card.debuff then
+        ease_dollars(self.ability.extra)
+      end
+      return "rebate-result"
+    end,
   }
   local forwarded_args, forwarded_extra
   _G.Game = { start_run = function(self, args, extra)
@@ -182,5 +219,103 @@ function love.load()
   end
   print("producer lifecycle fixture: cold Continue; New Run; menu; Continue 109->110->111; win; no resurrection")
   print("producer Dagger fixture: pre and resolved references retain sell value, mult, identity and timing")
+
+  fixture_time = fixture_time + 1
+  local mechanics_run_id = tostring(math.floor(fixture_time * 1e9)) .. "-1234"
+  G.STATE = 1
+  G.GAME = {won = false, dollars = 9, current_round = {mail_card = {id = 8, rank = "8"}}}
+  Game:start_run({})
+  local function use_hermit(request_id, dollars, instance_id, skip_effect)
+    _G.fixture_clock = _G.fixture_clock + 1
+    G.GAME.dollars = dollars
+    _G.skip_hermit_effect = skip_effect == true
+    bridge.emit("UseConsumable")
+    local card = {config = {center = {key = "c_hermit"}}, ability = {extra = 20}, unique_val = instance_id}
+    Card.use_consumeable(card)
+    local delayed = G.E_MANAGER.events[#G.E_MANAGER.events]
+    if not delayed or not delayed.func then return nil end
+    delayed.func()
+    _G.skip_hermit_effect = false
+    bridge.tick()
+    return read_file(io_root .. "\\mechanics_reference_"
+      .. mechanics_run_id:gsub("[^%w_-]", "_") .. "_" .. string.format("%012d", request_id)
+      .. "_mechanics.json")
+  end
+  local hermit_low = use_hermit(1, 9, 8001)
+  local hermit_capped = use_hermit(2, 30, 8006)
+  local hermit_zero = use_hermit(3, 0, 8007)
+  local hermit_unknown = use_hermit(4, 5, 8009, true)
+  if not hermit_low or not hermit_low:find('"dollars_before":9', 1, true)
+      or not hermit_low:find('"direct_contribution":9', 1, true)
+      or not hermit_low:find('"dollars_after":18', 1, true)
+      or not hermit_low:find('"source_instance_token":"8001"', 1, true)
+      or not hermit_capped or not hermit_capped:find('"direct_contribution":20', 1, true)
+      or not hermit_capped:find('"dollars_after":50', 1, true)
+      or not hermit_capped:find('"dollars_before":30', 1, true)
+      or not hermit_zero or not hermit_zero:find('"direct_contribution":0', 1, true)
+      or not hermit_zero:find('"dollars_after":0', 1, true)
+      or not hermit_unknown or not hermit_unknown:find('"status":"unknown"', 1, true)
+      or not hermit_unknown:find('"direct_contribution":null', 1, true) then
+    return fail("Hermit references missed repeated, capped, zero or instance-specific results")
+  end
+
+  _G.fixture_clock = _G.fixture_clock + 1
+  bridge.emit("DiscardHand")
+  local rebate = {config = {center = {key = "j_mail"}}, ability = {extra = 5}, unique_val = 8002}
+  local rebate2 = {config = {center = {key = "j_mail"}}, ability = {extra = 5}, unique_val = 8005}
+  local function playing_card(token, rank, effective_id)
+    local rank_ids = { ["8"] = 8, ["9"] = 9, ["7"] = 7, ["3"] = 3 }
+    return {unique_val = token, base = {value = rank, id = rank_ids[rank]}, debuff = false,
+      get_id = function(self) return effective_id or self.base.id end}
+  end
+  local card8 = playing_card(8003, "8")
+  Card.calculate_joker(rebate, {discard = true, other_card = card8})
+  Card.calculate_joker(rebate, {discard = true, other_card = card8})
+  local card7 = playing_card(8004, "7")
+  Card.calculate_joker(rebate, {discard = true, other_card = card7})
+  local rankless3 = playing_card(8009, "3", -37134)
+  Card.calculate_joker(rebate, {discard = true, other_card = rankless3})
+  bridge.tick()
+  local rebate_reference = read_file(io_root .. "\\mechanics_reference_"
+    .. mechanics_run_id:gsub("[^%w_-]", "_") .. "_000000000005_mechanics.json")
+  if not rebate_reference or not rebate_reference:find('"trigger":"mail_in_rebate"', 1, true)
+      or not rebate_reference:find('"target_rank":"8"', 1, true)
+      or not rebate_reference:find('"discarded_rank":"8"', 1, true)
+      or not rebate_reference:find('"trigger_multiplicity":2', 1, true)
+      or not rebate_reference:find('"direct_contribution":10', 1, true)
+      or not rebate_reference:find('"discarded_rank":"7"', 1, true)
+      or not rebate_reference:find('"discarded_rank_id":3', 1, true)
+      or not rebate_reference:find('"discarded_effective_rank_id":-37134', 1, true)
+      or not rebate_reference:find('"direct_contribution":0', 1, true) then
+    return fail("Mail-In Rebate references missed target/rank, multiplicity, zero participation or contribution: "
+      .. tostring(rebate_reference))
+  end
+
+  G.GAME.current_round.mail_card = {id = 9, rank = "9"}
+  _G.fixture_clock = _G.fixture_clock + 1
+  bridge.emit("DiscardHand")
+  local card9 = playing_card(8008, "9")
+  Card.calculate_joker(rebate, {discard = true, other_card = card9})
+  Card.calculate_joker(rebate, {discard = true, other_card = card9})
+  Card.calculate_joker(rebate2, {discard = true, other_card = card9})
+  bridge.tick()
+  local changed_rank = read_file(io_root .. "\\mechanics_reference_"
+    .. mechanics_run_id:gsub("[^%w_-]", "_") .. "_000000000006_mechanics.json")
+  if not changed_rank or not changed_rank:find('"target_rank":"9"', 1, true)
+      or not changed_rank:find('"discarded_rank":"9"', 1, true)
+      or not changed_rank:find('"trigger_multiplicity":2', 1, true)
+      or not changed_rank:find('"direct_contribution":10', 1, true)
+      or not changed_rank:find('"rebate_instance_token":"8005"', 1, true)
+      or not changed_rank:find('"direct_contribution":5', 1, true) then
+    return fail("Rebate rank snapshot or multiple-instance semantics were not retained")
+  end
+  G.STATE = G.STATES.GAME_OVER
+  bridge.tick()
+  local mechanics_end = read_file(end_for(mechanics_run_id))
+  if not mechanics_end or not mechanics_end:find('"resolved_mechanics_reference_count":6', 1, true)
+      or not mechanics_end:find('"pending_mechanics_reference_count":0', 1, true) then
+    return fail("terminal mechanics reference watermark omitted resolved Hermit/Rebate scenarios")
+  end
+  print("producer mechanics fixture: repeated/capped/zero Hermit; Rebate rank change, mixed ranks, retrigger and multiple instances")
   love.event.quit(0)
 end

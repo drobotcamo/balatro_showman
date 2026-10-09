@@ -65,6 +65,7 @@ class BalatroModManifestTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("Continue 109->110->111", result.stdout)
+            self.assertIn("producer mechanics fixture:", result.stdout)
             requests = [json.loads(path.read_text()) for path in io_dir.glob("request_*.json")]
             resumed = next(item["meta"]["run_id"] for item in requests if item["request_id"] == 111)
             consumer_io = Path(directory) / "consumer_io"

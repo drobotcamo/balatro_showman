@@ -15,6 +15,63 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-09: Hermit and Mail-In Rebate need occurrence-level money attribution
+
+- Context: Issue #129 source inspection of the installed embedded Balatro
+  `1.0.1o-FULL` executable, SHA-256
+  `0d75fe164accf3312734d4b37ac98788dd15f0b8e4f9bb8b7f90c4e59de93f47`.
+- Observation: `card.lua:1385-1391` queues Hermit's dollar calculation, which
+  clamps the current resolved dollars to the configured amount. `card.lua:2825-2834`
+  evaluates Mail-In Rebate for one `context.other_card`, requiring a non-debuffed
+  card whose `get_id()` matches the current-round target. The target rank/id is
+  reset in `functions/common_events.lua:2288-2300`. On the installed Steamodded
+  stack, `card.lua:1174-1179` makes `get_id()` return a random negative sentinel
+  when `SMODS.has_no_rank` applies, even if `base.value` retains a rank label.
+- Implication: use the delayed Hermit effect balance, retain every Rebate/card
+  participation (including zero), preserve the triggering card's identity/rank
+  and target rank, distinguish actual rank from effective trigger rank, and
+  separate direct effects from interval money deltas. This
+  source trace does not establish behavior for arbitrary mods or live reference
+  data. At initial source review #123's sidecar was Dagger-only; the separately
+  approved #129 extension now adds versioned Hermit/Rebate reference records.
+  The verification below records both live captures and remaining limits.
+- Verification/source: embedded Lua source inspected read-only; focused
+  `tests/test_hermit_rebate.py` exercises caps, zero, unknowns, identity,
+  multiplicity, ties and aggregation; the v2 sidecar validator accepts the
+  observed negative no-rank sentinel while retaining zero contribution. Live
+  Run `923049899800-1565` captured 15 Hermit effects and 315 Rebate/card rows;
+  8 were later legacy no-rank sentinel rows that the initial reader rejected.
+  The corrected reader accepted all 89 mechanics sidecar records and strict
+  RunBundle validation passed for the 514-step win. The second live RunBundle,
+  `15595792437600-8332`, contains three explicit Hermit-use action snapshots
+  whose direct contributions recompute to `$20`, `$20`, and `$0`; all three match
+  the separate reference channel. Its action snapshots also expose 281 Rebate
+  card participations across 66 discard intervals. Rank frequencies from those
+  snapshots match the sidecar after deduplicating each card across Rebate
+  instances: ranks 3 and 4 tie at 29 each. The action snapshots do not carry
+  Rebate target rank, effective rank, debuff, multiplicity, or stable Joker/card
+  instance tokens; earnings and qualifying-rank reconstruction therefore remain
+  unknown. The sidecar's `$370` Rebate total and 4/King qualifying-rank tie are
+  independent reference answers, never reducer inputs. The second-run source
+  hashes and named query outputs are recorded in
+  `planning/issue129-runbundle-query-report.md`.
+
+## 2026-10-09: Monitor live runs without blocking the interaction
+
+- Context: Capturing an owner-operated Balatro run through the file-IPC bridge.
+- Observation: A background watcher or short read-only poll can monitor bridge
+  output while the user plays, then let the agent resume validation as soon as
+  the session is terminal and producer watermarks have drained. Waiting on a
+  long foreground command blocks chat and makes progress opaque.
+- Implication: Keep the bridge consumer alive, establish the output baseline
+  before play, monitor the new run nonblockingly, and inspect only after its
+  terminal session and declared mechanics-reference watermark are complete. An
+  empty queue or idle game is not evidence of completion; a watcher timeout
+  remains a waiting state.
+- Verification/source: Run `15595792437600-8332` finalized as a loss with 347
+  steps, 69 resolved mechanics-reference records, and no pending reference
+  watches; strict RunBundle validation returned `valid` with 763 records.
+
 ## 2026-10-05: Dagger victim sell value is a current-cost derivation
 
 - Context: Issue #124 source inspection of installed Balatro `1.0.1o-FULL` and

@@ -133,6 +133,33 @@ that volume are not currently available. No capture was made; do not relaunch
 the game or recorder until the system is stable and the intended storage volume
 is available.
 
+## Issue #129 mechanics-reference capture (2026-10-09)
+
+After owner authorization, producer build `issue129-hermit-rebate-reference-1`
+(manifest 0.4.0) was installed reversibly. Backup:
+`%APPDATA%\Balatro\bridge-backups\balatro_showman_bridge-issue129-20261009`.
+The installed `main.lua` SHA-256 at launch was
+`444041AE20E1096B2611AF34BEBBE7C45D93545BD2478A3894FD7477A817EBF5`; the
+producer stayed loaded in Balatro `1.0.1o-FULL`, Lovely `0.10.0`, and Steamodded
+`26.926.0~dev-a`.
+
+Live run `923049899800-1565` completed as a win with 514 steps. OBS recording
+`F:\OBS_RECORDINGS\2026-10-09 05-12-21.mkv` used the saved `Untitled` profile
+(MKV, 60 FPS); its marker is in `session.json`. Strict capture integrity passed,
+and the v2 sidecar imported into `F:\OBS_RECORDINGS\issue123_dagger_reference.sqlite`
+with 1,117 valid records, including 603 mechanics-reference records (89 resolved
+mechanics sidecars). These are engine references, not reconstruction inputs.
+
+This installed build emitted the earlier v2 representation in which
+`discarded_rank_id` holds `Card:get_id()` and `discarded_rank` holds the actual
+base label. No-rank cards can therefore carry a negative `discarded_rank_id`.
+The updated reader preserves that legacy shape; the current PR producer also
+emits a separate `discarded_effective_rank_id` alongside the actual base rank ID.
+The run has 15 Hermit uses and 315 Rebate/card participations from one Rebate
+instance. It lacks a zero-balance Hermit use and a second Rebate source. Visual
+reducer comparison and user inspection of the query report remain open. The video
+has not been explicitly associated or frame-aligned.
+
 ## External references
 
 - Steamodded repository/source metadata is available in `smods-main/README.md`,
