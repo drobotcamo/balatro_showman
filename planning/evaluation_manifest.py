@@ -39,6 +39,7 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
     if not isinstance(frames, list):
         return errors + ["frames must be an array"]
     seen: set[str] = set()
+    seen_indices: set[int] = set()
     for i, frame in enumerate(frames):
         prefix = f"frames[{i}]"
         if not isinstance(frame, dict): errors.append(f"{prefix} must be an object"); continue
@@ -47,6 +48,8 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
         elif fid in seen: errors.append(f"duplicate frame_id: {fid}")
         else: seen.add(fid)
         if not isinstance(frame.get("frame_index"), int) or isinstance(frame.get("frame_index"), bool) or frame["frame_index"] < 0: errors.append(f"{prefix}.frame_index is invalid")
+        elif frame["frame_index"] in seen_indices: errors.append(f"duplicate source frame_index: {frame['frame_index']}")
+        else: seen_indices.add(frame["frame_index"])
         if not isinstance(frame.get("annotations"), dict): errors.append(f"{prefix}.annotations is required")
         if frame.get("synthetic_background") is True: errors.append(f"{prefix} uses a synthetic background")
         mapping = frame.get("mapping", {})
@@ -84,7 +87,7 @@ def validate_split_assignments(manifests: list[dict[str, Any]]) -> list[str]:
     errors: list[str] = []
     video_splits: dict[str, str] = {}
     run_splits: dict[str, str] = {}
-    frame_splits: dict[tuple[str, int], str] = {}
+    frame_assignments: dict[tuple[str, int], tuple[str, int]] = {}
     for manifest_index, manifest in enumerate(manifests):
         if not isinstance(manifest, dict):
             errors.append(f"manifests[{manifest_index}] must be an object")
@@ -115,11 +118,13 @@ def validate_split_assignments(manifests: list[dict[str, Any]]) -> list[str]:
             if isinstance(index, bool) or not isinstance(index, int) or index < 0:
                 continue
             frame_key = (video_sha, index)
-            previous = frame_splits.setdefault(frame_key, split)
-            if previous != split:
+            previous = frame_assignments.setdefault(frame_key, (split, manifest_index))
+            if previous[0] != split:
                 errors.append(f"source frame assigned to multiple splits: {video_sha} frame {index}")
+            elif previous[1] != manifest_index:
+                errors.append(f"duplicate source frame across manifests: {video_sha} frame {index}")
     by_video: dict[str, list[tuple[int, str]]] = {}
-    for (video_sha, frame_index), split in frame_splits.items():
+    for (video_sha, frame_index), (split, _) in frame_assignments.items():
         by_video.setdefault(video_sha, []).append((frame_index, split))
     for video_sha, assignments in by_video.items():
         assignments.sort()
