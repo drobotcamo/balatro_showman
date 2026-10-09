@@ -30,9 +30,10 @@
 --     canonical zoned labels are Issue #13; neither is attempted here.
 --   * Every engine read is failure-isolated: an unavailable field is emitted
 --     as null, never guessed.
---   * Dagger mechanics values are carried in an isolated answer-key field,
---     stored separately by the Python consumer. Resolved Mult references are
---     sampled after the game's update has executed queued Dagger events.
+--   * Dagger and #129 Hermit/Mail-In Rebate values are carried in an isolated
+--     mechanics-reference sidecar, never the reconstruction step payload.
+--     Delayed Hermit results are sampled at the direct money call; Rebate rows
+--     retain each Joker/card participation and direct call multiplicity.
 --   * No game assets, saves, or logs are copied anywhere; only JSON state is
 --     written to the shared agent_io directory.
 
@@ -53,6 +54,7 @@ end
 local IO_DIR = io_dir()
 local RECORDING_START_PATH = IO_DIR .. "\\recording_start.json"
 local RECORDING_MARKER_PATH = IO_DIR .. "\\recording_start_marker.json"
+local MECHANICS_RULE_REVISION = "balatro-1.0.1o-FULL:exe-sha256-0d75fe164accf3312734d4b37ac98788dd15f0b8e4f9bb8b7f90c4e59de93f47"
 
 local request_counter = 0
 local producer_write_failures = 0
@@ -66,6 +68,19 @@ local last_emit_seconds = -math.huge
 local recording_poll_diagnosed = false
 local pending_dagger_references = {}
 local resolved_dagger_reference_count = 0
+local pending_mechanics_references = {}
+local resolved_mechanics_reference_count = 0
+local active_rebate_invocation = nil
+local active_hermit_invocation = nil
+local mechanics_reference_path
+local write_new_atomic
+local active_hermit_registration = nil
+local mechanics_hooks_installed = false
+local original_ease_dollars = nil
+local original_add_event = nil
+local rebate_rows_by_request = {}
+local pending_hermit_uses = 0
+local queue_mechanics_reference
 
 -- Monotonic producer timestamp with sub-second precision.  Recording-start
 -- capture must use this same clock (see planning/align_oracle_video.py); it
@@ -1207,7 +1222,7 @@ local function encode_meta(page)
     '"pack_key":' .. (key and j_str(key) or "null"),
     '"sent_at_real_time":' .. j_num(os.time()),
     '"producer":"balatro_showman_bridge"',
-    '"producer_revision":"issue123-dagger-reference-1"',
+    '"producer_revision":"issue129-hermit-rebate-reference-1"',
     '"smoke_subset":true',
     '"page":' .. j_str(page),
     '"runtime":' .. runtime,
@@ -1215,7 +1230,7 @@ local function encode_meta(page)
   return "{" .. table.concat(parts, ",") .. "}"
 end
 
-local function encode_mechanics_reference(step_id, timestamp_ns, phase, resolved_effects)
+local function encode_mechanics_reference(step_id, timestamp_ns, phase, resolved_effects, mechanics_effects)
   local jokers = {}
   if G and G.jokers and G.jokers.cards then
     for i, card in ipairs(G.jokers.cards) do
@@ -1223,12 +1238,12 @@ local function encode_mechanics_reference(step_id, timestamp_ns, phase, resolved
     end
   end
   local parts = {
-    '"schema_version":"dagger-reference/1.0"',
+    '"schema_version":"dagger-reference/2.0"',
     '"run_id":' .. j_str(run_id),
     '"step_id":' .. j_str(step_id),
     '"capture_phase":' .. j_str(phase or "pre_action"),
     '"capture_timestamp_ns":' .. j_num(timestamp_ns),
-    '"producer_revision":"issue123-dagger-reference-1"',
+    '"producer_revision":"issue129-hermit-rebate-reference-1"',
     '"runtime":{"balatro":' .. j_str((G and G.VERSION) or "unknown")
       .. ',"steamodded":' .. j_str(steamodded_version())
       .. ',"lovely":' .. j_str(lovely_version()) .. '}',
@@ -1237,7 +1252,98 @@ local function encode_mechanics_reference(step_id, timestamp_ns, phase, resolved
   if resolved_effects then
     parts[#parts + 1] = '"resolved_effects":[' .. table.concat(resolved_effects, ",") .. "]"
   end
+  if mechanics_effects then
+    parts[#parts + 1] = '"mechanics_effects":[' .. table.concat(mechanics_effects, ",") .. "]"
+  end
   return "{" .. table.concat(parts, ",") .. "}"
+end
+
+local function encode_hermit_reference(use)
+  return '{"trigger":"hermit_use","occurrence_id":' .. j_str(use.occurrence_id)
+    .. ',"interval_id":' .. j_str(use.interval_id)
+    .. ',"rule_revision":' .. j_str(MECHANICS_RULE_REVISION .. ":hermit-use-v1")
+    .. ',"source_instance_token":' .. j_scalar(use.source_token)
+    .. ',"dollars_before":' .. j_scalar(use.dollars_before)
+    .. ',"dollars_after":' .. j_scalar(use.dollars_after)
+    .. ',"ability_extra":' .. j_scalar(use.ability_extra)
+    .. ',"direct_contribution":' .. j_scalar(use.direct_contribution)
+    .. ',"status":' .. j_str(use.status)
+    .. ',"pre_capture_timestamp_ns":' .. j_num(use.pre_timestamp_ns)
+    .. ',"resolved_capture_timestamp_ns":' .. j_num(use.resolved_timestamp_ns) .. '}'
+end
+
+local function encode_rebate_reference(row)
+  return '{"trigger":"mail_in_rebate","occurrence_id":' .. j_str(row.occurrence_id)
+    .. ',"interval_id":' .. j_str(row.interval_id)
+    .. ',"rule_revision":' .. j_str(MECHANICS_RULE_REVISION .. ":mail-in-rebate-v1")
+    .. ',"rebate_instance_token":' .. j_scalar(row.rebate_token)
+    .. ',"discarded_instance_token":' .. j_scalar(row.card_token)
+    .. ',"target_rank_id":' .. j_scalar(row.target_rank_id)
+    .. ',"target_rank":' .. j_scalar(row.target_rank)
+    .. ',"discarded_rank_id":' .. j_scalar(row.discarded_rank_id)
+    .. ',"discarded_rank":' .. j_scalar(row.discarded_rank)
+    .. ',"debuffed":' .. j_scalar(row.debuffed)
+    .. ',"bonus_per_trigger":' .. j_scalar(row.bonus_per_trigger)
+    .. ',"trigger_multiplicity":' .. j_num(row.trigger_multiplicity)
+    .. ',"direct_contribution":' .. j_scalar(row.direct_contribution)
+    .. ',"status":' .. j_str(row.status)
+    .. ',"pre_capture_timestamp_ns":' .. j_num(row.pre_timestamp_ns)
+    .. ',"resolved_capture_timestamp_ns":' .. j_num(row.resolved_timestamp_ns) .. '}'
+end
+
+local function stable_reference_id(namespace, parts)
+  local encoded = {}
+  for _, part in ipairs(parts) do
+    local value = tostring(part)
+    encoded[#encoded + 1] = tostring(#value) .. "#" .. value
+  end
+  return namespace .. ":" .. table.concat(encoded)
+end
+
+local function pack_values(...)
+  return {n = select("#", ...), ...}
+end
+
+local function finalize_hermit_reference(use)
+  if use.captured then return end
+  local source_token = use.source_token or "unknown"
+  use.occurrence_id = stable_reference_id("hermit-use-v1", {
+    run_id, use.interval_id, tostring(source_token),
+  })
+  use.status = (use.source_token ~= nil and use.dollars_before ~= nil
+    and use.dollars_after ~= nil and use.ability_extra ~= nil
+    and use.direct_contribution ~= nil) and "observed" or "unknown"
+  queue_mechanics_reference(use.request_id, encode_hermit_reference(use))
+  use.captured = true
+  pending_hermit_uses = math.max(0, pending_hermit_uses - 1)
+end
+
+queue_mechanics_reference = function(request_id, event)
+  local rows = pending_mechanics_references[request_id]
+  if not rows then
+    rows = {}
+    pending_mechanics_references[request_id] = rows
+  end
+  rows[#rows + 1] = event
+end
+
+local function flush_mechanics_references()
+  for request_id, events in pairs(pending_mechanics_references) do
+    local timestamp_ns = capture_timestamp_ns()
+    local encoded = {}
+    for _, event in ipairs(events) do encoded[#encoded + 1] = event end
+    local step_id = run_id .. ":" .. tostring(request_id)
+    local body = encode_mechanics_reference(step_id, timestamp_ns,
+      "resolved_mechanics", nil, encoded)
+    local path = mechanics_reference_path(run_id, request_id, "mechanics")
+    local wrote = write_new_atomic(path, body)
+    if wrote then
+      resolved_mechanics_reference_count = resolved_mechanics_reference_count + 1
+      pending_mechanics_references[request_id] = nil
+    else
+      print("[balatro_showman_bridge] could not enqueue mechanics reference at " .. path)
+    end
+  end
 end
 
 -- ---------------------------------------------------------------------------
@@ -1277,7 +1383,7 @@ local function run_end_path(target_run_id)
   return IO_DIR .. "\\run_end_" .. filename_token(target_run_id) .. ".json"
 end
 
-local function mechanics_reference_path(target_run_id, request_id, phase)
+mechanics_reference_path = function(target_run_id, request_id, phase)
   return IO_DIR .. "\\mechanics_reference_" .. filename_token(target_run_id) .. "_"
     .. string.format("%012d", request_id) .. "_" .. filename_token(phase) .. ".json"
 end
@@ -1291,7 +1397,7 @@ end
 
 -- Queue entries are immutable and become visible only after a successful
 -- rename. A failed write leaves the request counter unchanged.
-local function write_new_atomic(path, text)
+write_new_atomic = function(path, text)
   if file_exists(path) then return false end
   local tmp = path .. ".tmp"
   local handle = io.open(tmp, "wb")
@@ -1370,6 +1476,174 @@ local function poll_dagger_references()
     end
   end
   pending_dagger_references = remaining
+end
+
+local function capture_rebate_invocation(self, context, original, ...)
+  local other = context and context.other_card
+  local is_rebate_discard = center_key(self) == "j_mail" and context and context.discard and other
+  if not is_rebate_discard then
+    local parent = active_rebate_invocation
+    active_rebate_invocation = nil
+    local args = pack_values(...)
+    local ok, results = pcall(function()
+      return pack_values(original(self, context, unpack(args, 1, args.n)))
+    end)
+    active_rebate_invocation = parent
+    if not ok then error(results, 0) end
+    return unpack(results, 1, results.n)
+  end
+  local request_id = request_counter
+  local interval_id = run_id .. ":" .. tostring(request_id)
+  local rebate_token = mechanics_card_identity(self)
+  local card_token = mechanics_card_identity(other)
+  local target = try(function() return G.GAME.current_round.mail_card end)
+  local row = {
+    request_id = request_id,
+    interval_id = interval_id,
+    rebate_token = rebate_token,
+    card_token = card_token,
+    target_rank_id = try(function() return target.id end),
+    target_rank = try(function() return target.rank end),
+    discarded_rank_id = try(function() return other:get_id() end),
+    discarded_rank = try(function() return other.base.value end),
+    debuffed = try(function() return other.debuff end),
+    bonus_per_trigger = try(function() return self.ability.extra end),
+    trigger_multiplicity = 0,
+    direct_contribution = 0,
+    pre_timestamp_ns = capture_timestamp_ns(),
+  }
+  local parent = active_rebate_invocation
+  active_rebate_invocation = row
+  local args = pack_values(...)
+  local ok, results = pcall(function()
+    return pack_values(original(self, context, unpack(args, 1, args.n)))
+  end)
+  active_rebate_invocation = parent
+  if not ok then error(results, 0) end
+  row.resolved_timestamp_ns = capture_timestamp_ns()
+  local qualifying = row.target_rank_id ~= nil and row.discarded_rank_id ~= nil
+    and row.target_rank_id == row.discarded_rank_id and not row.debuffed
+  local inputs_complete = row.rebate_token ~= nil and row.card_token ~= nil
+    and row.target_rank_id ~= nil and row.target_rank ~= nil
+    and row.discarded_rank_id ~= nil and row.discarded_rank ~= nil
+    and row.debuffed ~= nil and type(row.bonus_per_trigger) == "number"
+  if not qualifying then
+    row.direct_contribution = 0
+    row.trigger_multiplicity = 0
+    row.status = inputs_complete and "observed" or "unknown"
+  else
+    row.status = (inputs_complete and row.trigger_multiplicity > 0) and "observed" or "unknown"
+    if row.status == "unknown" then row.direct_contribution = nil end
+  end
+  local identity = stable_reference_id("rebate-discard-v1", {
+    run_id, interval_id, tostring(rebate_token or "unknown"), tostring(card_token or "unknown"),
+  })
+  local key = tostring(request_id) .. "\0" .. identity
+  local aggregate = rebate_rows_by_request[key]
+  if aggregate then
+    aggregate.trigger_multiplicity = aggregate.trigger_multiplicity + row.trigger_multiplicity
+    if aggregate.direct_contribution ~= nil and row.direct_contribution ~= nil then
+      aggregate.direct_contribution = aggregate.direct_contribution + row.direct_contribution
+    else
+      aggregate.direct_contribution = nil
+      aggregate.status = "unknown"
+    end
+    if row.status ~= "observed" then aggregate.status = "unknown" end
+    aggregate.resolved_timestamp_ns = row.resolved_timestamp_ns
+  else
+    row.occurrence_id = identity
+    rebate_rows_by_request[key] = row
+  end
+  return unpack(results, 1, results.n)
+end
+
+local function install_mechanics_hooks()
+  if mechanics_hooks_installed then return end
+  if type(ease_dollars) == "function" then
+    original_ease_dollars = ease_dollars
+    ease_dollars = function(amount, ...)
+      if active_rebate_invocation and type(amount) == "number" then
+        active_rebate_invocation.trigger_multiplicity = active_rebate_invocation.trigger_multiplicity + 1
+        active_rebate_invocation.direct_contribution = active_rebate_invocation.direct_contribution + amount
+      elseif active_hermit_invocation and type(amount) == "number" then
+        active_hermit_invocation.direct_contribution = amount
+        active_hermit_invocation.dollars_before = try(function() return G.GAME.dollars end)
+      end
+      local results = pack_values(original_ease_dollars(amount, ...))
+      if active_hermit_invocation then
+        active_hermit_invocation.dollars_after = try(function() return G.GAME.dollars end)
+      end
+      return unpack(results, 1, results.n)
+    end
+  end
+  if type(Card) == "table" and type(Card.calculate_joker) == "function" then
+    local original = Card.calculate_joker
+    Card.calculate_joker = function(self, context, ...)
+      return capture_rebate_invocation(self, context, original, ...)
+    end
+  end
+  if type(Card) == "table" and type(Card.use_consumeable) == "function" then
+    local original = Card.use_consumeable
+    Card.use_consumeable = function(self, ...)
+      if center_key(self) ~= "c_hermit" then return original(self, ...) end
+      local request_id = request_counter
+      local token = mechanics_card_identity(self)
+      local invocation = {
+        request_id = request_id,
+        interval_id = run_id .. ":" .. tostring(request_id),
+        source_token = token,
+        ability_extra = try(function() return self.ability.extra end),
+        pre_timestamp_ns = capture_timestamp_ns(),
+        events_pending = 0,
+      }
+      pending_hermit_uses = pending_hermit_uses + 1
+      active_hermit_registration = invocation
+      local args = pack_values(...)
+      local ok, results = pcall(function()
+        return pack_values(original(self, unpack(args, 1, args.n)))
+      end)
+      active_hermit_registration = nil
+      invocation.registration_closed = true
+      if invocation.events_pending == 0 then finalize_hermit_reference(invocation) end
+      if not ok then error(results, 0) end
+      return unpack(results, 1, results.n)
+    end
+  end
+  if G and G.E_MANAGER and type(G.E_MANAGER.add_event) == "function" then
+    original_add_event = G.E_MANAGER.add_event
+    G.E_MANAGER.add_event = function(manager, event, ...)
+      if active_hermit_registration and type(event) == "table" and type(event.func) == "function" then
+        local use = active_hermit_registration
+        local callback = event.func
+        use.events_pending = use.events_pending + 1
+        event.func = function(...)
+          local previous = active_hermit_invocation
+          active_hermit_invocation = use
+          if use.dollars_before == nil then use.dollars_before = try(function() return G.GAME.dollars end) end
+          local ok, result = pcall(callback, ...)
+          use.resolved_timestamp_ns = capture_timestamp_ns()
+          if use.dollars_after == nil then use.dollars_after = try(function() return G.GAME.dollars end) end
+          active_hermit_invocation = previous
+          use.events_pending = math.max(0, use.events_pending - 1)
+          if use.registration_closed and use.events_pending == 0 then finalize_hermit_reference(use) end
+          if not ok then error(result, 0) end
+          return result
+        end
+      end
+      return original_add_event(manager, event, ...)
+    end
+  end
+  mechanics_hooks_installed = true
+end
+
+local function poll_mechanics_references()
+  for key, row in pairs(rebate_rows_by_request) do
+    local events = pending_mechanics_references[row.request_id] or {}
+    events[#events + 1] = encode_rebate_reference(row)
+    pending_mechanics_references[row.request_id] = events
+    rebate_rows_by_request[key] = nil
+  end
+  flush_mechanics_references()
 end
 
 local function poll_recording_start()
@@ -1467,6 +1741,10 @@ function Bridge.emit(action_label)
     producer_write_failures = 0
     pending_dagger_references = {}
     resolved_dagger_reference_count = 0
+    pending_mechanics_references = {}
+    resolved_mechanics_reference_count = 0
+    pending_hermit_uses = 0
+    rebate_rows_by_request = {}
     run_ending = false
     run_finalized = false
   end
@@ -1496,12 +1774,17 @@ local function finalize(outcome)
   if run_finalized or not run_id then return end
   run_ending = true
   local end_path = run_end_path(run_id)
+  local pending_mechanics = pending_hermit_uses
+  for _, _ in pairs(pending_mechanics_references) do pending_mechanics = pending_mechanics + 1 end
+  for _, _ in pairs(rebate_rows_by_request) do pending_mechanics = pending_mechanics + 1 end
   local body = '{"run_id":' .. j_str(run_id)
     .. ',"ipc_schema_version":"file-queue/1.0.0"'
     .. ',"outcome":' .. j_str(outcome)
     .. ',"last_request_id":' .. tostring(request_counter)
     .. ',"resolved_dagger_reference_count":' .. tostring(resolved_dagger_reference_count)
     .. ',"pending_dagger_reference_count":' .. tostring(#pending_dagger_references)
+    .. ',"resolved_mechanics_reference_count":' .. tostring(resolved_mechanics_reference_count)
+    .. ',"pending_mechanics_reference_count":' .. tostring(pending_mechanics)
     .. ',"producer_write_failures":' .. tostring(producer_write_failures) .. "}"
   local wrote = write_new_atomic(end_path, body)
   if wrote then
@@ -1576,8 +1859,10 @@ end
 
 function Bridge.tick()
   install_action_hooks()
+  install_mechanics_hooks()
   poll_recording_start()
   poll_dagger_references()
+  poll_mechanics_references()
   if run_id and not run_finalized and G and G.STATE == G.STATES.GAME_OVER then
     finalize((G.GAME and G.GAME.won) and "win" or "loss")
   end
@@ -1608,6 +1893,10 @@ local function install_game_hooks()
         producer_write_failures = 0
         pending_dagger_references = {}
         resolved_dagger_reference_count = 0
+        pending_mechanics_references = {}
+        resolved_mechanics_reference_count = 0
+        pending_hermit_uses = 0
+        rebate_rows_by_request = {}
         run_ending = false
         run_finalized = false
         finalization_failure_logged = false
@@ -1633,6 +1922,6 @@ pcall(function() love.filesystem.createDirectory("agent_io") end)
 install_game_hooks()
 install_action_hooks()
 
-print("[balatro_showman_bridge] loaded; build=issue123-dagger-reference-1; io_dir=" .. IO_DIR)
+print("[balatro_showman_bridge] loaded; build=issue129-hermit-rebate-reference-1; io_dir=" .. IO_DIR)
 
 return Bridge

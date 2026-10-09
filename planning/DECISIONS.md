@@ -624,6 +624,45 @@ criteria or any evaluation threshold. Alternative considered: keep one issue
 and one undifferentiated completion state, rejected because it caused repeated
 implementation PRs while the remaining blocker was external evidence.
 
+### D044 — accepted — Hermit and Mail-In Rebate preserve per-trigger evidence and attribution
+
+For the bounded #129 slice, emit one evidence-linked occurrence per Hermit use
+and per Rebate/Joker/discarded-card participation. Retain every discard while a
+Rebate is observed as owned, including nonqualifying and zero cases; snapshot the
+target rank at trigger time and preserve each triggering card instance and rank.
+Record Hermit's money immediately before and after its delayed call, with its
+direct contribution separate from interval-wide net money changes. Preserve
+multiplicity and distinct instances, reject duplicate
+occurrence identities on replay, expose occurrence evidence behind all requested
+aggregates, return all tied ranks, and report unknown totals/frequencies when
+coverage or attribution is incomplete. This decision does not authorize other
+mechanics or establish live engine-reference validation; that requires a #123
+reference-capture extension.
+
+Alternative: store only successful payout totals or infer direct contribution
+from the action interval's money delta. Rejected because those views lose
+nonqualifying participation, conflate concurrent money effects, hide multiple
+sources, and cannot distinguish missing evidence from zero. Source shape is
+documented in `RUN_MECHANICS_DESIGN.md`; user approval is recorded on Issue #129
+in comments 6079247336 and 6079268359 (2026-10-09).
+
+### D045 — accepted — Extend isolated mechanics references for #129 scenarios
+
+Extend the #123 mechanics-reference sidecar with versioned Hermit-use and
+Mail-In Rebate invocation records for #129. Record Hermit's delayed money before
+and after its direct call, plus its contribution; record each Rebate Joker/card
+participation, including target and
+actual rank, debuff, multiplicity, direct amount, occurrence/action identity,
+and timing. Preserve legacy Dagger record reading. Keep all reference values
+outside reconstruction inputs. The owner approved this bounded extension on
+2026-10-09 in Issue #129 comment 6080045933; live installation and gameplay
+capture still need their separate authorization after implementation and
+preflight.
+
+Alternative: infer effects from interval money deltas or add these fields to
+ordinary step observations. Rejected because the interval can contain unrelated
+effects and engine-reference values must remain isolated.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the

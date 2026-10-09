@@ -3,10 +3,10 @@
   "name": "Balatro Showman Bridge",
   "display_name": "Balatro Showman Bridge",
   "author": ["balatro_showman"],
-  "description": "Balatro Showman durable file-queue producer with isolated Dagger mechanics references (Issue #123).",
+  "description": "Balatro Showman durable file-queue producer with isolated Dagger, Hermit, and Mail-In Rebate mechanics references.",
   "prefix": "bmbr",
   "main_file": "main.lua",
   "priority": 0,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "dependencies": ["Steamodded (>=1.*~)", "Lovely (>=0.6)"]
 }

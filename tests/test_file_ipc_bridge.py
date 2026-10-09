@@ -197,6 +197,87 @@ class FileIpcBridgeTests(unittest.TestCase):
                 bridge.step_once()
             self.assertTrue(request.exists())
 
+    def test_v2_hermit_and_rebate_references_are_validated_and_isolated(self) -> None:
+        from ground_truth.file_ipc_bridge import _validate_mechanics_reference
+
+        record = {
+            "schema_version": "dagger-reference/2.0", "step_id": "mechanics:1",
+            "capture_phase": "resolved_mechanics", "capture_timestamp_ns": 200,
+            "producer_revision": "issue129-mechanics-reference-1",
+            "runtime": {"balatro": "1.0.1o-FULL", "steamodded": "test", "lovely": "test"},
+            "jokers": [], "mechanics_effects": [
+                {"trigger": "hermit_use", "occurrence_id": "hermit:1", "interval_id": "mechanics:1",
+                 "rule_revision": "balatro-test:hermit-use-v1",
+                 "source_instance_token": "hermit-1", "dollars_before": 12, "dollars_after": 24,
+                 "ability_extra": 20,
+                 "direct_contribution": 12, "pre_capture_timestamp_ns": 100,
+                 "resolved_capture_timestamp_ns": 200, "status": "observed"},
+                {"trigger": "mail_in_rebate", "occurrence_id": "rebate:1", "interval_id": "mechanics:1",
+                 "rule_revision": "balatro-test:mail-in-rebate-v1",
+                 "rebate_instance_token": "rebate-1", "discarded_instance_token": "card-1",
+                 "target_rank_id": 8, "target_rank": "8", "discarded_rank_id": 8,
+                 "discarded_rank": "8", "debuffed": False, "bonus_per_trigger": 5,
+                 "trigger_multiplicity": 2, "direct_contribution": 10,
+                 "pre_capture_timestamp_ns": 100, "resolved_capture_timestamp_ns": 200,
+                 "status": "observed"},
+            ],
+        }
+        self.assertEqual(
+            _validate_mechanics_reference({"mechanics_reference": record}), record
+        )
+        invalid_formula = json.loads(json.dumps(record))
+        invalid_formula["mechanics_effects"][0]["direct_contribution"] = 11
+        with self.assertRaisesRegex(ValueError, "Hermit formula"):
+            _validate_mechanics_reference({"mechanics_reference": invalid_formula})
+
+        unknown = json.loads(json.dumps(record))
+        unknown["mechanics_effects"] = [{
+            "trigger": "hermit_use", "occurrence_id": "hermit:unknown", "interval_id": "mechanics:1",
+            "rule_revision": "balatro-test:hermit-use-v1",
+            "source_instance_token": None, "dollars_before": None, "ability_extra": 20,
+            "dollars_after": None,
+            "direct_contribution": None, "pre_capture_timestamp_ns": 100,
+            "resolved_capture_timestamp_ns": 200, "status": "unknown",
+        }]
+        self.assertEqual(
+            _validate_mechanics_reference({"mechanics_reference": unknown}), unknown
+        )
+
+    def test_v2_mechanics_reference_waits_for_terminal_sidecar_count(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            io_dir, out_dir = root / "io", root / "runs"
+            io_dir.mkdir()
+            request = _queue_request(io_dir, "mechanics-v2", 1)
+            mechanics_path = io_dir / "mechanics_reference_mechanics-v2_000000000001_mechanics.json"
+            mechanics_path.write_text(json.dumps({
+                "schema_version": "dagger-reference/2.0", "run_id": "mechanics-v2",
+                "step_id": "mechanics-v2:1", "capture_phase": "resolved_mechanics",
+                "capture_timestamp_ns": 200, "producer_revision": "test",
+                "runtime": {"balatro": "1.0.1o-FULL", "steamodded": "test", "lovely": "test"},
+                "jokers": [], "mechanics_effects": [{
+                    "trigger": "hermit_use", "occurrence_id": "hermit:1", "interval_id": "mechanics-v2:1",
+                    "rule_revision": "balatro-test:hermit-use-v1",
+                    "source_instance_token": "hermit-1", "dollars_before": 12, "dollars_after": 24,
+                    "ability_extra": 20,
+                    "direct_contribution": 12, "pre_capture_timestamp_ns": 100,
+                    "resolved_capture_timestamp_ns": 200, "status": "observed",
+                }],
+            }), encoding="utf-8")
+            (io_dir / "run_end_mechanics-v2.json").write_text(json.dumps({
+                "ipc_schema_version": "file-queue/1.0.0", "run_id": "mechanics-v2",
+                "outcome": "loss", "last_request_id": 1,
+                "resolved_mechanics_reference_count": 1, "pending_mechanics_reference_count": 0,
+            }), encoding="utf-8")
+            bridge = FileIpcBridge(io_dir, out_dir)
+            self.assertTrue(bridge.step_once())
+            step = json.loads((out_dir / "mechanics-v2" / "steps.ndjson").read_text().splitlines()[0])
+            self.assertNotIn("mechanics_reference", step)
+            self.assertFalse(mechanics_path.exists())
+            references = read_mechanics_reference(out_dir / "mechanics-v2")
+            self.assertEqual(references[0]["schema_version"], "dagger-reference/2.0")
+            self.assertEqual(references[0]["mechanics_effects"][0]["direct_contribution"], 12)
+
     def test_snapshot_action_and_run_end_are_recorded(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

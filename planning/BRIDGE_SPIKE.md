@@ -30,16 +30,18 @@ mechanics_reference_<run>_<id>_resolved.json ─▶ isolated Dagger answer-key r
 - Mechanics reference: the producer includes a pre-action Dagger snapshot in the
   queued request and may later emit a separate
   `mechanics_reference_<run_id>_<request_id>_resolved.json` after the game update
-  observes queued Dagger Mult growth. The client stores both phases in
-  `mechanics_reference.ndjson`, outside `steps.ndjson`; the generic observation
-  adapters never receive these records. The reference file is retained until the
-  matching step is durable, then acknowledged. It is keyed by the original step
-  and phase, so resolved aftermath requires no intervening player action. A new
-  run-end signal declares the number of emitted resolved references and any
-  still pending Dagger watches. The consumer waits for the declared count before
-  automatic bundle import; pending watches remain diagnosed and do not claim
-  complete reference intake. Sidecar updates replace a complete file atomically
-  so an interrupted write preserves the prior reference records for replay.
+  observes queued Dagger Mult growth. Producer revision
+  `issue129-hermit-rebate-reference-1` also emits
+  `mechanics_reference_<run_id>_<request_id>_mechanics.json` after observing
+  direct Hermit use resolution and Mail-In Rebate Joker/card invocations. The
+  versioned `dagger-reference/2.0` envelope keeps those records in the isolated
+  sidecar. The client stores all phases in `mechanics_reference.ndjson`, outside
+  `steps.ndjson`; generic observation adapters never receive these records.
+  Records are keyed by the original step and phase, so delayed aftermath needs
+  no intervening player action. The run-end signal declares resolved and pending
+  counts for Dagger and mechanics references. The consumer waits for declared
+  counts before automatic bundle import; unresolved watches do not imply complete
+  intake. Each sidecar file is published atomically.
 
 ## Lua producer
 
@@ -82,6 +84,14 @@ contract only; it is never the granularized step schema `3.0.0`):
   engine identity, Mult, sell cost, runtime revision, and source step/timing.
   The consumer removes this object from step payloads and stores it in the
   isolated reference sidecar. Missing identity or values remain null.
+- `producer/1.0.0` with `issue129-hermit-rebate-reference-1`: preserves Dagger
+  records and emits sidecar schema `dagger-reference/2.0`. Hermit is observed
+  inside its delayed event at the direct `ease_dollars` call. Mail-In Rebate is
+  observed per `Card.calculate_joker` discard invocation; repeated direct calls
+  for one Joker/card/interval are aggregated with explicit multiplicity.
+  Nonqualifying, zero, and unknown-input rows are retained. The checked-in LÖVE
+  fixture exercises these hooks with stubs; live installation/capture remains
+  separate evidence.
 
 ## Repository check
 

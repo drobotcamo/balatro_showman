@@ -15,6 +15,27 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-09: Hermit and Mail-In Rebate need occurrence-level money attribution
+
+- Context: Issue #129 source inspection of the installed embedded Balatro
+  `1.0.1o-FULL` executable, SHA-256
+  `0d75fe164accf3312734d4b37ac98788dd15f0b8e4f9bb8b7f90c4e59de93f47`.
+- Observation: `card.lua:1385-1391` queues Hermit's dollar calculation, which
+  clamps the current resolved dollars to the configured amount. `card.lua:2825-2834`
+  evaluates Mail-In Rebate for one `context.other_card`, requiring a non-debuffed
+  card whose `get_id()` matches the current-round target. The target rank/id is
+  reset in `functions/common_events.lua:2288-2300`.
+- Implication: use the delayed Hermit effect balance, retain every Rebate/card
+  participation (including zero), preserve the triggering card's identity/rank
+  and target rank, and separate direct effects from interval money deltas. This
+  source trace does not establish behavior for arbitrary mods or live reference
+  data. At initial source review #123's sidecar was Dagger-only; the separately
+  approved #129 extension now adds versioned Hermit/Rebate reference records,
+  but no live scenario has been captured with that producer.
+- Verification/source: embedded Lua source inspected read-only; focused
+  `tests/test_hermit_rebate.py` exercises caps, zero, unknowns, identity,
+  multiplicity, ties and aggregation. Engine-reference verification remains open.
+
 ## 2026-10-05: Dagger victim sell value is a current-cost derivation
 
 - Context: Issue #124 source inspection of installed Balatro `1.0.1o-FULL` and
