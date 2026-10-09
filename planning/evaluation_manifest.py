@@ -25,11 +25,15 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     if not isinstance(manifest, dict):
         return ["manifest must be an object"]
+    unknown = set(manifest) - {"schema_version", "protocol", "source", "frames"}
+    if unknown: errors.append(f"manifest has unknown fields: {','.join(sorted(map(str, unknown)))}")
     if manifest.get("schema_version") != SCHEMA_VERSION: errors.append("unsupported schema_version")
     if not isinstance(manifest.get("protocol"), str) or not manifest["protocol"]: errors.append("protocol is required")
     source = manifest.get("source")
     if not isinstance(source, dict): errors.append("source must be an object")
     else:
+        unknown = set(source) - {"video_sha256", "run_sha256", "alignment_sha256", "split", "width", "height"}
+        if unknown: errors.append(f"source has unknown fields: {','.join(sorted(map(str, unknown)))}")
         for key in ("video_sha256", "run_sha256", "alignment_sha256"):
             if not isinstance(source.get(key), str) or not re.fullmatch(r"[0-9a-f]{64}", source[key]): errors.append(f"source.{key} must be sha256")
         if not isinstance(source.get("split"), str) or source["split"] not in {"development", "held_out"}: errors.append("source.split is invalid")
@@ -43,6 +47,8 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
     for i, frame in enumerate(frames):
         prefix = f"frames[{i}]"
         if not isinstance(frame, dict): errors.append(f"{prefix} must be an object"); continue
+        unknown = set(frame) - {"frame_id", "frame_index", "mapping", "canonical_to_source", "annotations", "review", "synthetic_background", "excluded"}
+        if unknown: errors.append(f"{prefix} has unknown fields: {','.join(sorted(map(str, unknown)))}")
         fid = frame.get("frame_id")
         if not isinstance(fid, str) or not fid: errors.append(f"{prefix}.frame_id is required")
         elif fid in seen: errors.append(f"duplicate frame_id: {fid}")
@@ -51,8 +57,13 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
         elif frame["frame_index"] in seen_indices: errors.append(f"duplicate source frame_index: {frame['frame_index']}")
         else: seen_indices.add(frame["frame_index"])
         if not isinstance(frame.get("annotations"), dict): errors.append(f"{prefix}.annotations is required")
+        if "synthetic_background" in frame and not isinstance(frame["synthetic_background"], bool): errors.append(f"{prefix}.synthetic_background must be boolean")
         if frame.get("synthetic_background") is True: errors.append(f"{prefix} uses a synthetic background")
+        if "excluded" in frame and not isinstance(frame["excluded"], bool): errors.append(f"{prefix}.excluded must be boolean")
         mapping = frame.get("mapping", {})
+        if isinstance(mapping, dict):
+            unknown = set(mapping) - {"x", "y", "width", "height"}
+            if unknown: errors.append(f"{prefix}.mapping has unknown fields: {','.join(sorted(map(str, unknown)))}")
         if not isinstance(mapping, dict) or any(isinstance(mapping.get(k), bool) or not isinstance(mapping.get(k), (int, float)) or not math.isfinite(mapping[k]) for k in ("x", "y", "width", "height")) or mapping.get("width", 0) <= 0 or mapping.get("height", 0) <= 0:
             errors.append(f"{prefix}.mapping is malformed")
         transform = frame.get("canonical_to_source")
@@ -65,6 +76,9 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
         reviewers = review.get("reviewers")
         valid_reviewers = isinstance(reviewers, list) and all(isinstance(reviewer, str) and reviewer for reviewer in reviewers)
         if review.get("status") != "reviewed" or not valid_reviewers or len(set(reviewers)) < 2: errors.append(f"{prefix} is not independently reviewed")
+        unknown = set(review) - {"reviewers", "status", "disagreement"}
+        if unknown: errors.append(f"{prefix}.review has unknown fields: {','.join(sorted(map(str, unknown)))}")
+        if "disagreement" in review and not isinstance(review["disagreement"], bool): errors.append(f"{prefix}.review.disagreement must be boolean")
         annotations = frame.get("annotations")
         if not isinstance(annotations, dict):
             continue
@@ -75,6 +89,9 @@ def validate_manifest(manifest: dict[str, Any]) -> list[str]:
         if unsupported: errors.append(f"{prefix} has unsupported fields: {','.join(sorted(unsupported))}")
         for field, value in annotations.items():
             if not isinstance(value, dict) or not isinstance(value.get("status"), str) or value["status"] not in STATUSES: errors.append(f"{prefix}.annotations.{field} has invalid status")
+            if isinstance(value, dict):
+                unknown = set(value) - {"status", "raw", "normalized", "contradictory", "oracle", "ground_truth", "reference_value"}
+                if unknown: errors.append(f"{prefix}.annotations.{field} has unknown fields: {','.join(sorted(map(str, unknown)))}")
             elif value.get("status") == "observed" and "raw" not in value: errors.append(f"{prefix}.annotations.{field} lacks raw value")
             if isinstance(value, dict) and "normalized" in value and "raw" not in value: errors.append(f"{prefix}.annotations.{field} normalized value lacks raw value")
             if isinstance(value, dict) and any(key in value for key in ("oracle", "ground_truth", "reference_value")): errors.append(f"{prefix}.annotations.{field} contains oracle/reference data")
