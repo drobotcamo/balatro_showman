@@ -636,8 +636,8 @@ multiplicity and distinct instances, reject duplicate
 occurrence identities on replay, expose occurrence evidence behind all requested
 aggregates, return all tied ranks, and report unknown totals/frequencies when
 coverage or attribution is incomplete. This decision does not authorize other
-mechanics or establish live engine-reference validation; that requires a #123
-reference-capture extension.
+mechanics or establish reconstruction quality; live comparisons must use the
+separate #123 reference-capture extension and the approved observation boundary.
 
 Alternative: store only successful payout totals or infer direct contribution
 from the action interval's money delta. Rejected because those views lose
@@ -650,14 +650,14 @@ in comments 6079247336 and 6079268359 (2026-10-09).
 
 Extend the #123 mechanics-reference sidecar with versioned Hermit-use and
 Mail-In Rebate invocation records for #129. Record Hermit's delayed money before
-and after its direct call, plus its contribution; record each Rebate Joker/card
-participation, including target and
-actual rank, debuff, multiplicity, direct amount, occurrence/action identity,
-and timing. Preserve legacy Dagger record reading. Keep all reference values
+and after its direct call, plus its contribution. For each Rebate Joker/card
+participation, record target rank, actual rank, effective trigger ID, debuff,
+multiplicity, direct amount, occurrence/action identity, and timing. Preserve
+legacy Dagger record reading. Keep all reference values
 outside reconstruction inputs. The owner approved this bounded extension on
-2026-10-09 in Issue #129 comment 6080045933; live installation and gameplay
-capture still need their separate authorization after implementation and
-preflight.
+2026-10-09 in Issue #129 comment 6080045933 and separately authorized its
+reversible installation and first launch. Live reducer comparisons and user
+inspection of the report remain acceptance work.
 
 Alternative: infer effects from interval money deltas or add these fields to
 ordinary step observations. Rejected because the interval can contain unrelated

@@ -566,8 +566,13 @@ The checked-in #123 producer/reader extension records Hermit and Rebate values
 in `dagger-reference/2.0` sidecars while preserving Dagger `1.0` compatibility.
 Its LÖVE fixture and Python validator exercise delayed Hermit resolution,
 repeated Rebate calls, mixed ranks and known-zero participation with stubs. The
-extension is not yet installed in the game, and no captured Hermit/Rebate
-engine-reference scenarios have been verified. Run
+owner-authorized producer was installed and launched on 2026-10-09. Live run
+`923049899800-1565` completed with 514 steps and a win; strict RunBundle
+validation is valid with 1,117 records. Its isolated sidecar has 15 Hermit uses
+and 315 Rebate/card participations. This establishes live producer capture and
+reader operation, not reconstruction quality: the run has no zero-balance Hermit
+use or second Rebate source, and no visual-input reducer comparison or
+user-inspected report has been completed. Run
 `python -m run_mechanics.hermit_rebate` for a printable synthetic report of the
 named queries. It labels the data synthetic and reference verification as not
 run; it is not an engine-reference scenario.

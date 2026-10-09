@@ -33,13 +33,18 @@ under its Decisions section. This file is a knowledge base, not a task log.
   separate direct effects from interval money deltas. This
   source trace does not establish behavior for arbitrary mods or live reference
   data. At initial source review #123's sidecar was Dagger-only; the separately
-  approved #129 extension now adds versioned Hermit/Rebate reference records,
-  but no live scenario has been captured with that producer.
+  approved #129 extension now adds versioned Hermit/Rebate reference records.
+  The verification below records its first live capture and remaining limits.
 - Verification/source: embedded Lua source inspected read-only; focused
   `tests/test_hermit_rebate.py` exercises caps, zero, unknowns, identity,
   multiplicity, ties and aggregation; the v2 sidecar validator accepts the
-  observed negative no-rank sentinel while retaining zero contribution.
-  Engine-reference verification remains open.
+  observed negative no-rank sentinel while retaining zero contribution. Live
+  Run `923049899800-1565` captured 15 Hermit effects and 315 Rebate/card rows;
+  8 were later legacy no-rank sentinel rows that the initial reader rejected.
+  The corrected reader accepted all 89 mechanics sidecar records and strict
+  RunBundle validation passed for the 514-step win. Reducer comparison from
+  visual observations and user inspection remain open; captured references are
+  not reconstruction inputs.
 
 ## 2026-10-05: Dagger victim sell value is a current-cost derivation
 

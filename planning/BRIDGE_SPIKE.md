@@ -89,9 +89,13 @@ contract only; it is never the granularized step schema `3.0.0`):
   inside its delayed event at the direct `ease_dollars` call. Mail-In Rebate is
   observed per `Card.calculate_joker` discard invocation; repeated direct calls
   for one Joker/card/interval are aggregated with explicit multiplicity.
-  Nonqualifying, zero, and unknown-input rows are retained. The checked-in LÖVE
-  fixture exercises these hooks with stubs; live installation/capture remains
-  separate evidence.
+  Actual base rank and effective `Card:get_id()` are distinct; negative no-rank
+  sentinels remain known nonmatches. Nonqualifying, zero, and unknown-input rows
+  are retained. The checked-in LÖVE fixture exercises these hooks with stubs.
+  Live run `923049899800-1565` verified
+  89 mechanics-reference sidecars and imported with 1,117 valid records; its
+  no-rank sentinel rows motivated the reader compatibility fix. Reducer
+  comparison to video observations and user inspection remain open.
 
 ## Repository check
 
