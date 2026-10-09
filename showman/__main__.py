@@ -205,6 +205,8 @@ def build_parser():
     export.add_argument("output", type=Path)
     example = surfaces.add_parser("demo", help="run synthetic capture-to-inspection onboarding without Balatro/OBS")
     example.add_argument("--output-dir", type=Path, required=True, help="new directory beneath an existing parent")
+    archive = surfaces.add_parser("archive", help="stage immutable captures into a single operational catalog")
+    archive.add_argument("archive_arguments", nargs=argparse.REMAINDER)
     return parser
 
 
@@ -214,6 +216,9 @@ def main(argv=None):
     try:
         if args.surface == "inspect":
             return bundle_cli.main(argv[1:])
+        if args.surface == "archive":
+            from .archive import main as archive_main
+            return archive_main(argv[1:])
         if args.surface == "record":
             if args.bundle_db:
                 check_bundle(args.bundle_db)

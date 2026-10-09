@@ -15,6 +15,25 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-09: F-drive producer roots and bundle names are not ownership boundaries
+
+- Context: Issue #153 read-only inspection and staged reconciliation of seven
+  `F:\OBS_RECORDINGS\oracle_runs*` roots and two operational SQLite bundles.
+- Observation: 28 distinct producer session IDs declare 3,800 steps; the old
+  bundles contain 5 and 4 distinct run IDs. The source for run
+  `658987181400-2294` resides in `oracle_runs_issue123` but its imported run
+  is in `run_bundle_issue79.sqlite`. Two capture directories have date-prefixed
+  names differing from their internal run IDs. A further live Issue #82 session
+  appeared while the inventory was being reviewed.
+- Implication: enumerate source `session.json` objects with explicit roots and
+  exclusions. Identify copies by content hashes and preserved run IDs; separate
+  capture segments, whole plays, recording markers and confirmed videos.
+- Verification/source: `python -m showman archive inventory --recordings-root
+  F:\OBS_RECORDINGS` returned 28 sessions and 3,800 declared steps;
+  `archive verify` returned 28 catalog runs, 5+4 old-bundle matches and zero
+  failures after staging. The step count is declared, not a per-source
+  conformance/visual audit.
+
 ## 2026-10-09: Hermit and Mail-In Rebate need occurrence-level money attribution
 
 - Context: Issue #129 source inspection of the installed embedded Balatro

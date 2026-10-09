@@ -23,6 +23,17 @@ different source identity under that run ID is a conflict. Import never
 modifies source evidence. See `planning/RUN_BUNDLE_OPERATIONS.md` for automatic
 intake and recovery.
 
+Issue #153 adds `archive_entries` at Alembic revision `0004_archive_catalog`.
+The location row points to byte-verified staged capture files and records their
+original path/source identity; a confirmed media path is populated only from
+existing human-confirmed provenance. Schema revision, source protocol version,
+capture-time Git revisions and installed Lua hash are distinct. Historical
+capture-time revisions remain null when they cannot be established. Existing
+bundles require explicit migration before they can contain archive entries;
+inspection never upgrades them. See `docs/capture/archive.md`.
+Revision `0005_archive_video_hash` adds a checked video SHA-256 to confirmed
+location rows; no media bytes are embedded in SQLite.
+
 The intake API requires terminal lifecycle statuses to carry their matching
 outcome. An `incomplete` run must carry no outcome; `active` and `interrupted`
 runs may carry only a missing or explicitly unknown outcome.

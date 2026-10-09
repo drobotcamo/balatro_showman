@@ -31,6 +31,9 @@ The mechanics evidence/reference boundary is in `planning/RUN_MECHANICS_DESIGN.m
 - Versioned run bundles with active, interrupted, and finalized lifecycle
   states, provenance, integrity metadata, and read-only inspection access
   (Issue #34).
+- One operational catalog for staged historical captures and future direct
+  capture, with separate file locations and capture-time code identity when
+  verified (Issue #153; `docs/capture/archive.md`).
 - Raw engine persistent fields and the game's own legal actions/mask basis, as
   the reducer validation reference (D021).
 - Aligned video frames for benchmarked steps.

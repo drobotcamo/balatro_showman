@@ -10,6 +10,12 @@ against a Lua ground-truth oracle. `planning/README.md` is the planning index.
 
 - Using capture/storage/inspection: start with `docs/capture/README.md` for
   Showman Capture's vocabulary, task commands, and API/result meanings.
+- For the F-drive recording catalog, read `docs/capture/archive.md` before
+  selecting paths or invoking archive commands. Use the configured
+  `SHOWMAN_ARCHIVE_ROOT`; a producer session is not necessarily a whole play,
+  and an OBS marker is not a confirmed video association. Never retarget an
+  active recorder/OBS or move its evidence. Inventory, hash-check and preserve
+  historical originals when staging into the catalog.
 - Resuming work: read the relevant
   `planning/agent-state/threads/<issue-number-or-tag>-<short-name>.md`.
 - Changing a component: read its contract in `planning/components/` first.

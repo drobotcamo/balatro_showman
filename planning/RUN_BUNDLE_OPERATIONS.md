@@ -11,6 +11,11 @@ See `docs/capture/README.md` and `docs/capture/reference.md` for onboarding,
 capture/import/inspection commands, and the terminal association surface.
 `python -m showman inspect ...` delegates to the same read-only inspector;
 `store init`, `store import`, `record`, and confirmed `associate` are mutating.
+For the default F-drive location, the single operational catalog, source
+staging and location/association rules are in `docs/capture/archive.md`.
+`showman archive inventory/list/verify` are read-only;
+`archive init/upgrade/ingest/sync-associations/stage-video` are explicit writes. The catalog does
+not migrate older bundles or redirect an already-running recorder.
 
 Use the package module rather than a second standalone launcher:
 
@@ -113,6 +118,9 @@ import on confirmation. Run intake above remains automatic.
 
 Before proposing a new capture or explicit association, the agent does the
 read-only inventory below; a new capture also needs the staged live preflight.
+Include `showman archive list` and `showman archive verify` when the F-drive
+catalog is available. Historical sources and the issue82 live output remain
+separate until their exact state is inspected; never classify a run by root name.
 An unassociated marker does not prove that no video exists; a matching filename,
 marker or nearby timestamp does not prove that pixels correspond to the run.
 

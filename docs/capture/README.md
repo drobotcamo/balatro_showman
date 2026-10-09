@@ -4,6 +4,13 @@ Showman Capture records and inspects gameplay evidence for Balatro Showman.
 Start with an existing artifact or the synthetic demo. Live capture requires
 the game bridge and OBS setup; inspection does not.
 
+**Operational archive:** The default on this Windows machine is
+`F:\OBS_RECORDINGS\showman-archive` with one `catalog.sqlite` and
+`captures/<run-id>/` evidence directories. See [archive and naming
+rules](archive.md) before choosing a recording destination, moving evidence,
+or launching a catalog-backed review. Set `SHOWMAN_ARCHIVE_ROOT` explicitly;
+the tools do not infer a drive or redirect an existing recorder/OBS process.
+
 ## First ten minutes
 
 1. Inspect `git status --short --branch`, worktrees, and the assigned issue.
@@ -72,6 +79,11 @@ an existing destination and has no video, recording marker, or reviewed labels.
 To inspect a recording beside its original action sequence, use the local
 [video/action review viewer](video-review.md). It supports sequential or seeded
 random windows and external debugging exports; it does not export scored labels.
+For a cataloged, confirmed single-video association, use
+`python -m showman archive list` and
+`python -m showman archive review --run <run-id> --open` instead of looking up
+paths manually. Multiple confirmed segments require all `--run` IDs in verified
+order. A capture's marker alone is not a confirmed association.
 
 For a SQLite bundle:
 
@@ -129,6 +141,11 @@ establish another game's runtime support.
 
 Initialize the destination bundle once, then start the Recorder:
 
+For new captures after the current live recorder is stopped and its queue
+drained, use the archive's existing `catalog.sqlite` and `captures` directory
+together as described in [archive.md](archive.md). Do not start a second
+consumer or change OBS's video destination as part of this command.
+
 ```text
 python -m showman record --io-dir <agent_io> --out-dir <capture-root> --bundle-db <bundle.sqlite>
 ```
@@ -137,6 +154,13 @@ python -m showman record --io-dir <agent_io> --out-dir <capture-root> --bundle-d
 With it, complete terminal sessions import automatically; there is no per-run
 confirmation prompt. An import failure is logged as pending and retried, not
 converted into a successful stored run. Verify the database after capture.
+Only a run written directly under the archive's `captures` directory and
+imported into that archive's `catalog.sqlite` is automatically registered for
+`archive list`; other configured bundles still use the normal inspector.
+The recorder stamps `capture_build` on newly created sessions: a bridge/producer
+Git commit only if the captured implementation bytes match that commit, plus
+the installed producer SHA-256 when available. `unknown` for an older or
+modified build must not be replaced with a guessed revision.
 
 Load `ground_truth/obs_recording_start.py` in OBS Tools > Scripts. Use a fully
 expanded absolute IO path, the actual recording FPS, and a recording-ID prefix.

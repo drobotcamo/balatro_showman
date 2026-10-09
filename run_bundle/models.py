@@ -44,3 +44,18 @@ class SchemaVersion(Base):
     __tablename__ = "schema_versions"
     version: Mapped[str] = mapped_column(String(32), primary_key=True)
     applied_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class ArchiveEntry(Base):
+    """Location metadata; evidence identity remains in the run provenance."""
+    __tablename__ = "archive_entries"
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), primary_key=True)
+    original_path: Mapped[str] = mapped_column(Text, nullable=False)
+    capture_path: Mapped[str] = mapped_column(Text, nullable=False)
+    source_identity: Mapped[str] = mapped_column(Text, nullable=False)
+    capture_revision: Mapped[str | None] = mapped_column(String(40))
+    bridge_revision: Mapped[str | None] = mapped_column(String(40))
+    producer_sha256: Mapped[str | None] = mapped_column(String(64))
+    video_path: Mapped[str | None] = mapped_column(Text)
+    video_sha256: Mapped[str | None] = mapped_column(String(64))
+    video_status: Mapped[str] = mapped_column(String(16), nullable=False, default="unassociated")

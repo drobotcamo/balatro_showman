@@ -5,6 +5,14 @@ actions on the right. It is debugging QA, not an annotation/evaluation exporter.
 Inputs are an existing video path and ordered capture directories for that video.
 Source files remain unchanged. Generated browser media and exports stay external.
 
+For a run with an **already confirmed** video association in the operational
+catalog, start with `python -m showman archive list` followed by
+`python -m showman archive review --run <run-id> --open` (set
+`SHOWMAN_ARCHIVE_ROOT` first). Repeat `--run` in reviewed source order when
+multiple confirmed segments share the video. [Archive layout and limitations](archive.md)
+explain when the explicit paths below are still required. A marker, nearby
+timestamp or matching filename never creates an association.
+
 From the repository root, with Python 3.11+ and existing `ffmpeg` / `ffprobe` on PATH. Quote every video/run/export path in PowerShell because recording filenames may contain spaces:
 
 ```powershell
