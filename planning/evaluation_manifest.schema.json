@@ -3,21 +3,22 @@
   "title": "Balatro evaluation slice manifest",
   "type": "object",
   "required": ["schema_version", "protocol", "source", "frames"],
+  "additionalProperties": false,
   "properties": {
     "schema_version": {"const": "evaluation-slice-1.0"},
     "protocol": {"type": "string", "minLength": 1},
-    "source": {"type": "object", "required": ["video_sha256", "run_sha256", "alignment_sha256", "split", "width", "height"], "properties": {
+    "source": {"type": "object", "additionalProperties": false, "required": ["video_sha256", "run_sha256", "alignment_sha256", "split", "width", "height"], "properties": {
       "video_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
       "run_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
       "alignment_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
        "split": {"enum": ["development", "held_out"]}, "width": {"type": "integer", "minimum": 1}, "height": {"type": "integer", "minimum": 1}
     }},
-    "frames": {"type": "array", "items": {"type": "object", "required": ["frame_id", "frame_index", "mapping", "canonical_to_source", "annotations", "review"], "properties": {
+    "frames": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["frame_id", "frame_index", "mapping", "canonical_to_source", "annotations", "review"], "properties": {
       "frame_id": {"type": "string", "minLength": 1}, "frame_index": {"type": "integer", "minimum": 0},
-      "mapping": {"type": "object", "required": ["x", "y", "width", "height"], "properties": {"x": {"type": "number"}, "y": {"type": "number"}, "width": {"type": "number", "exclusiveMinimum": 0}, "height": {"type": "number", "exclusiveMinimum": 0}}}, "canonical_to_source": {"type": "array", "minItems": 6, "maxItems": 6, "items": {"type": "number"}},
-       "synthetic_background": {"not": {"const": true}},
-       "annotations": {"type": "object", "propertyNames": {"enum": ["page", "zone", "identity", "modifier", "edition", "seal", "sticker", "ocr"]}, "additionalProperties": {"type": "object", "required": ["status"], "properties": {"status": {"enum": ["observed", "unknown", "missing", "occluded", "ambiguous", "unsupported"]}, "raw": {}, "normalized": {}, "contradictory": {"not": {"const": true}}, "oracle": {"not": {}} , "ground_truth": {"not": {}}, "reference_value": {"not": {}}}, "allOf": [{"if": {"properties": {"status": {"const": "observed"}}}, "then": {"required": ["raw"]}}, {"if": {"required": ["normalized"]}, "then": {"required": ["raw"]}}]}},
-       "review": {"type": "object", "required": ["reviewers", "status"], "properties": {"reviewers": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "status": {"const": "reviewed"}}}
+      "mapping": {"type": "object", "additionalProperties": false, "required": ["x", "y", "width", "height"], "properties": {"x": {"type": "number"}, "y": {"type": "number"}, "width": {"type": "number", "exclusiveMinimum": 0}, "height": {"type": "number", "exclusiveMinimum": 0}}}, "canonical_to_source": {"type": "array", "minItems": 6, "maxItems": 6, "items": {"type": "number"}},
+       "synthetic_background": {"const": false}, "excluded": {"type": "boolean"},
+       "annotations": {"type": "object", "propertyNames": {"enum": ["page", "zone", "identity", "modifier", "edition", "seal", "sticker", "ocr"]}, "additionalProperties": {"type": "object", "additionalProperties": false, "required": ["status"], "properties": {"status": {"enum": ["observed", "unknown", "missing", "occluded", "ambiguous", "unsupported"]}, "raw": {}, "normalized": {}, "contradictory": {"not": {"const": true}}, "oracle": {"not": {}} , "ground_truth": {"not": {}}, "reference_value": {"not": {}}}, "allOf": [{"if": {"properties": {"status": {"const": "observed"}}}, "then": {"required": ["raw"]}}, {"if": {"required": ["normalized"]}, "then": {"required": ["raw"]}}]}},
+       "review": {"type": "object", "additionalProperties": false, "required": ["reviewers", "status"], "properties": {"reviewers": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "status": {"const": "reviewed"}, "disagreement": {"type": "boolean"}}}
     }}}
   }
 }

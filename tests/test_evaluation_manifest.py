@@ -60,6 +60,14 @@ def test_malformed_manifest_shapes_return_diagnostics():
     value["frames"][0]["annotations"] = {"page": {"status": []}}
     assert any("invalid status" in e for e in validate_manifest(value))
 
+def test_unknown_fields_are_rejected_at_runtime():
+    value = manifest(); value["extra"] = True
+    assert any("manifest has unknown fields" in e for e in validate_manifest(value))
+    value = manifest(); value["frames"][0]["review"]["extra"] = True
+    assert any("review has unknown fields" in e for e in validate_manifest(value))
+    value = manifest(); value["frames"][0]["annotations"]["page"] = {"status": "unknown", "extra": True}
+    assert any("annotations.page has unknown fields" in e for e in validate_manifest(value))
+
 def test_split_validation_blocks_source_and_neighbor_leakage():
     first = manifest(); second = manifest()
     first["source"]["split"] = "development"
@@ -94,6 +102,11 @@ def test_schema_enums_match_runtime_contract():
     assert set(frame_properties["annotations"]["propertyNames"]["enum"]) == SUPPORTED_FIELDS
     assert set(frame_properties["annotations"]["additionalProperties"]["properties"]["status"]["enum"]) == STATUSES
     assert set(schema["properties"]["source"]["properties"]["split"]["enum"]) == {"development", "held_out"}
+    assert schema["additionalProperties"] is False
+    assert schema["properties"]["source"]["additionalProperties"] is False
+    assert frame_properties["mapping"]["additionalProperties"] is False
+    assert frame_properties["review"]["additionalProperties"] is False
+    assert frame_properties["annotations"]["additionalProperties"]["additionalProperties"] is False
 
 def test_held_out_export_requires_and_checks_development_split_context(tmp_path: Path):
     development = manifest()
