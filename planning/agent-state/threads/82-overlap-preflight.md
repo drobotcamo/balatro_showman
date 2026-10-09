@@ -1,7 +1,7 @@
 # Work Checkpoint
 Updated: 2026-10-09
 Issue: #82
-PR: none
+PR: #152 (https://github.com/drobotcamo/balatro_showman/pull/152)
 Branch: issue-82-capture-checkpoint-20261009
 Worktree: C:\Users\camgr\.t3\worktrees\balatro_showman\t3code-f51748d4
 Objective: Complete the first-slice held-out export and source-overlap review under the frozen v2 protocol.
