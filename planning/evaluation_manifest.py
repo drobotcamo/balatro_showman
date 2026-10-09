@@ -136,7 +136,7 @@ def pilot_report(manifest: dict[str, Any]) -> dict[str, Any]:
     disagreements = sum(1 for f in frames if isinstance(f, dict) and isinstance(f.get("review"), dict) and f["review"].get("disagreement") is True)
     missing = sum(1 for f in frames for v in (f.get("annotations", {}) if isinstance(f, dict) and isinstance(f.get("annotations"), dict) else {}).values() if isinstance(v, dict) and v.get("status") in {"missing", "unknown", "occluded"})
     exclusions = sum(1 for f in frames if isinstance(f, dict) and f.get("excluded") is True)
-    return {"frames": len(frames), "reviewed": reviewed, "coverage": reviewed / len(frames) if frames else 0.0, "disagreements": disagreements, "missing_or_unavailable_values": missing, "exclusions": exclusions}
+    return {"frames": len(frames), "reviewed": reviewed, "review_status_is_self_reported": True, "coverage": reviewed / len(frames) if frames else 0.0, "disagreements": disagreements, "missing_or_unavailable_values": missing, "exclusions": exclusions}
 
 def export_manifest(manifest: dict[str, Any], destination: Path, split_context: list[dict[str, Any]] | None = None) -> None:
     errors = validate_manifest(manifest)

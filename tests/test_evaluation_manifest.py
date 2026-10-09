@@ -33,7 +33,7 @@ def test_invalid_mapping_is_not_repaired(tmp_path: Path):
 
 def test_report_counts_review_and_missingness():
     value = manifest(); value["frames"][0]["review"]["disagreement"] = True
-    assert pilot_report(value) == {"frames": 2, "reviewed": 2, "coverage": 1.0, "disagreements": 1, "missing_or_unavailable_values": 1, "exclusions": 0}
+    assert pilot_report(value) == {"frames": 2, "reviewed": 2, "review_status_is_self_reported": True, "coverage": 1.0, "disagreements": 1, "missing_or_unavailable_values": 1, "exclusions": 0}
 
 def test_rejects_oracle_promotion_and_boolean_dimensions():
     value = manifest(); value["source"]["width"] = True
