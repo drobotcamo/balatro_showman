@@ -60,6 +60,16 @@ The mechanics evidence/reference boundary is in `planning/RUN_MECHANICS_DESIGN.m
 - Video-to-engine alignment is explicit and auditable (timestamps, offsets).
 - Recording coordination is human-confirmed: a tool may request OBS recording
   and associate its marker, but it never assumes video exists without evidence.
+- Recorder and QA viewer startup expose flushed, truthful readiness separately
+  from process creation. Local owner locks identify the exact command and paths;
+  only a live matching healthy viewer/recorder is reused. Ambiguous conflicts
+  are reported without terminating processes not created by the current launch.
+- Recorder readiness follows a successful consumer poll and identity/path health
+  checks. Its 120-second readiness deadline reports failure but never imposes a
+  lifetime timeout or terminates a recorder; viewer readiness requires HTTP 200.
+- Owner metadata is advisory diagnostic state; OS locks establish liveness.
+  Interrupted stale metadata is never sufficient evidence to reuse or terminate
+  a process and is replaced only after acquiring the corresponding lock.
 - The run-bundle storage boundary does not own the low-level OBS hook or the
   timestamp-to-frame alignment algorithm.
 - Evaluation clips are disjoint from synthetic backgrounds and from training

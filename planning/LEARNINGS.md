@@ -684,5 +684,32 @@ under its Decisions section. This file is a knowledge base, not a task log.
 - Verification/source: read-only inspection of
   `%APPDATA%\Balatro\Mods\lovely\game-dump\functions\UI_definitions.lua:637-658`,
   `%APPDATA%\Balatro\Mods\smods-main\src\game_object.lua:1723`, and
-  `legacy/vendor/balatro-policy-transformer/{granularize.py,mask_builder.py,live/live_encoder.py,live/smoke_test.py,action_map.py}`
-  on 2026-09-30.
+   `legacy/vendor/balatro-policy-transformer/{granularize.py,mask_builder.py,live/live_encoder.py,live/smoke_test.py,action_map.py}`
+   on 2026-09-30.
+
+## 2026-10-09: Synthetic viewer startup remains near one second
+
+- Context: Issue #142 measured the current grouped-video QA viewer from process
+  launch through successful local HTTP readiness on a Windows Python 3.14.7,
+  FFmpeg/ffprobe 8.1.1 runtime.
+- Observation: Nine cold-cache trials varied generated H.264 clips from
+  160x90/4s/40 frames/14,603 bytes, through 640x360/20s/200 frames/131,885 bytes,
+  to 1280x720/60s/600 frames/684,540 bytes. Per-size process-start-to-first-status
+  samples were 628.8/683.0/633.9 ms, 633.0/734.4/787.1 ms, and
+  788.4/633.0/683.9 ms; process-start-to-HTTP-ready samples were
+  1089.0/1033.8/989.9 ms, 1046.3/1142.5/1152.6 ms, and 1130.7/1041.9/1019.2 ms.
+  The respective medians were 633.9/734.4/683.9 ms to first status and
+  1033.8/1142.5/1041.9 ms to HTTP readiness.
+  Median source packet probes were 0.1042/0.1099/0.1166 s; median cache-miss
+  remuxes 0.0633/0.0683/0.0712 s; remux packet probes 0.1097/0.1055/0.1072 s.
+  Video SHA-256 medians were below 1 ms. Oracle source validation medians were
+  0.0032/0.0076/0.0137 s.
+- Implication: This fixture does not show a dominant media-preparation delay;
+  imports/process startup and HTTP readiness account for much of the observed
+  end-to-end duration. These small synthetic runs cannot attribute the historic
+  multi-minute reports or establish production-video performance.
+- Verification/source: nine bounded direct viewer launches with isolated
+  temporary export roots; each readiness result was an HTTP 200 from the local
+  viewer. Generated FFmpeg `testsrc` inputs were 10 fps with `libx264` `ultrafast`
+  and CRF 32. Raw stage trials are recorded in the Issue #142 review evidence.
+  No real-video performance claim follows from these generated clips.
