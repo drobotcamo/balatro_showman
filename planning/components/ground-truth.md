@@ -31,6 +31,8 @@ independent proof of engine truth. Broad acceptance below remains an obligation.
 - Aligned video frames for benchmarked steps.
 - Evaluation-set manifests with an annotation protocol.
 - A minimal annotation/QA tool for real-frame boxes and text fields.
+- A local video/action review viewer for inspecting recorded frames alongside
+  oracle actions; the viewer is retained as expandable project tooling.
 
 ## Invariants
 
@@ -47,6 +49,11 @@ independent proof of engine truth. Broad acceptance below remains an obligation.
   video.
 - The oracle scores page classification, zone assignment, persistent reduction,
   and event inference; it does not replace them.
+- The viewer is an inspection aid only: it must not silently turn visual review
+  into alignment, provenance, or reconstruction-quality evidence.
+- Engine-reference mechanics fields, if captured, remain distinct from video
+  observations and validate derived state/effects under the mechanics design in
+  `planning/RUN_MECHANICS_DESIGN.md`.
 
 ## Acceptance Criteria
 

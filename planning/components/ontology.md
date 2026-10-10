@@ -26,6 +26,9 @@ typography needed for synthetic OCR.
 - Typography assets: every glyph, digit, symbol, and modifier state (negative,
   debuffed, highlighted) needed by synthetic OCR.
 - Versioned class map usable by training and inference.
+- Definition identity is distinct from run-scoped instance identity; mechanics
+  semantics and proposed record boundaries are in
+  `planning/RUN_MECHANICS_DESIGN.md`.
 
 ## Invariants
 
@@ -34,6 +37,8 @@ typography needed for synthetic OCR.
 - Modifier combinations do not require an unbounded class explosion; they are
   composition labels with a dedicated visible-attribute channel.
 - Unknown assets can be represented without corrupting known IDs.
+- Extending the class map never implies that a visual tracking ID is a stable
+  game-instance ID.
 - Every typography glyph declares its source and license.
 
 ## Acceptance Criteria

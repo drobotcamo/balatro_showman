@@ -84,6 +84,11 @@ Conformance gaps (coarse actions, empty `persistent_state`, missing
 The Lua producer writes snapshots to `%APPDATA%\Balatro\agent_io`; the
 repository bridge consumes them, acknowledges each action, and writes one run
 directory containing `session.json` and `steps.ndjson`.
+This recipe exercises oracle delivery, not verified video capture. Before
+inviting a user to make a video or associating a run with one, follow the
+existing-evidence inventory, live preflight and human checkpoint in
+`planning/RUN_BUNDLE_OPERATIONS.md`. Do not treat the dated paths or producer
+build in this recipe as current without checking the loaded runtime.
 
 1. Install the producer revision using the reversible, hash-checked procedure
    in `planning/BRIDGE_SPIKE.md` → Installation. It keeps the previous mod tree
@@ -103,7 +108,8 @@ directory containing `session.json` and `steps.ndjson`.
 3. Start a new Balatro run and play through the states being evaluated. For
    shop/pack offering coverage, enter the shop and open at least one booster
    pack. A clean audit requires the run to end in a win or loss so
-   `run_end.json` finalizes `session.json`.
+   `run_end_<run_id>.json` supplies the terminal request watermark; the bridge
+   finalizes `session.json` after every request through that watermark persists.
 4. Find the new child directory under the `--out-dir` path. Its name is the
    producer `run_id`, for example `1790821374-5833`.
 5. Audit it from the repository root:

@@ -354,6 +354,23 @@ If two milestones produce no usable artifact, revisit scope or the bottleneck;
 do not automatically add another agent role. This is an experiment, not a promise
 that fewer documents alone will improve output.
 
+## Deferred review: efficiency and agent automation
+
+The user asked to revisit workflow efficiency and agent automation after Phase 0
+passes. Treat the findings in this retrospective as hypotheses to test, not as
+proof that the workflow changes improved delivery. Before proposing another
+overhaul, review what happened during the production milestones, including #81
+and the evaluation work: accepted artifacts, elapsed time including waits,
+administrative follow-ups, human decision delays, rework, and whether bounded
+research or review delegation helped resolve actual bottlenecks.
+
+Make that review well researched. Compare repository evidence with relevant
+external research, state the limits of causal attribution, and distinguish
+automation that removes demonstrated repetitive work from added process surface.
+Do not expand agent roles or automate approvals as a default outcome. Any policy,
+permission, or automation changes remain proposals for user decision. This
+follow-up does not block current Phase 0 or #82 work.
+
 ## Methods researched and applied
 
 Sources accessed 2026-10-02. These guide the proposal; they do not prove a causal

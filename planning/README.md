@@ -37,7 +37,10 @@ other work. Winning plays are not a special objective at this stage.
   handoff rules.
 - `DECISIONS.md`: durable decisions and open questions.
 - `LEARNINGS.md`: verified reusable findings and failure modes.
+- `components/run-mechanics.md`: owner-approved v0.1 mechanics interface/examples;
+  later staged examples and exact order verification remain open.
 - `TOOLING.md`: verified project and machine-specific command recipes.
+- `docs/capture/video-review.md`: local video/action viewer workflow and scope.
 - `agent-state/`: work-thread handoffs.
 - `../.opencode/agents/`: configured subagents.
 - `../.opencode/command/`: workflow commands (`/work`, `/orchestrate`,
@@ -56,6 +59,8 @@ other work. Winning plays are not a special objective at this stage.
 - `components/events.md`: state transitions and action inference.
 - `components/dataset.md`: storage, manifests, and reproducible exports.
 - `components/learning.md`: downstream analytics and learning consumers.
+- `components/run-mechanics.md`: mechanics-level derived state/effect boundary
+  and its relationship to the existing component owners.
 
 Planning documents are mechanically validated by running python on
 `planning/check_contracts.py`: thread naming and handoff fields, decision and

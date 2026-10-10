@@ -25,6 +25,9 @@ ground-truth oracle.
   action, indexed within the Phase 7 action space (D020).
 - Explicit `unknown` or `ambiguous` events.
 - Oracle-agreement reports per event family.
+- Action-anchored intervals consumed by mechanics derivation; they do not claim
+  to be the complete engine trigger stream. See
+  `planning/RUN_MECHANICS_DESIGN.md`.
 
 ## Invariants
 
@@ -35,6 +38,8 @@ ground-truth oracle.
 - No action is inferred solely because it is strategically plausible.
 - Cascading error is acknowledged: an event requiring two unreliable state
   deltas cannot be high confidence when either is low confidence.
+- Observed action order is distinct from internal trigger order; exact mechanics
+  order requires source inspection and owner verification.
 
 ## Acceptance Criteria
 

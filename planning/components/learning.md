@@ -13,6 +13,8 @@ agent experiments without making strategy assumptions part of data collection.
 - The declared persistent-state / action-space / mask contract.
 - Optional outcome/run metadata, including oracle outcomes.
 - Explicit train/validation/test split manifests.
+- Mechanics-derived state/effects with status, evidence, provenance, and query
+  coverage as specified in `planning/RUN_MECHANICS_DESIGN.md`.
 
 ## Outputs
 
@@ -25,6 +27,8 @@ agent experiments without making strategy assumptions part of data collection.
 - Outcomes are optional metadata, not a filter on collection.
 - Offline action accuracy is not treated as gameplay competence.
 - Reports identify missing state, inferred state, and label leakage.
+- Mechanics queries report unknown coverage and the attribution/denominator
+  policy; lineage is not presented as counterfactual benefit.
 - Outcome-conditioned consumers (e.g. a policy transformer) are optional; the
   pipeline does not require them.
 

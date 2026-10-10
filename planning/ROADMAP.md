@@ -54,7 +54,14 @@ the deliverable of one phase.
 | 8 | `components/events.md` |
 | 9 | `components/dataset.md` |
 | 10 | `components/learning.md` |
-| Cross-cutting | `components/coordinates.md` |
+| Cross-cutting | `components/coordinates.md`, `components/run-mechanics.md` |
+
+Run-mechanics reconstruction is an approved design effort tracked by #122 and
+specified in `components/run-mechanics.md`. Its v0.1
+interface and initial examples are owner-approved. It is cross-cutting across
+ontology, tracking, reduction, events, ground truth, and analysis, but does not
+renumber the phase sequence or pass any existing phase gate. Later staged
+examples and exact order verification remain open.
 
 Coordinates and stream-layout normalization (D007) are defined once and
 consumed by detection (Phase 3), page classification (4), OCR (5), tracking

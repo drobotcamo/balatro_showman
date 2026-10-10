@@ -345,6 +345,61 @@ failures (rejected because it conceals missing test inputs). Source: user
 approval during Issue #81 on 2026-10-02; clean worktree reproduced the missing
 CSV on the same date.
 
+### D031 — accepted — Retain and expand the local video/action viewer
+The local video and action review viewer remains active project tooling. It is
+not retired or replaced by a heavier annotation studio; future work may expand
+its playback, oracle-step inspection, and review/export capabilities. The
+viewer remains an inspection aid and does not itself establish frame
+alignment, provenance, or reconstruction-quality acceptance.
+
+Alternative considered: remove the viewer after the initial QA slice and rely
+on ad-hoc media inspection. Retaining the existing tool preserves a repeatable
+review surface and fits D005's minimal-tooling direction without changing the
+ground-truth or evaluation contracts.
+
+### D032 — accepted — Run mechanics separates definitions, instances, state and effects
+
+Use a storage-neutral, versioned mechanics interface with separate definition,
+run-instance, derived-state, derived-effect, evidence, and participation records.
+Visual tracks are not game-instance identity. Preserve observed/inferred/unknown/
+ambiguous/unsupported statuses, append-only evidence, reproducible derived
+results, explicit validity/provenance, exact source-backed ordering when needed,
+and separate engine-reference data. Persistent mutation, scoring/money
+contribution, participation, and interval net deltas remain distinct. Direct
+attribution and upstream lineage are separate query views; lineage is not proof
+of counterfactual benefit. Sell value is derivable in principle but unknown when
+inputs/evidence are missing. Structured and readable diagnostics are required.
+
+The initial v0.1 interface and Dagger/scoring/reset example boundaries were
+approved by the owner on 2026-10-04 for Issue #122. Exact trigger order still
+requires source inspection and owner verification. Hermit/Mail-In Rebate and
+Certificate/Death/Gold Seal examples remain staged for #129/#130; held-out
+evaluation requires a separately approved frozen protocol. Alternatives
+considered: combine state and effects (rejected because mutation/contribution
+queries and causal accounting differ); use only visual track IDs as instances
+(rejected because tracks are observation-local and can fragment); infer exact
+order from STEP events alone (rejected because the engine trigger stream is
+incomplete); mandate graph storage or one handler class per Joker (rejected
+`planning/RUN_MECHANICS_DESIGN.md`.
+
+### D033 — accepted — Separate implementation acceptance from evidence acceptance
+
+Work items that combine a software artifact with an external evaluation must
+track the two acceptance surfaces separately. Implementation acceptance requires
+the artifact, focused runnable checks, review, and CI appropriate to its tier.
+Evidence acceptance requires the declared external inputs, provenance and split
+checks, human-review identity where applicable, artifact hashes, and the
+protocol-specific claim. Classify evidence as fixture/tooling, development
+pilot, held-out evaluation, or reconstruction result. A green implementation
+check does not pass an evidence gate, and an evidence blocker does not reopen
+completed implementation work without a new defect. If the surfaces have
+different owners or independent value, use separate bounded work items.
+
+This generalizes the repeated #82 pattern without changing #82's acceptance
+criteria or any evaluation threshold. Alternative considered: keep one issue
+and one undifferentiated completion state, rejected because it caused repeated
+implementation PRs while the remaining blocker was external evidence.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the
