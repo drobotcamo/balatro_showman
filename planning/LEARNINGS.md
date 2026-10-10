@@ -15,6 +15,49 @@ this format:
 Unresolved questions belong in `planning/DECISIONS.md`; durable choices belong
 under its Decisions section. This file is a knowledge base, not a task log.
 
+## 2026-10-04: Keep the local video/action viewer as active tooling
+
+- Context: Issue #115 follow-up clarified that the existing viewer will be
+  expanded later rather than retired.
+- Observation: The viewer provides a repeatable surface for reviewing recorded
+  video beside oracle actions, while its visual output alone does not prove
+  alignment or provenance.
+- Implication: Preserve the viewer in the active tooling set and expand it
+  incrementally; keep evidence and acceptance claims governed by the recording,
+  oracle, and alignment contracts.
+- Verification/source: Issue #115 owner clarification; `planning/DECISIONS.md`
+  D031; `planning/components/ground-truth.md`.
+
+## 2026-10-03: Action snapshots omit mutable Joker values needed for growth analytics
+
+- Context: Dagger investigation of external debug export
+  `F:\OBS_RECORDINGS\qa_debug\review-20261004T041049Z-a2572aa9`, sourced from
+  `1898258342000-5384` (109 steps) and `2317688862100-2663` (271 steps).
+- Observation: Source SHA-256 hashes match the export manifest. All 315 Dagger
+  observations omit mutable ability values, sell cost and instance identity.
+  At steps `2317688862100-2663:174` and `:175`, Joker Stencil disappears,
+  Joker count falls from eight to seven and round advances from 19 to 20.
+  Extracted clip frames at 0 and 2 seconds visibly show Dagger +62 and +70.
+  These are human-readable video observations, not serialized engine values;
+  the manifest still labels timestamp correspondence unverified.
+- Implication: Inventory deltas support a derived sacrifice inference, but do
+  not directly measure the numeric gain. Accumulating base-price estimates is
+  weaker than retaining mutable Joker state and actual victim sell value.
+  The same sources include rental sacrifices and a holographic Egg sacrifice.
+  Any capture-field or event-contract extension requires a separate approved
+  design; this investigation does not change those contracts.
+- Verification/source: Read-only Python diagnostic verified both source-file
+  hashes per segment and enumerated 17 Dagger-owned blind selections: 14 have
+  the right-neighbor center absent in the next snapshot; three retain an
+  eternal right neighbor. Diagnostic ended `DIAGNOSTIC OK: source hashes
+  verified; no source writes`. `ground_truth/balatro_mod/main.lua:734-746`
+  selects inventory fields; `:1014-1040` selects raw persistent fields;
+  `:1423-1427` emits before the original callback. Installed patched
+  `Mods/lovely/dump/card.lua:2953-2981` scales `ability.mult` from victim
+  `sell_cost` with factor two, and `:517-527` includes discounts, rental
+  cost and extra value in pricing. Installed runtime source is supporting
+  mechanism evidence, not a pinned source hash for the historical capture.
+
 ## 2026-10-02: Passing local tests leave capture lifecycle faults uncovered
 
 - Context: Production retrospective of the active file-IPC recorder.

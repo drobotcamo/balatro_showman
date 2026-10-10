@@ -20,6 +20,9 @@ with a single shared stabilization model for objects and OCR fields.
 - Track IDs, per-frame boxes, confidence history, and lifecycle status.
 - Cleaned detection tables.
 - Track-quality diagnostics.
+- Visual track identities and evidence-backed association candidates consumed by
+  run mechanics; tracks do not assert run-instance identity. See
+  `planning/RUN_MECHANICS_DESIGN.md`.
 - A shared stabilization/age record covering object tracks and OCR fields,
   consumed by state composition (Phase 7). OCR does not consume it.
 
@@ -27,6 +30,8 @@ with a single shared stabilization model for objects and OCR fields.
 
 - Track IDs are unique within a video and stable through allowed gaps.
 - A gap fill is marked as inferred, not observed.
+- Track IDs remain observation identities and are never silently promoted to
+  game-instance IDs.
 - Parent/attribute tracks remain composable.
 - Objects are tracked within their zone; a track does not silently cross
   incompatible zones or pages.

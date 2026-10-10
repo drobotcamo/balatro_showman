@@ -23,6 +23,9 @@ over the declared action space. This is the interface learning consumes.
 - The declared action-space index (the coordinate space the masks index).
 - Deterministic legality masks per step.
 - Explicit schema and contract versions.
+- Mechanics-derived state facts may be consumed through the separate interface
+  described in `planning/RUN_MECHANICS_DESIGN.md`; this does not give mechanics
+  a competing canonical persistent-state authority.
 
 ## Invariants
 
@@ -37,6 +40,8 @@ over the declared action space. This is the interface learning consumes.
 - The reducer is the only producer of canonical `persistent_state`; oracle raw
   engine fields and engine legality are validation inputs, never inference
   inputs (D021).
+- Mechanics-derived effects remain distinct from persistent state and do not
+  weaken the no-future-information invariant.
 
 ## Acceptance Criteria
 

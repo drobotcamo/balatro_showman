@@ -25,6 +25,20 @@ scope boundary, owner and actual prerequisite. Find equivalents before creating
 one. Numeric issues and checkpoint filenames are normal; historical four-letter
 aliases in `planning/issue-tags.json` remain valid. Allocation is optional.
 
+Separate implementation acceptance from evidence acceptance when an outcome has
+both. Implementation acceptance covers the code, schema, tooling, or fixture
+artifact and its runnable checks. Evidence acceptance covers external inputs,
+human review, provenance, split/leakage audits, and claims made from those
+inputs. A passing implementation check does not establish an evidence claim,
+and an evidence limitation does not justify repeating completed implementation
+work.
+
+Classify artifacts as `fixture/tooling`, `development pilot`, `held-out
+evaluation`, or `reconstruction result`. Keep the class, source identity,
+reviewer identity, hashes, and limitations with the artifact. When only external
+evidence remains, name one concrete next evidence action and owner; do not create
+another implementation PR merely to keep the issue active.
+
 Use one accountable lead for an agreed outcome. Split only independently useful,
 reviewable work or a real external blocker, not design/test/review/settlement
 ceremony. One active production outcome is the default; research and review can
@@ -42,6 +56,10 @@ Do not delete unfamiliar worktrees or discard changes to resolve uncertainty.
    checkpoint if present, roadmap gate and component contracts. Preserve unrelated
    work. A ready issue does not require reconstructing the closed portfolio.
 2. State observable acceptance, files in scope and narrowest verification.
+   Search the relevant handoff/worktree, documented local evidence locations and
+   existing tools before declaring an input missing or assigning investigation
+   to the user. A missing artifact in the current checkout is not proof it does
+   not exist elsewhere. Do not broaden into an archive-wide audit by default.
 3. Implement the smallest justified change. Use bounded independent research
    where it resolves uncertainty; keep unknowns explicit.
 4. Run relevant checks immediately after meaningful changes. Investigate failures,
@@ -50,13 +68,23 @@ Do not delete unfamiliar worktrees or discard changes to resolve uncertainty.
 5. Integrate when authorized. Verify merge and post completion evidence on the
    same PR/issue; close only when acceptance is addressed or explicitly deferred.
 6. If blocked or context-limited, leave one factual unfinished-work checkpoint
-   with exact results, ownership exclusions and the requested next action.
+    with exact results, ownership exclusions and the requested next action. If
+    implementation is complete but evidence is not, hand off only the unmet
+    evidence action; do not reopen settled code work without a new defect.
 
 For `/work`, ask clarifying questions at most once, then use the narrowest
 reasonable assumptions. Do not pause for routine progress or permissions already
 granted. Continue through review/publication/integration when in scope and allowed.
 A draft, local diff or ready-to-review state is not completion. Report external
 blockers instead of inventing success or manufacturing a handoff boundary.
+When a check fails or a limitation remains, take the next authorized,
+evidence-producing action (or a materially different diagnostic) before reporting
+it as a blocker. Name the exact unmet claim, the next action and its owner. Do
+not ask the user to search paths, read files, choose technical defaults, or
+repeat `continue` for agent-owned work. Prepare screenshots/viewer links and a
+short factual summary when human visual judgment is actually needed. Pause for
+specific approval, the recording-association checkpoint, unsafe operations, or
+a demonstrated external blocker; a caveat or handoff document alone is not one.
 
 ## Orchestrator
 
