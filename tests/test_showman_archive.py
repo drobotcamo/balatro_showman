@@ -175,7 +175,8 @@ def test_root_relocation_keeps_hidden_absolute_path_aliases_and_is_resumable(tmp
     (run_dir / "steps.ndjson").write_text("", encoding="utf-8")
     eval_dir = recordings / "evaluation_slices"
     eval_dir.mkdir()
-    (eval_dir / "manifest.json").write_text('{"video":"F:/OBS_RECORDINGS/legacy.mkv"}', encoding="utf-8")
+    (eval_dir / "manifest.json").write_text(
+        json.dumps({"video": str(media).replace("\\", "/")}), encoding="utf-8")
     log = recordings / "capture.log"
     log.write_text("diagnostic", encoding="utf-8")
     assert archive.stage_media(root, recordings, min_age_hours=0)["staged"][0]["video"] == media.name

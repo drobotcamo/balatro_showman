@@ -27,6 +27,7 @@ distinct. Analysis is a product now; learning is an optional downstream consumer
 | Development history | `FIRST_SLICE_PROTOCOL_V1.md`, `FIRST_SLICE_PILOT_REVIEW.md` |
 | Runtime and oracle | `BALATRO_RUNTIME.md`, `BRIDGE_SPIKE.md`, `ORACLE_DATA_REVIEW.md` |
 | Run-bundle operations/storage | `RUN_BUNDLE_OPERATIONS.md`, `RUN_BUNDLE_STORAGE.md` |
+| Audit tracked F-drive path references after an archive cutover | `python -m planning.audit_archive_paths --recordings-root F:\OBS_RECORDINGS` (checks tracked files, including binary byte strings, against current path aliases) |
 | Provenance and reducer boundary | `PHASE0_INVENTORY.md`, `PERSISTENT_STATE_OWNERSHIP.md` |
 | Decisions, findings and commands | `DECISIONS.md`, `LEARNINGS.md`, `TOOLING.md` |
 | Mechanics interface, Dagger source findings and checks | `RUN_MECHANICS_DESIGN.md`, `dagger_sell_value.md`, `schemas/run_mechanics_v0_1.schema.json`, `mechanics_contract_check.py`, `../run_mechanics/dagger.py`, `../run_mechanics/hermit_rebate.py` (demo: `python -m run_mechanics.hermit_rebate`) |
