@@ -3,6 +3,7 @@
 import argparse
 from contextlib import redirect_stdout
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -171,8 +172,13 @@ def build_parser():
     parser = argparse.ArgumentParser(prog="python -m showman", description=__doc__,
                                      epilog="Start with demo. See docs/capture/README.md for the agent guide.")
     surfaces = parser.add_subparsers(dest="surface", required=True)
-    surfaces.add_parser("record", parents=[file_ipc_bridge.build_parser(add_help=False)],
-                        help="consume game messages; optionally import terminal runs automatically")
+    record = surfaces.add_parser("record", parents=[file_ipc_bridge.build_parser(add_help=False)],
+                                 help="consume game messages; import terminal runs into the configured archive")
+    # The product CLI supplies the operational archive defaults. Keep the lower-
+    # level bridge parser's required --out-dir contract unchanged.
+    record._option_string_actions["--out-dir"].required = False
+    record.add_argument("--no-import", action="store_true",
+                        help="explicitly record files without importing them into SQLite")
     surfaces.add_parser("inspect", parents=[bundle_cli.build_parser(
         add_help=False, include_import=False, prog="python -m showman inspect")],
                         help="read SQLite evidence without changing it")
@@ -205,19 +211,49 @@ def build_parser():
     export.add_argument("output", type=Path)
     example = surfaces.add_parser("demo", help="run synthetic capture-to-inspection onboarding without Balatro/OBS")
     example.add_argument("--output-dir", type=Path, required=True, help="new directory beneath an existing parent")
+    surfaces.add_parser("archive", help="stage immutable captures into a single operational catalog")
     return parser
 
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "archive":
+        from .archive import main as archive_main
+        return archive_main(argv[1:])
     args = build_parser().parse_args(argv)
     try:
         if args.surface == "inspect":
             return bundle_cli.main(argv[1:])
         if args.surface == "record":
-            if args.bundle_db:
+            record_args = list(argv[1:])
+            root_value = os.environ.get("SHOWMAN_ARCHIVE_ROOT")
+            root = Path(root_value).expanduser().resolve() if root_value else None
+            if args.no_import:
+                if args.bundle_db:
+                    raise ValueError("--no-import cannot be combined with --bundle-db")
+                if args.out_dir is None:
+                    raise ValueError("--no-import requires an explicit --out-dir")
+                record_args.remove("--no-import")
+            else:
+                if args.bundle_db is None:
+                    if root is None:
+                        raise ValueError("recording imports by default; set SHOWMAN_ARCHIVE_ROOT, pass --bundle-db, or explicitly use --no-import")
+                    default_out = root / "captures"
+                    if args.out_dir is not None and Path(args.out_dir).expanduser().resolve() != default_out:
+                        raise ValueError("custom --out-dir requires an explicit --bundle-db or --no-import")
+                    args.out_dir = default_out
+                    args.bundle_db = str(root / "catalog.sqlite")
+                elif args.out_dir is None:
+                    if root is not None and Path(args.bundle_db).expanduser().resolve() == root / "catalog.sqlite":
+                        args.out_dir = root / "captures"
+                    else:
+                        raise ValueError("--bundle-db requires --out-dir unless it is the configured archive catalog")
+                if not any(arg == "--bundle-db" or arg.startswith("--bundle-db=") for arg in record_args):
+                    record_args.extend(("--bundle-db", str(args.bundle_db)))
                 check_bundle(args.bundle_db)
-            file_ipc_bridge.main(argv[1:])
+            if not any(arg == "--out-dir" or arg.startswith("--out-dir=") for arg in record_args):
+                record_args.extend(("--out-dir", str(args.out_dir)))
+            file_ipc_bridge.main(record_args)
             return 0
         if args.surface == "store":
             if args.operation == "init":

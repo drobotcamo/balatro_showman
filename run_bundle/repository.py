@@ -161,6 +161,17 @@ class RunBundle:
         provenance["oracle.usage"] = json.dumps(usage, sort_keys=True, separators=(",", ":"))
         if "recording" in metadata:
             provenance["oracle.recording"] = json.dumps(metadata["recording"], sort_keys=True, separators=(",", ":"))
+        if "capture_build" in metadata:
+            build = metadata["capture_build"]
+            if not isinstance(build, dict):
+                raise BundleError("capture_build must be an object")
+            for field in ("bridge_commit", "producer_commit", "installed_producer_sha256"):
+                value = build.get(field)
+                if value is not None and (not isinstance(value, str) or
+                                          not (len(value) == (64 if field.endswith("sha256") else 40)) or
+                                          any(char not in "0123456789abcdefABCDEF" for char in value)):
+                    raise BundleError(f"invalid capture_build.{field}")
+            provenance["capture.build"] = json.dumps(build, sort_keys=True, separators=(",", ":"))
         mechanics_reference_path = source / "mechanics_reference.ndjson"
         mechanics_reference_raw = mechanics_reference_path.read_bytes() if mechanics_reference_path.exists() else None
         if mechanics_reference_raw is not None:

@@ -7,6 +7,7 @@ import hashlib
 import json
 import math
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -20,6 +21,38 @@ MECHANICS_REFERENCE_VERSION = "dagger-reference/1.0"
 MECHANICS_REFERENCE_VERSION_V2 = "dagger-reference/2.0"
 RECORDER_STATUS_INTERVAL_SECONDS = 10
 RECORDER_READINESS_DEADLINE_SECONDS = 120
+
+
+def capture_build_identity() -> dict[str, str | None]:
+    """Record actual installed bytes; claim a commit only for matching committed files."""
+    root = Path(__file__).resolve().parents[1]
+    installed = (Path(os.environ["SHOWMAN_INSTALLED_PRODUCER"]) if os.environ.get("SHOWMAN_INSTALLED_PRODUCER")
+                 else Path(os.environ.get("APPDATA", "")) / "Balatro" / "Mods" / "balatro_showman_bridge" / "main.lua")
+    result: dict[str, str | None] = {
+        "bridge_commit": None, "producer_commit": None,
+        "installed_producer_sha256": None,
+    }
+    if installed.is_file():
+        result["installed_producer_sha256"] = hashlib.sha256(installed.read_bytes()).hexdigest()
+    try:
+        sha = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"],
+                                      stderr=subprocess.DEVNULL, timeout=5).decode().strip()
+        for name, path in (("bridge_commit", Path(__file__)),
+                           ("producer_commit", installed)):
+            relative = ("ground_truth/file_ipc_bridge.py" if name == "bridge_commit"
+                        else "ground_truth/balatro_mod/main.lua")
+            checkout = root / relative
+            # Git's clean filter handles Windows CRLF; compare actual installed
+            # bytes to that clean checkout, and retain the raw installed hash.
+            tracked = subprocess.run(["git", "-C", str(root), "ls-files", "--error-unmatch", relative],
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5).returncode == 0
+            clean = subprocess.run(["git", "-C", str(root), "diff", "--quiet", "HEAD", "--", relative],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5).returncode == 0
+            if tracked and clean and path.is_file() and path.read_bytes() == checkout.read_bytes():
+                result[name] = sha
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return result
 
 
 def _validate_mechanics_reference(snapshot: dict[str, Any]) -> dict[str, Any] | None:
@@ -534,6 +567,7 @@ class FileIpcBridge:
                 "ended_at": None,
                 "outcome": None,
                 "n_steps": 0,
+                "capture_build": capture_build_identity(),
                 "usage": {
                     "action_counts": {},
                     "unique_action_count": 0,
@@ -942,6 +976,11 @@ class FileIpcBridge:
             try:
                 bundle = RunBundle(self._bundle_db)
                 result = bundle.import_oracle_directory(source)
+                archive_root = source.parent.parent
+                if (source.parent.name == "captures" and
+                        Path(self._bundle_db).resolve() == archive_root / "catalog.sqlite"):
+                    from showman.archive import register_captured_run
+                    register_captured_run(archive_root, source)
             except ImportConflict as error:
                 self._import_conflicts[run_id] = str(error)
                 print(f"[file_ipc_bridge] import conflict for run {run_id}: {error}", file=sys.stderr)

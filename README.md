@@ -26,6 +26,13 @@ OBS -> video + game-clock marker -> candidate frame alignment -> human frame QA
 The Recorder can import terminal captures into the Run Store automatically.
 Video remains external. Recording association is a separate human-confirmed
 operation; successful storage does not imply a confirmed video or alignment.
+The designated F-drive operational catalog is
+`F:\OBS_RECORDINGS\showman-archive\catalog.sqlite`; captures live under
+`captures/`, confirmed videos under `videos/`, unlinked video under
+`videos/unlinked/`, and evaluation/review artifacts under their named folders.
+Old absolute paths resolve through hidden compatibility links.
+Use [archive layout and migration rules](docs/capture/archive.md) for paths;
+an active recorder/OBS must not be redirected by following an example.
 
 ### Start here
 
@@ -35,8 +42,9 @@ SQLAlchemy/Alembic dependencies in `pyproject.toml`. Use `py -3` instead of
 required for this module entrypoint.
 
 ```powershell
-python -m showman --help
-python -m showman demo --output-dir "C:\external\showman-demo"
+py -3 -m showman --help
+$demo = Join-Path $env:TEMP ("showman-demo-" + [guid]::NewGuid().ToString("N"))
+py -3 -m showman demo --output-dir "$demo"
 ```
 
 Choose a **new** output directory under an existing parent, outside Git. The
@@ -49,6 +57,7 @@ has no video association; it is an onboarding check, not game-quality evidence.
 
 | Task | Surface |
 | --- | --- |
+| Discover cataloged runs and confirmed videos | `python -m showman archive list` (set `SHOWMAN_ARCHIVE_ROOT`) |
 | Record supported game actions | `python -m showman record` |
 | Initialize a database or import a capture | `python -m showman store` |
 | Read stored runs, steps, hashes, and provenance | `python -m showman inspect` |
@@ -61,6 +70,8 @@ has no video association; it is an onboarding check, not game-quality evidence.
 
 - [Agent start and task guide](docs/capture/README.md): first successful use,
   capture-to-inspection workflow, and failure handling.
+- [Archive layout](docs/capture/archive.md): configured catalog, capture and
+  video naming, verified staging and future recording destination.
 - [Vocabulary](docs/capture/vocabulary.md): what runs, recordings, steps,
   bundles, alignment, and manifests mean.
 - [CLI and Python API reference](docs/capture/reference.md): arguments,
@@ -74,8 +85,9 @@ Phase 0 is `building`. Recording/storage/inspection are implemented; #81
 delivered a user-confirmed recorded run with representative rendered-frame
 checks. #79 delivered a reviewed development pilot and frozen prospective
 first-slice criteria. The annotation exporter is development-only and unscored.
-The pilot has no reconstruction predictions and its seven frame alignments
-remain unverified. Video-only reconstruction accuracy, held-out results, and
+The development samples have no reconstruction predictions; reviewed frame
+mappings do not establish broad alignment. Video-only reconstruction accuracy,
+held-out results, and
 broad Phase 0 acceptance are not established.
 
 The current producer covers selected actions and fields. Missing identities,

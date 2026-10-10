@@ -12,12 +12,24 @@ or schema. There is no HTTP service.
 | `demo` | `--output-dir NEW_DIR` | Writes labeled synthetic queue/capture/SQLite files under a new directory; returns a JSON result with summary, validation, and next command. Parent must exist. |
 | `store init` | `--db NEW_SQLITE_FILE` | Runs Alembic for a new database only; JSON result. Parent must exist. |
 | `store import` | `--db DB --source CAPTURE_DIR` | Mutates the existing migrated bundle in one import transaction; source files unchanged; JSON envelope. |
-| `record` | `--out-dir ROOT`, optional `--io-dir IO`, `--bundle-db DB`, `--action LABEL`, `--timeout SECONDS`, `--once` | Writable queue consumption/recovery, capture files, optional automatic terminal-run import; human-readable startup/readiness on stderr. IO defaults to the platform's Balatro `agent_io` directory. Live consumer and output-root locks prevent duplicate consumption or writes; only an exact recent healthy recorder is reused, and conflicts are reported without signaling existing processes. Readiness is confirmed after a consumer poll and IO/output health checks. A 120-second readiness deadline reports failure but does not stop the long-running recorder. `--action` is a smoke-test fallback only. |
+| `record` | optional `--out-dir ROOT`, `--bundle-db DB`, `--no-import`; also `--io-dir IO`, `--action LABEL`, `--timeout SECONDS`, `--once` | Writable queue consumption/recovery and capture files. With `SHOWMAN_ARCHIVE_ROOT`, defaults to `<root>/captures` and `<root>/catalog.sqlite`, importing terminal runs automatically. A custom output directory requires an explicit bundle DB. Without the environment root, specify both output and bundle paths, or explicitly select `--no-import --out-dir ROOT`. Startup is reported on stderr. Live consumer and output-root locks prevent duplicate consumption/writes; only an exact recent healthy recorder is reused, and conflicts are reported without signaling existing processes. Readiness follows a consumer poll and IO/output health checks. A 120-second readiness deadline reports failure but does not stop the recorder. IO defaults to the platform's Balatro `agent_io` directory. `--action` is a smoke-test fallback only. |
 | `capture summary` | `CAPTURE_DIR` | Read-only compatibility result wrapped in JSON; returns source objects/hashes, classification, video status, and diagnostics. |
 | `capture audit` | `CAPTURE_DIR` | Read-only finalized-run audit; JSON summaries plus text findings/failures and final verdict. |
 | `associate` | `--db DB --run ID --marker JSON --confirmed-by HUMAN`, optional `--video FILE`, `--required` | Observed summary and explicit terminal input on stderr/stdin; JSON result on stdout. Confirmed association adds provenance; existing evidence/outcome untouched. A supplied video must be a present file. |
 | `align` | `STEPS_NDJSON`, optional `--recording-start-ns NS`, `--fps FPS` | Read-only candidate mapping from sibling `session.json` marker; one JSON object per step (`step_id`, `frame_idx`). Overrides are diagnostic inputs, not confirmed provenance. |
 | `annotations export` | `INPUT_JSON OUTPUT_JSON` | Deterministic development manifest; JSON result with output hash/path and `development_only_unscored`. Existing identical output accepted, differing output refused. |
+| `archive inventory` | `--recordings-root ROOT` | Read-only SHA-256 inventory of the seven approved historical capture roots; does not import or include new live roots. |
+| `archive init`, `archive upgrade` | `--root ARCHIVE` | Explicitly create a new catalog/layout or back up and upgrade an existing catalog through Alembic. Never part of inspection. |
+| `archive ingest` | `--root ARCHIVE --source CAPTURE_DIR` | Copy and hash-check source members, import from the copy and register original/staged locations. Conflicting identity/path is an error. |
+| `archive list`, `archive verify` | optional `--root ARCHIVE`; `verify` also accepts repeated `--legacy-db DB` | Read-only run/location discovery or source-byte, stored-identity, confirmed-video and old-bundle reconciliation. Failures are reported rather than repaired. |
+| `archive sync-associations` | optional `--root ARCHIVE --legacy-db DB` | Copy already-confirmed recording provenance from matching source identity, and hash the existing video; no new association decision. Omit `--legacy-db` to refresh catalog associations. |
+| `archive stage-video` | `--root ARCHIVE --run ID` | Hash-check/copy one already-confirmed original into `videos/` and update only catalog location, retaining original provenance. |
+| `archive media-inventory` | `--root ARCHIVE --recordings-root ROOT` | Read-only list of root-level MKVs and their archive state; no associations inferred. |
+| `archive stage-media` | `--root ARCHIVE --recordings-root ROOT`, optional repeatable `--only BASENAME`, `--exclude BASENAME`, `--min-age-hours N` | Copy stable MKVs to `videos/` when already confirmed or `videos/unlinked/` otherwise. Original paths remain in place. |
+| `archive verify-media` | `--root ARCHIVE` | Read-only source and staged-copy hash/size reconciliation for registered media. |
+| `archive relocate-root` | `--root ARCHIVE --recordings-root ROOT`, optional `--apply` | Dry-run by default. With `--apply`, checks process/IPC quiescence, moves classified entries into the archive, and leaves hidden compatibility links. Explicit authorization is required. |
+| `archive verify-relocation` | `--root ARCHIVE`, optional repeatable `--only BASENAME` | Read-only validation of compatibility links and relocated content hashes; `--only` allows bounded batches. |
+| `archive review` | repeat `--run ID` in verified segment order; optional `--root ARCHIVE --export-root ROOT --recording-start-ns NS --timing-evidence TEXT --open` | Launch the browser QA viewer using only a confirmed video location and all its cataloged segments. The viewer runs until stopped; it does not export scored labels. |
 
 All inspection commands accept `--db DB`; all except `list` require `--run ID`,
 with `capabilities` allowing an optional run. DB may be a SQLite filename or a
@@ -67,7 +79,10 @@ shape across all operations.
 Demo recorder logs and association summaries/prompts go to stderr. Normal demo,
 store, inspection, association, and annotation success results are JSON on stdout.
 `record` and `capture audit` retain their existing mixed/log output formats;
-`align` is NDJSON. The CLI is task-unified, not one interchangeable result schema.
+`align` is NDJSON. Archive commands except `review` return JSON envelopes;
+`review` delegates to the long-running browser viewer. The CLI is task-unified,
+not one interchangeable result schema. Archive commands take
+`SHOWMAN_ARCHIVE_ROOT` from the environment when `--root` is absent.
 
 ## Python API reference
 

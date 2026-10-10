@@ -5,7 +5,20 @@ actions on the right. It is debugging QA, not an annotation/evaluation exporter.
 Inputs are an existing video path and ordered capture directories for that video.
 Source files remain unchanged. Generated browser media and exports stay external.
 
-From the repository root, with Python 3.11+ and existing `ffmpeg` / `ffprobe` on PATH. Quote every video/run/export path in PowerShell because recording filenames may contain spaces:
+For a run with an **already confirmed** video association in the operational
+catalog, start with `python -m showman archive list` followed by
+`python -m showman archive review --run <run-id> --open` (set
+`SHOWMAN_ARCHIVE_ROOT` first). Repeat `--run` in reviewed source order when
+multiple confirmed segments share the video. [Archive layout and limitations](archive.md)
+explain when the explicit paths below are still required. A marker, nearby
+timestamp or matching filename never creates an association.
+
+The example below is a **historical, explicitly grouped** Issue #115 video
+whose two source segments are not both confirmed catalog associations. Their
+original paths remain valid but are not new output destinations. Use this
+diagnostic route rather than guessing the second segment's association. From
+the repository root, with Python 3.11+ and existing `ffmpeg` / `ffprobe` on
+PATH, quote paths with spaces:
 
 ```powershell
 py -3 -m ground_truth.qa_viewer `
@@ -14,7 +27,7 @@ py -3 -m ground_truth.qa_viewer `
   --run "F:\OBS_RECORDINGS\oracle_runs_issue79\2317688862100-2663" `
   --recording-start-ns 1895948216800 `
   --timing-evidence "User-confirmed shared recording/play in issue 115; diagnostic timing only" `
-  --export-root "F:\OBS_RECORDINGS\qa_debug" --seed "issue118-review-v1" --open
+  --export-root "F:\OBS_RECORDINGS\showman-archive\reviews" --seed "issue118-review-v1" --open
 ```
 
 For other recordings, supply their own paths and timing evidence. With one source
@@ -116,7 +129,7 @@ For a predeclared group, create one UTF-8 JSON config from
 external paths, and run this once:
 
 ```powershell
-py -3 -m ground_truth.qa_viewer_launch --config "F:\OBS_RECORDINGS\issue82-review.json" --open
+py -3 -m ground_truth.qa_viewer_launch --config "<external-review-config.json>" --open
 ```
 
 The config file's directory anchors relative paths. Each video needs one object

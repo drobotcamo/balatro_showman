@@ -7,6 +7,7 @@ import sys
 import pytest
 
 from run_bundle import RunBundleInspector
+from showman import __main__ as showman_cli
 from showman.__main__ import main
 
 
@@ -104,6 +105,33 @@ def test_record_command_consumes_a_queue_and_imports_terminal_capture(example, c
     result = json.loads(capsys.readouterr().out)["data"]
     assert result["record_count"] == 1
     assert result["run"]["status"] == "won"
+
+
+def test_record_defaults_to_configured_archive_capture_and_catalog(tmp_path, monkeypatch, capsys):
+    archive = tmp_path / "archive"
+    assert main(["archive", "init", "--root", str(archive)]) == 0
+    capsys.readouterr()
+    monkeypatch.setenv("SHOWMAN_ARCHIVE_ROOT", str(archive))
+    calls = []
+    monkeypatch.setattr(showman_cli.file_ipc_bridge, "main", lambda argv: calls.append(argv))
+
+    assert main(["record", "--once", "--io-dir", str(tmp_path / "io")]) == 0
+
+    assert calls[0][calls[0].index("--out-dir") + 1] == str(archive / "captures")
+    assert calls[0][calls[0].index("--bundle-db") + 1] == str(archive / "catalog.sqlite")
+
+
+def test_record_requires_import_target_or_explicit_no_import(tmp_path, monkeypatch, capsys):
+    monkeypatch.delenv("SHOWMAN_ARCHIVE_ROOT", raising=False)
+    assert main(["record", "--once", "--out-dir", str(tmp_path / "captures")]) == 2
+    diagnostic = json.loads(capsys.readouterr().out)["diagnostics"][0]["message"]
+    assert "recording imports by default" in diagnostic
+
+    calls = []
+    monkeypatch.setattr(showman_cli.file_ipc_bridge, "main", lambda argv: calls.append(argv))
+    assert main(["record", "--no-import", "--once", "--out-dir", str(tmp_path / "captures")]) == 0
+    assert "--no-import" not in calls[0]
+    assert "--bundle-db" not in calls[0]
 
 
 def test_mutating_commands_require_an_existing_migrated_bundle(tmp_path, capsys):

@@ -44,7 +44,10 @@ class OwnershipTests(unittest.TestCase):
             self.assertIn("owned by another", result.stderr)
 
     def test_process_command_identity_matches_the_current_test_process(self):
-        self.assertTrue(process_matches(os.getpid(), ["-m", "unittest"]))
+        # Support both repository invocation styles: unittest directly and the
+        # pytest command used by CI and archive-related agent verification.
+        runner_args = (["-m", "unittest"], ["-m", "pytest"])
+        self.assertTrue(any(process_matches(os.getpid(), args) for args in runner_args))
         self.assertFalse(process_matches(os.getpid(), ["-m", "unrelated-command"]))
 
     def test_process_command_match_uses_exact_argument_tokens(self):

@@ -663,6 +663,38 @@ Alternative: infer effects from interval money deltas or add these fields to
 ordinary step observations. Rejected because the interval can contain unrelated
 effects and engine-reference values must remain isolated.
 
+### D046 — accepted — One operational recording catalog with external originals
+
+Use one configured SQLite catalog for new capture discovery, inspection and
+viewer lookup, with byte-preserved capture directories and OBS originals outside
+the database. The first historical staging set is the 28 identified F-drive
+sessions and the two F-drive bundles; do not promote `%TEMP%` or legacy assets
+implicitly. Use distinct Alembic, capture protocol, IPC, mechanics and
+capture-time code identities. A Git commit is recorded for a new capture only
+when the installed producer/bridge bytes match files in that commit; otherwise
+the revision is unknown while the available file hash is retained. Historical
+capture revisions remain unknown without contemporaneous evidence.
+
+The archive uses `catalog.sqlite`, `captures/<producer-run-id>`, confirmed
+`videos/`, unpaired `videos/unlinked/`, and `reviews/`/`evaluations/` for their
+respective artifacts. Old absolute paths remain backward-compatible through
+hidden, cataloged symbolic links to organized locations; content itself is no
+longer stored at the F-drive root. Existing marker and explicit human
+association rules still apply. The live Issue #82 recorder/OBS were stopped
+before path relocation. Four finalized Issue #82 runs were audited and added as
+post-baseline catalog runs; their videos remain unassociated. The unfinished
+segment `2110871066199-6186` was preserved under `captures/` for recovery
+without an invented outcome. The owner authorized moving 101 root entries into
+categories after recorder/viewer shutdown and queue inspection. Future path
+migrations still require the same quiescence and compatibility checks.
+
+Alternative: replace the SQLite boundary or embed media and retrospectively
+rename runs/videos. Rejected because the existing typed, hashed store already
+supports multiple runs, while old media names and run IDs do not prove one-to-one
+association. Source: owner approval of catalog and initial 28-session scope in
+the Issue #153 planning conversation, 2026-10-09; implementation and layout in
+`docs/capture/archive.md`.
+
 ## Open Questions
 
 - **Q01** — Which exact Balatro version and mod configuration define the

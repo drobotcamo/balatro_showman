@@ -11,6 +11,14 @@ See `docs/capture/README.md` and `docs/capture/reference.md` for onboarding,
 capture/import/inspection commands, and the terminal association surface.
 `python -m showman inspect ...` delegates to the same read-only inspector;
 `store init`, `store import`, `record`, and confirmed `associate` are mutating.
+For the default F-drive location, the single operational catalog, source
+staging and location/association rules are in `docs/capture/archive.md`.
+`showman archive inventory/list/verify/media-inventory/verify-media/verify-relocation`
+are read-only. `archive init/upgrade/ingest/sync-associations/stage-video/stage-media`
+are explicit writes. `archive relocate-root --apply` is the physical path
+cutover: it checks active processes/IPC, creates hidden compatibility aliases,
+and follows a recorded hash plan. The catalog does not migrate older bundles or
+redirect an already-running recorder.
 
 Use the package module rather than a second standalone launcher:
 
@@ -25,16 +33,27 @@ python -m run_bundle <command> --db <bundle.sqlite> ...
 separate engine-answer channel. `validate --strict` requests strict diagnostics; inspection never
 repairs evidence or changes lifecycle state.
 
-Database setup is separate and mutating:
+Database setup is separate and mutating. For an **explicitly approved** upgrade
+of the existing catalog, the archive command backs it up before invoking
+Alembic:
 
-```text
-alembic upgrade head
+```powershell
+py -3 -m showman archive upgrade --root 'F:\OBS_RECORDINGS\showman-archive'
 ```
 
-Run it only when creating or upgrading a bundle under the storage procedure in
-`planning/RUN_BUNDLE_STORAGE.md`. Do not run migrations as part of inspection.
+Do not run a bare `alembic upgrade head`: `alembic.ini` contains a generic
+relative filename that is not the F-drive catalog. For a standalone bundle,
+set its `sqlalchemy.url` deliberately under the storage procedure in
+`planning/RUN_BUNDLE_STORAGE.md`. Do not migrate during inspection or merely
+to start a recording; the catalog was already initialized and migrated.
 
 ## Automatic File-IPC Intake
+
+For a new operational capture, use `docs/capture/README.md` → “Record a new
+session” and the paired `showman-archive/captures` and `catalog.sqlite` paths.
+The generic bridge command below describes the lower-level interface and does
+not itself register a new session in the archive catalog when pointed elsewhere.
+Do not start it alongside a running `showman record` consumer.
 
 After migrating the destination once, configure the recorder with the existing
 file source and bundle. The bridge never runs migrations:
@@ -113,6 +132,9 @@ import on confirmation. Run intake above remains automatic.
 
 Before proposing a new capture or explicit association, the agent does the
 read-only inventory below; a new capture also needs the staged live preflight.
+Include `showman archive list` and `showman archive verify` when the F-drive
+catalog is available. Historical sources and the issue82 live output remain
+separate until their exact state is inspected; never classify a run by root name.
 An unassociated marker does not prove that no video exists; a matching filename,
 marker or nearby timestamp does not prove that pixels correspond to the run.
 

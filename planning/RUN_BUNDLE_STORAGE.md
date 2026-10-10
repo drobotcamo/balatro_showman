@@ -1,9 +1,14 @@
 # Run-bundle storage
 
-Issue #44 stores each operational bundle in SQLite using SQLAlchemy 2.x. Alembic
-owns schema creation and upgrades: `alembic upgrade head` (set
-`sqlalchemy.url` to the bundle URL) is the production setup command. SQLite
-transactions are short and atomic; one writer is expected, while readers may
+Issue #44 stores operational bundles in SQLite using SQLAlchemy 2.x. Alembic
+owns schema creation and upgrades. For a standalone bundle,
+`alembic upgrade head` requires an explicitly configured `sqlalchemy.url`.
+For the designated F-drive catalog, use `showman archive init` only for a new
+root or `showman archive upgrade` for an authorized upgrade; the latter backs
+up the database first. Never run bare Alembic using `alembic.ini`'s relative
+example URL or initialize over the existing archive.
+
+SQLite transactions are short and atomic; one writer is expected, while readers may
 use SQLite's normal snapshot/read isolation. Evidence records are canonical
 JSON UTF-8 bytes, or unmodified raw bytes, hashed with SHA-256. Final outcomes
 reject further evidence writes; validation reports and persists integrity
@@ -22,6 +27,21 @@ an import with the same run ID and source identity is a no-op success; a
 different source identity under that run ID is a conflict. Import never
 modifies source evidence. See `planning/RUN_BUNDLE_OPERATIONS.md` for automatic
 intake and recovery.
+
+Issue #153 adds `archive_entries` at Alembic revision `0004_archive_catalog`.
+The location row points to byte-verified staged capture files and records their
+original path/source identity; a confirmed media path is populated only from
+existing human-confirmed provenance. Schema revision, source protocol version,
+capture-time Git revisions and installed Lua hash are distinct. Historical
+capture-time revisions remain null when they cannot be established. Existing
+bundles require explicit migration before they can contain archive entries;
+inspection never upgrades them. See `docs/capture/archive.md`.
+Revision `0005_archive_video_hash` adds a checked video SHA-256 to confirmed
+location rows. Revision `0006_archive_media` records copied video paths, hashes,
+sizes and whether each media item is confirmed or unlinked; this does not assert
+a new run association. Revision `0007_archive_path_aliases` records current
+capture locations and hash-verified compatibility aliases for old absolute
+paths. No media bytes are embedded in SQLite.
 
 The intake API requires terminal lifecycle statuses to carry their matching
 outcome. An `incomplete` run must carry no outcome; `active` and `interrupted`

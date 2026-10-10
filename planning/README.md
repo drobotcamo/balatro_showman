@@ -22,11 +22,12 @@ distinct. Analysis is a product now; learning is an optional downstream consumer
 
 | Need | Canonical reference |
 | --- | --- |
-| Capture / inspect / export | `../docs/capture/README.md`, `../docs/capture/reference.md` |
+| Capture / inspect / export | `../docs/capture/README.md`, `../docs/capture/archive.md`, `../docs/capture/reference.md` |
 | First-slice criteria and annotation | `FIRST_SLICE_PROTOCOL_V2.md`, `FIRST_SLICE_ANNOTATION.md`; #82 owns live evaluation |
 | Development history | `FIRST_SLICE_PROTOCOL_V1.md`, `FIRST_SLICE_PILOT_REVIEW.md` |
 | Runtime and oracle | `BALATRO_RUNTIME.md`, `BRIDGE_SPIKE.md`, `ORACLE_DATA_REVIEW.md` |
 | Run-bundle operations/storage | `RUN_BUNDLE_OPERATIONS.md`, `RUN_BUNDLE_STORAGE.md` |
+| Audit tracked F-drive path references after an archive cutover | `python -m planning.audit_archive_paths --recordings-root F:\OBS_RECORDINGS` (checks tracked files, including binary byte strings, against current path aliases) |
 | Provenance and reducer boundary | `PHASE0_INVENTORY.md`, `PERSISTENT_STATE_OWNERSHIP.md` |
 | Decisions, findings and commands | `DECISIONS.md`, `LEARNINGS.md`, `TOOLING.md` |
 | Mechanics interface, Dagger source findings and checks | `RUN_MECHANICS_DESIGN.md`, `dagger_sell_value.md`, `schemas/run_mechanics_v0_1.schema.json`, `mechanics_contract_check.py`, `../run_mechanics/dagger.py`, `../run_mechanics/hermit_rebate.py` (demo: `python -m run_mechanics.hermit_rebate`) |
@@ -42,10 +43,12 @@ extension; independent live engine-reference scenarios remain required.
 Workflow migration and retrospective documents are historical references, not a
 second current execution plan.
 
-Status: `building`. Capture, inspection, annotation export and the viewer exist;
-active mechanics and visual inference do not. #82's seven-frame pilot has no
-predictions and unverified alignment. #115 owns Continue identity/live acceptance.
-No broad phase pass or reconstruction accuracy follows from this planning revision.
+Status: `building`. Capture, catalog inspection, annotation export and the
+viewer exist; active mechanics and visual inference do not. #82's development
+samples have no model predictions; some rendered-frame mappings have been
+reviewed, but a broad held-out acceptance result does not exist. #115 addressed
+Continue identity; explicit whole-play/video grouping remains necessary. No
+broad phase pass or reconstruction accuracy follows from this planning revision.
 
 Use `planned`, `designing`, `building`, `validated`, `blocked` or `retired` in
 contracts. Run `python planning/check_contracts.py` for mechanical consistency;
