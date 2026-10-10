@@ -5,12 +5,15 @@ import bisect
 import hashlib
 import json
 import math
+import os
 import random
 import re
 import secrets
 import shutil
 import subprocess
+import sys
 import threading
+import time
 import urllib.error
 import urllib.request
 import webbrowser
@@ -20,6 +23,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from run_bundle.compatibility import read_oracle_run
+from ground_truth.process_ownership import (OwnershipConflict, OwnershipLock, active_owner,
+                                           process_matches)
 
 ASSET = Path(__file__).with_name("qa_viewer.html")
 
@@ -93,8 +98,10 @@ class Review:
         self.seed = seed or secrets.token_hex(8)
         self.rng = random.Random(self.seed)
         self.draw = 0
+        self.startup_timings = {}
         if start_ns is not None and (type(start_ns) is not int or start_ns < 0 or not timing_evidence):
             raise ValueError("an override timestamp requires nonnegative integer ns and timing evidence")
+        source_load_started = time.perf_counter()
         self.sources = []
         self.source_bytes = []
         for directory in runs:
@@ -118,6 +125,7 @@ class Review:
             self.source_bytes.append(frozen)
         if not self.sources or len({r["run_id"] for r in self.sources}) != len(self.sources):
             raise ValueError("sources must be nonempty and have distinct run IDs")
+        self.startup_timings["oracle_source_validation_s"] = time.perf_counter() - source_load_started
         if paths_overlap(self.video, self.export_root):
             raise ValueError("export root overlaps the source video")
         repository = Path(__file__).resolve().parent.parent
@@ -125,8 +133,12 @@ class Review:
             raise ValueError("generated exports must be outside the repository")
         if not self.export_root.parent.is_dir():
             raise ValueError("export parent must already exist")
+        stage = time.perf_counter()
         self.video_hash = digest(self.video)
+        self.startup_timings["video_hash_s"] = time.perf_counter() - stage
+        stage = time.perf_counter()
         self.video_probe = probe(self.video)
+        self.startup_timings["source_packet_probe_s"] = time.perf_counter() - stage
         if self.video_probe.get("codec_name") != "h264":
             raise ValueError("eligibility frame mapping currently supports H.264 video only")
         if not self.video_probe.get("constant_fps"):
@@ -172,18 +184,26 @@ class Review:
         cache.mkdir(parents=True, exist_ok=True)
         destination = cache / (self.video_hash + ".mp4")
         metadata = destination.with_suffix(".json")
+        stage = time.perf_counter()
         if destination.exists() or metadata.exists():
             if not destination.is_file() or not metadata.is_file():
                 raise ValueError("incomplete browser cache; preserve it and choose a fresh export root")
             cached = json.loads(metadata.read_text())
             if cached.get("source_sha256") != self.video_hash or cached.get("media_sha256") != digest(destination):
                 raise ValueError("browser cache hashes disagree; preserve it and choose a fresh export root")
+            self.startup_timings["verified_cache_check_s"] = time.perf_counter() - stage
         else:
+            remux_started = time.perf_counter()
             run_ffmpeg(["-i", str(self.video), "-map", "0:v:0", "-c:v", "copy", "-an",
                         "-movflags", "+faststart", str(destination)])
+            self.startup_timings["cache_miss_remux_s"] = time.perf_counter() - remux_started
+        stage = time.perf_counter()
         if digest(self.video) != self.video_hash:
             raise ValueError("source video changed while preparing browser media")
+        self.startup_timings["source_recheck_hash_s"] = time.perf_counter() - stage
+        stage = time.perf_counter()
         self.media_probe = probe(destination)
+        self.startup_timings["remux_packet_probe_s"] = time.perf_counter() - stage
         # Oracle time is relative to video start. Reject remuxes that materially
         # change duration or leave a shifted presentation origin.
         origin = float(self.media_probe["streams"][0].get("start_time", 0))
@@ -198,7 +218,9 @@ class Review:
             raise ValueError("browser remux frame timestamps do not map one-to-one to source frames")
         self.frame_mapping = {"status": "one_to_one_timestamps_confirmed", "frame_count": len(source_times),
                               "maximum_timestamp_delta_seconds": maximum_frame_delta}
+        stage = time.perf_counter()
         self.media, self.media_hash = destination, digest(destination)
+        self.startup_timings["prepared_media_hash_s"] = time.perf_counter() - stage
         if not metadata.exists():
             with metadata.open("x", encoding="utf-8") as stream:
                 json.dump({"source_sha256": self.video_hash, "media_sha256": self.media_hash,
@@ -531,25 +553,115 @@ def main():
     args = parser.parse_args()
     if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
         parser.error("ffmpeg and ffprobe must already be installed on PATH")
+    identity = {
+        "command": "ground_truth.qa_viewer", "video": str(args.video.resolve()),
+        "command_args": ["-m", "ground_truth.qa_viewer"],
+        "runs": [str(run.resolve()) for run in args.run],
+        "export_root": str(args.export_root.resolve()), "steps": args.steps,
+        "seed": args.seed,
+    }
+    ownership = OwnershipLock(args.export_root, "qa-viewer", identity)
+    print("Checking viewer ownership and preparing media; HTTP readiness still unverified; "
+          "deadline 120s.",
+          file=sys.stderr, flush=True)
+    stopped = threading.Event()
+    def progress():
+        elapsed = 0
+        while not stopped.wait(15):
+            elapsed += 15
+            print(f"Viewer readiness still unverified after {elapsed}s; deadline 120s; pid={os.getpid()}; "
+                  f"ownership/log path={args.export_root.resolve()}.", file=sys.stderr, flush=True)
+    reporter = threading.Thread(target=progress, daemon=True)
+    reporter.start()
+    server = None
+    server_thread = None
     try:
+        ownership.acquire()
+        print(f"Viewer preparation in progress; pid={os.getpid()} diagnostics=stderr.",
+              file=sys.stderr, flush=True)
+        stage = time.monotonic()
         review = Review(args.video, args.run, args.export_root, args.seed,
                         args.recording_start_ns, args.timing_evidence)
+        print(f"Viewer source inspection/probe: {time.monotonic() - stage:.3f}s.",
+              file=sys.stderr, flush=True)
+        print("Viewer startup stages: " + json.dumps(review.startup_timings, sort_keys=True),
+              file=sys.stderr, flush=True)
+        stage = time.monotonic()
         review.window(count=args.steps)
         print("Preparing external browser media; original recording is unchanged.", flush=True)
         review.prepare_media()
+        print(f"Viewer media preparation: {time.monotonic() - stage:.3f}s.",
+              file=sys.stderr, flush=True)
+        print("Viewer media stages: " + json.dumps(review.startup_timings, sort_keys=True),
+              file=sys.stderr, flush=True)
         server = make_server(review, args.port, args.steps)
+        url = f"http://127.0.0.1:{server.server_port}"
+        server_thread = threading.Thread(target=server.serve_forever, daemon=True)
+        server_thread.start()
+        deadline = time.monotonic() + 120
+        while time.monotonic() < deadline:
+            try:
+                with urllib.request.urlopen(url + "/", timeout=1) as response:
+                    if response.status == 200:
+                        break
+            except (OSError, urllib.error.URLError, TimeoutError):
+                time.sleep(0.1)
+        else:
+            raise ValueError("viewer HTTP readiness timed out after 120s")
+        ownership.update(ready_url=url, ready_seed=review.seed)
+    except OwnershipConflict as exc:
+        stopped.set(); reporter.join()
+        try:
+            record = json.loads(ownership.path.read_text(encoding="utf-8"))
+            ready_url = record.get("ready_url")
+            if (record.get("identity") == identity and isinstance(record.get("pid"), int)
+                    and isinstance(ready_url, str)
+                    and process_matches(record["pid"], identity["command_args"])):
+                with urllib.request.urlopen(ready_url + "/", timeout=1) as response:
+                    current_owner = active_owner(args.export_root, "qa-viewer")
+                    if (response.status == 200 and current_owner is not None
+                            and current_owner.get("token") == record.get("token")):
+                        print(json.dumps({"url": ready_url, "export_root": identity["export_root"],
+                                          "seed": record.get("ready_seed", args.seed), "pid": record["pid"],
+                                          "reused": True, "startup_ms": None}), flush=True)
+                        print(f"Reusing healthy matching viewer: pid={record['pid']}; HTTP {ready_url}/; "
+                              f"export_root={identity['export_root']}.", file=sys.stderr, flush=True)
+                        return
+        except (OSError, ValueError, urllib.error.URLError, TimeoutError):
+            pass
+        parser.error(f"viewer ownership conflict; existing process is mismatched or unhealthy: {exc}")
     except (ValueError, OSError, subprocess.SubprocessError) as exc:
+        stopped.set(); reporter.join()
+        if server is not None and server_thread is not None:
+            server.shutdown(); server.server_close()
+        elif server is not None:
+            server.server_close()
+        ownership.close()
         parser.error(str(exc))
-    url = f"http://127.0.0.1:{server.server_port}"
-    print(json.dumps({"url": url, "export_root": str(review.export_root), "seed": review.seed}), flush=True)
+    except BaseException:
+        stopped.set(); reporter.join()
+        if server is not None and server_thread is not None:
+            server.shutdown(); server.server_close()
+        elif server is not None:
+            server.server_close()
+        ownership.close()
+        raise
+    stopped.set(); reporter.join()
+    print(json.dumps({"url": url, "export_root": str(review.export_root), "seed": review.seed,
+                      "pid": os.getpid(), "reused": False}), flush=True)
+    print(f"Viewer ready: HTTP {url}/; pid={os.getpid()}; export_root={review.export_root}",
+          file=sys.stderr, flush=True)
     if args.open:
         webbrowser.open(url)
     try:
-        server.serve_forever()
+        server_thread.join()
     except KeyboardInterrupt:
         pass
     finally:
+        server.shutdown()
+        server_thread.join()
         server.server_close()
+        ownership.close()
 
 
 def launch_group():
@@ -614,6 +726,9 @@ def launch_group():
                 raise ValueError("export root overlaps source video or oracle evidence")
             resolved_groups.append((resolved_video, resolved_runs, name))
         children = []
+        already_ready = []
+        child_start_times = {}
+        first_status_times = {}
         for ordinal, (video, resolved_runs, name) in enumerate(resolved_groups, 1):
             child_name = name
             child_export = export_root / child_name
@@ -621,6 +736,41 @@ def launch_group():
                     any(paths_overlap(child_export, root) for root in resolved_runs)):
                 raise ValueError("child export folder overlaps source video or oracle evidence")
             child_export.mkdir(parents=True, exist_ok=True)
+            identity = {
+                "command": "ground_truth.qa_viewer", "video": str(video),
+                "command_args": ["-m", "ground_truth.qa_viewer"],
+                "runs": [str(run) for run in resolved_runs],
+                "export_root": str(child_export.resolve()), "steps": args.steps,
+                "seed": f"{args.seed}-{ordinal}" if args.seed else None,
+            }
+            owner = active_owner(child_export, "qa-viewer")
+            if owner is not None:
+                ready_url = owner.get("ready_url")
+                if owner.get("identity") != identity or not isinstance(ready_url, str):
+                    raise ValueError(f"conflicting viewer owner for {child_name}: {owner}")
+                if not process_matches(owner.get("pid"), identity["command_args"]):
+                    raise ValueError(f"viewer owner PID/command mismatch for {child_name}: {owner}")
+                reuse_started = time.monotonic()
+                try:
+                    with urllib.request.urlopen(ready_url + "/", timeout=1) as response:
+                        if response.status != 200:
+                            raise ValueError(f"matching viewer owner is not healthy for {child_name}")
+                    current_owner = active_owner(child_export, "qa-viewer")
+                    if (current_owner is None or current_owner.get("token") != owner.get("token")
+                            or current_owner.get("pid") != owner.get("pid")):
+                        raise ValueError(f"viewer ownership changed during health check for {child_name}")
+                except (OSError, urllib.error.URLError, TimeoutError) as exc:
+                    raise ValueError(f"matching viewer owner is not healthy for {child_name}: {exc}") from exc
+                already_ready.append({"name": child_name, "url": ready_url,
+                                      "export_root": identity["export_root"],
+                                      "seed": owner.get("ready_seed", identity["seed"]),
+                                      "pid": owner["pid"],
+                                      "reused": True, "startup_ms": None,
+                                      "reuse_check_ms": round((time.monotonic() - reuse_started) * 1000, 1)})
+                print(f"Reusing healthy matching viewer {child_name}: pid={owner['pid']}; "
+                      f"HTTP {ready_url}/; export_root={identity['export_root']}.",
+                      file=sys.stderr, flush=True)
+                continue
             command = [sys.executable, "-m", "ground_truth.qa_viewer", "--video", str(video),
                        "--export-root", str(child_export), "--steps", str(args.steps)]
             for run in resolved_runs:
@@ -630,9 +780,14 @@ def launch_group():
             if args.open:
                 command.append("--open")
             log_base = export_root / (child_name + "-" + secrets.token_hex(4) + ".log")
+            print(f"Starting viewer {ordinal}/{len(resolved_groups)} ({child_name}); "
+                  f"readiness still unverified; deadline 120s; "
+                  f"diagnostics: {log_base}.[out|err].txt",
+                  file=sys.stderr, flush=True)
             stdout = log_base.with_suffix(log_base.suffix + ".out.txt").open("x", encoding="utf-8")
             stderr = log_base.with_suffix(log_base.suffix + ".err.txt").open("x", encoding="utf-8")
             try:
+                child_started = time.monotonic()
                 proc = subprocess.Popen(command, cwd=Path(__file__).resolve().parent.parent,
                                         stdout=stdout, stderr=stderr, text=True)
             except Exception:
@@ -640,17 +795,31 @@ def launch_group():
                 stderr.close()
                 raise
             children.append((proc, stdout, stderr, child_name, log_base))
+            child_start_times[proc.pid] = child_started
         deadline = time.monotonic() + 120
+        last_progress = time.monotonic()
+        if children:
+            print("Viewers started; checking HTTP readiness (still unverified). "
+                  "Owned PIDs/logs: " + "; ".join(
+                      f"{name} pid={proc.pid} logs={log_base}.[out|err].txt"
+                      for proc, _, _, name, log_base in children), file=sys.stderr, flush=True)
+        else:
+            print("All viewers are reused healthy matches; HTTP readiness verified.",
+                  file=sys.stderr, flush=True)
         while time.monotonic() < deadline:
             failed = [child for child in children if child[0].poll() is not None]
             if failed:
                 details = "; ".join(f"{name}: {err.with_suffix(err.suffix + '.err.txt').read_text(encoding='utf-8', errors='replace')}"
                                      for _, _, _, name, err in failed)
                 raise ValueError("viewer startup failed: " + details)
-            ready = []
+            ready = list(already_ready)
             for proc, _, _, name, log_base in children:
                 out = log_base.with_suffix(log_base.suffix + ".out.txt")
                 text_out = out.read_text(encoding="utf-8", errors="replace") if out.exists() else ""
+                err = log_base.with_suffix(log_base.suffix + ".err.txt")
+                text_err = err.read_text(encoding="utf-8", errors="replace") if err.exists() else ""
+                if "Checking viewer ownership and preparing media" in text_err:
+                    first_status_times.setdefault(proc.pid, time.monotonic())
                 for line in text_out.splitlines():
                     try:
                         record = json.loads(line)
@@ -663,18 +832,32 @@ def launch_group():
                             with urllib.request.urlopen(record["url"] + "/", timeout=1) as response:
                                 if response.status == 200:
                                     if proc.poll() is None:
-                                        ready.append({"name": name, **record, "pid": proc.pid})
+                                        ready.append({"name": name, **record, "pid": proc.pid,
+                                                      "reused": False,
+                                                      "launch_to_first_status_observed_ms": (
+                                                          round((first_status_times[proc.pid] -
+                                                                 child_start_times[proc.pid]) * 1000, 1)
+                                                          if proc.pid in first_status_times else None),
+                                                      "startup_ms": round((time.monotonic() -
+                                                                           child_start_times[proc.pid]) * 1000, 1)})
                                         break
                                     raise ValueError(f"{name} viewer exited during readiness probe")
                         except (OSError, urllib.error.URLError, TimeoutError):
                             continue
-            if len(ready) == len(children):
+            if len(ready) == len(resolved_groups):
                 if all(child[0].poll() is None for child in children):
                     print(json.dumps({"viewers": ready}, indent=2))
                     for child in children:
                         child[1].close()
                         child[2].close()
                     return
+            now = time.monotonic()
+            if now - last_progress >= 30:
+                elapsed = int(now - (deadline - 120))
+                print(f"Viewer readiness still unverified after {elapsed}s; "
+                      f"deadline 120s; inspect the per-viewer logs above.",
+                      file=sys.stderr, flush=True)
+                last_progress = now
             time.sleep(0.25)
         raise ValueError("viewer startup timed out; inspect per-viewer .err.txt logs")
     except (ValueError, OSError, json.JSONDecodeError, subprocess.SubprocessError) as exc:

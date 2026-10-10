@@ -6,10 +6,12 @@ import shutil
 import tempfile
 import threading
 import unittest
+import urllib.error
 from pathlib import Path
 from unittest.mock import patch
 
 from ground_truth.qa_viewer import Review, byte_range, digest, launch_group, make_server, probe, run_ffmpeg
+from ground_truth.process_ownership import OwnershipLock
 
 
 def source(root, name, n=23, marker=True):
@@ -172,13 +174,25 @@ class ViewerTests(unittest.TestCase):
             stdout.flush()
             return Process()
 
+        probes = []
+        def delayed_probe(*args, **kwargs):
+            probes.append(args[0])
+            if len(probes) == 1:
+                raise urllib.error.URLError("fixture delayed readiness")
+            return contextlib.nullcontext(type("Response", (), {"status": 200})())
+
         with patch("sys.argv", ["qa_viewer_launch", "--config", str(config_path)]), \
                 patch("ground_truth.qa_viewer.subprocess.Popen", side_effect=popen), \
-                patch("urllib.request.urlopen", return_value=contextlib.nullcontext(type("Response", (), {"status": 200})())), \
-                contextlib.redirect_stdout(io.StringIO()) as captured:
+                patch("urllib.request.urlopen", side_effect=delayed_probe), \
+                patch("ground_truth.qa_viewer.time.sleep"), \
+                contextlib.redirect_stdout(io.StringIO()) as captured, \
+                contextlib.redirect_stderr(io.StringIO()) as progress:
             launch_group()
         response = json.loads(captured.getvalue())
         self.assertEqual(len(response["viewers"]), 2)
+        self.assertGreaterEqual(len(probes), 3)
+        self.assertIn("Starting viewer 1/2", progress.getvalue())
+        self.assertIn("still unverified", progress.getvalue())
         self.assertIn(str(self.video), launched[0])
         self.assertEqual(launched[1].count("--run"), 2)
         self.assertTrue((output_parent / "reviews" / "first").is_dir())
@@ -218,6 +232,109 @@ class ViewerTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 launch_group()
         self.assertIn("exited during readiness probe", errors.getvalue())
+
+    def test_group_launcher_reuses_healthy_matching_owned_viewer(self):
+        parent = self.root / "external output"
+        parent.mkdir()
+        export_root = parent / "reviews"
+        child_export = export_root / "01-recording"
+        child_export.mkdir(parents=True)
+        config_path = self.root / "review config.json"
+        config_path.write_text(json.dumps({"export_root": str(export_root), "viewers": [
+            {"video": str(self.video), "runs": [str(self.runs[0])]},
+        ]}), encoding="utf-8")
+        owner = OwnershipLock(child_export, "qa-viewer", {
+            "command": "ground_truth.qa_viewer", "video": str(self.video.resolve()),
+            "command_args": ["-m", "ground_truth.qa_viewer"],
+            "runs": [str(self.runs[0].resolve())], "export_root": str(child_export.resolve()),
+            "steps": 10, "seed": None,
+        })
+        owner.acquire()
+        owner.update(ready_url="http://127.0.0.1:64123", ready_seed="fixture-seed")
+        try:
+            with patch("sys.argv", ["qa_viewer_launch", "--config", str(config_path)]), \
+                    patch("ground_truth.qa_viewer.subprocess.Popen") as popen, \
+                    patch("ground_truth.qa_viewer.process_matches", return_value=True), \
+                    patch("urllib.request.urlopen", return_value=contextlib.nullcontext(
+                        type("Response", (), {"status": 200})())), \
+                    contextlib.redirect_stdout(io.StringIO()) as captured, \
+                    contextlib.redirect_stderr(io.StringIO()) as progress:
+                launch_group()
+            popen.assert_not_called()
+            result = json.loads(captured.getvalue())
+            self.assertEqual(result["viewers"][0]["pid"], json.loads(
+                owner.path.read_text(encoding="utf-8"))["pid"])
+            self.assertEqual(result["viewers"][0]["seed"], "fixture-seed")
+            self.assertIn("Reusing healthy matching viewer", progress.getvalue())
+        finally:
+            owner.close()
+
+    def test_group_launcher_reports_mismatched_owner_without_spawning_or_removing_it(self):
+        parent = self.root / "external output"
+        parent.mkdir()
+        export_root = parent / "reviews"
+        child_export = export_root / "01-recording"
+        child_export.mkdir(parents=True)
+        config_path = self.root / "review config.json"
+        config_path.write_text(json.dumps({"export_root": str(export_root), "viewers": [
+            {"video": str(self.video), "runs": [str(self.runs[0])]},
+        ]}), encoding="utf-8")
+        owner = OwnershipLock(child_export, "qa-viewer", {
+            "command": "ground_truth.qa_viewer", "video": str(self.video.resolve()),
+            "command_args": ["-m", "ground_truth.qa_viewer"],
+            "runs": [str(self.runs[0].resolve())], "export_root": str(child_export.resolve()),
+            "steps": 10, "seed": None,
+        }).acquire()
+        owner.update(ready_url="http://127.0.0.1:64124")
+        record_before = owner.path.read_text(encoding="utf-8")
+        try:
+            with patch("sys.argv", ["qa_viewer_launch", "--config", str(config_path)]), \
+                    patch("ground_truth.qa_viewer.subprocess.Popen") as popen, \
+                    patch("ground_truth.qa_viewer.process_matches", return_value=False), \
+                    contextlib.redirect_stderr(io.StringIO()) as errors:
+                with self.assertRaises(SystemExit):
+                    launch_group()
+            popen.assert_not_called()
+            self.assertIn("PID/command mismatch", errors.getvalue())
+            self.assertEqual(owner.path.read_text(encoding="utf-8"), record_before)
+        finally:
+            owner.close()
+
+    def test_group_launcher_timeout_terminates_only_its_owned_child(self):
+        parent = self.root / "external output"
+        parent.mkdir()
+        config_path = self.root / "review config.json"
+        config_path.write_text(json.dumps({"export_root": "external output/reviews", "viewers": [
+            {"video": str(self.video), "runs": [str(self.runs[0])]},
+        ]}), encoding="utf-8")
+
+        class OwnedChild:
+            pid = 43
+            terminated = False
+            def poll(self):
+                return None
+            def terminate(self):
+                self.terminated = True
+            def wait(self, timeout=None):
+                return 0
+
+        child = OwnedChild()
+        def popen(command, cwd, stdout, stderr, text):
+            stdout.write(json.dumps({"url": "http://127.0.0.1:64002",
+                                     "export_root": "external", "seed": "fixed"}) + "\n")
+            stdout.flush()
+            return child
+
+        with patch("sys.argv", ["qa_viewer_launch", "--config", str(config_path)]), \
+                patch("ground_truth.qa_viewer.subprocess.Popen", side_effect=popen), \
+                patch("urllib.request.urlopen", side_effect=urllib.error.URLError("not ready")), \
+                patch("ground_truth.qa_viewer.time.monotonic", side_effect=[0, 40, 80, 120, 160, 200]), \
+                patch("ground_truth.qa_viewer.time.sleep"), \
+                contextlib.redirect_stderr(io.StringIO()) as errors:
+            with self.assertRaises(SystemExit):
+                launch_group()
+        self.assertTrue(child.terminated)
+        self.assertIn("timed out", errors.getvalue())
 
     def test_export_rejects_changed_sources_and_overlapping_destinations(self):
         with self.assertRaises(ValueError):

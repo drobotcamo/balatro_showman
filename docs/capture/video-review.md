@@ -129,6 +129,13 @@ process before reporting its URL, PID, export directory, and seed. Startup error
 go to per-viewer `.err.txt` files beside
 the export root. The browser's **Open eligibility review** link opens the second
 tab; `--open` opens the regular viewer page.
+Startup prints flushed status to stderr, including owned child PIDs, diagnostics,
+and the 120-second viewer startup deadline. A per-export-root OS lock records the
+command, source paths, PID, and ready URL. The launcher reuses only an exact
+matching owner whose live process command line and HTTP page are verified; it
+reports ambiguous or unhealthy owners without signaling them. Lock metadata is
+diagnostic; the live OS lock, PID/command-line match, and HTTP response establish
+ownership and readiness.
 
 Direct single-viewer launch remains available through
 `py -3 -m ground_truth.qa_viewer`. Its `--run` can be repeated for all segments

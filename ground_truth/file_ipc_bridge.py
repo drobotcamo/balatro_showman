@@ -8,6 +8,7 @@ import json
 import math
 import os
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,6 +18,8 @@ from typing import Any
 OUTCOMES = {"win", "loss"}
 MECHANICS_REFERENCE_VERSION = "dagger-reference/1.0"
 MECHANICS_REFERENCE_VERSION_V2 = "dagger-reference/2.0"
+RECORDER_STATUS_INTERVAL_SECONDS = 10
+RECORDER_READINESS_DEADLINE_SECONDS = 120
 
 
 def _validate_mechanics_reference(snapshot: dict[str, Any]) -> dict[str, Any] | None:
@@ -1009,13 +1012,19 @@ class FileIpcBridge:
             self._finalized_sessions.add(run_id)
             self._finalized_session_data[run_id] = session
 
-    def serve(self, timeout: float | None = None) -> None:
+    def serve(self, timeout: float | None = None, on_ready=None) -> None:
         self.io_dir.mkdir(parents=True, exist_ok=True)
         self.out_dir.mkdir(parents=True, exist_ok=True)
         deadline = None if timeout is None else time.monotonic() + timeout
+        ready_reported = False
         try:
             while deadline is None or time.monotonic() < deadline:
-                if not self.step_once():
+                did_work = self.step_once()
+                if not ready_reported:
+                    ready_reported = True
+                    if on_ready is not None:
+                        on_ready()
+                if not did_work:
                     time.sleep(0.02)
         except KeyboardInterrupt:
             self._mark_open_sessions_incomplete()
@@ -1042,13 +1051,99 @@ def build_parser(*, add_help=True):
 
 def main(argv=None) -> None:
     args = build_parser().parse_args(argv)
-    bridge = FileIpcBridge(args.io_dir, args.out_dir, args.action, args.bundle_db)
-    if args.once:
-        bridge.io_dir.mkdir(parents=True, exist_ok=True)
-        bridge.out_dir.mkdir(parents=True, exist_ok=True)
-        bridge.step_once()
-    else:
-        bridge.serve(args.timeout)
+    from ground_truth.process_ownership import (OwnershipConflict, OwnershipLock, active_owner,
+                                               process_matches)
+    out_identity = {
+        "command": "python -m showman record", "io_dir": str(args.io_dir.resolve()),
+        "command_args": ["-m", "showman", "record"],
+        "out_dir": str(args.out_dir.resolve()), "bundle_db": args.bundle_db,
+    }
+    consumer_identity = out_identity
+    ownership = OwnershipLock(args.out_dir, "showman-recorder", out_identity)
+    print(f"Checking recorder ownership and storage paths; readiness still unverified; pid={os.getpid()}; "
+          "readiness deadline 120s (report-only; no recorder lifetime timeout; status updates every 10s).",
+          file=sys.stderr, flush=True)
+    consumer_ownership = OwnershipLock(args.io_dir, "showman-consumer", consumer_identity)
+    try:
+        consumer_ownership.acquire()
+    except OwnershipConflict as exc:
+        consumer_owner = active_owner(args.io_dir, "showman-consumer")
+        output_owner = active_owner(args.out_dir, "showman-recorder")
+        if (consumer_owner and output_owner
+                and consumer_owner.get("identity") == consumer_identity
+                and output_owner.get("identity") == out_identity
+                and consumer_owner.get("pid") == output_owner.get("pid")
+                and process_matches(consumer_owner.get("pid"), consumer_identity["command_args"])
+                and consumer_owner.get("ready") is True
+                and time.time_ns() - consumer_owner.get("heartbeat_ns", 0) < 45_000_000_000):
+            print(f"Reusing healthy matching recorder: pid={consumer_owner['pid']}; "
+                  f"io_dir={args.io_dir.resolve()}; out_dir={args.out_dir.resolve()}.",
+                  file=sys.stderr, flush=True)
+            return
+        raise OwnershipConflict(f"recorder consumer ownership conflict: {exc}; "
+                                f"consumer={consumer_owner}; output={output_owner}") from exc
+    try:
+        ownership.acquire()
+    except Exception:
+        consumer_ownership.close()
+        raise
+    stopped = threading.Event()
+    ready = threading.Event()
+    def progress():
+        elapsed = 0
+        deadline_reported = False
+        while not stopped.wait(RECORDER_STATUS_INTERVAL_SECONDS):
+            now_ns = time.time_ns()
+            consumer_ownership.update(heartbeat_ns=now_ns, ready=ready.is_set())
+            ownership.update(heartbeat_ns=now_ns, ready=ready.is_set())
+            if not ready.is_set():
+                elapsed += RECORDER_STATUS_INTERVAL_SECONDS
+                print(f"Recorder startup/readiness still unverified after {elapsed}s; "
+                      f"readiness deadline {RECORDER_READINESS_DEADLINE_SECONDS}s "
+                      "(report-only; no recorder lifetime timeout); "
+                      f"owner={ownership.path}; no process will be terminated.",
+                      file=sys.stderr, flush=True)
+                if elapsed >= RECORDER_READINESS_DEADLINE_SECONDS and not deadline_reported:
+                    print(f"Recorder readiness deadline failed at {RECORDER_READINESS_DEADLINE_SECONDS}s; "
+                          "the consumer remains running "
+                          "and no process was terminated.", file=sys.stderr, flush=True)
+                    deadline_reported = True
+    reporter = threading.Thread(target=progress, daemon=True)
+    reporter.start()
+
+    def confirm_ready():
+        consumer_owner = active_owner(args.io_dir, "showman-consumer")
+        output_owner = active_owner(args.out_dir, "showman-recorder")
+        if (not args.io_dir.is_dir() or not args.out_dir.is_dir()
+                or not os.access(args.io_dir, os.R_OK | os.W_OK)
+                or not os.access(args.out_dir, os.R_OK | os.W_OK)
+                or not consumer_owner or not output_owner
+                or consumer_owner.get("pid") != os.getpid()
+                or output_owner.get("pid") != os.getpid()
+                or consumer_owner.get("identity") != consumer_identity
+                or output_owner.get("identity") != out_identity):
+            raise ValueError("recorder readiness check failed: owner identity or IO/output health changed")
+        ready.set()
+        consumer_ownership.update(heartbeat_ns=time.time_ns(), ready=True)
+        ownership.update(heartbeat_ns=time.time_ns(), ready=True)
+        print(f"Recorder ready: consumer loop healthy; io_dir={args.io_dir.resolve()}; "
+              f"out_dir={args.out_dir.resolve()}; pid={os.getpid()}; owner={ownership.path}.",
+              file=sys.stderr, flush=True)
+
+    try:
+        bridge = FileIpcBridge(args.io_dir, args.out_dir, args.action, args.bundle_db)
+        args.io_dir.mkdir(parents=True, exist_ok=True)
+        args.out_dir.mkdir(parents=True, exist_ok=True)
+        if args.once:
+            bridge.step_once()
+            print(f"Recorder one-shot completed: io_dir={args.io_dir.resolve()}; "
+                  f"out_dir={args.out_dir.resolve()}; pid={os.getpid()}.", file=sys.stderr, flush=True)
+        else:
+            bridge.serve(args.timeout, on_ready=confirm_ready)
+            if not ready.is_set():
+                raise ValueError("recorder readiness was not verified before its requested timeout")
+    finally:
+        stopped.set(); reporter.join(); ownership.close(); consumer_ownership.close()
 
 
 if __name__ == "__main__":
