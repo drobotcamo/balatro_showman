@@ -94,9 +94,9 @@ build label or approximate date is available.
 
 ## Historical staging and verification
 
-Issue #153's approved historical baseline is exactly the seven roots in `archive
-inventory`: **28** sessions and 3,800 *declared* steps. After its recorder
-session finalized, the separate Issue #82 run `894135760800-6346` (77 steps)
+Issue #153's approved historical baseline is exactly the seven roots reported
+by `archive inventory`: **28** sessions and 3,800 *declared* steps. After its
+recorder session finalized, the separate Issue #82 run `894135760800-6346` (77 steps)
 was independently audited and staged too. It is an additional catalog run, not
 part of the historical baseline or an association confirmation. For a new
 archive, use:
@@ -123,9 +123,8 @@ validation does not prove complete gameplay, video identity or rendered frames.
 At the original baseline check, `archive verify` returned 28 runs, 3,800 declared
 steps, 5 and 4 exact old-bundle matches, and zero failures. The current catalog
 has 29 runs and 3,877 declared steps; the old-bundle overlap remains 5 and 4.
-Five confirmed
-recording references were transferred. A confirmed closed video can be staged
-with `py -3 -m showman archive stage-video --run <run-id>`; this hashes the
+Five confirmed recording references were transferred. A confirmed closed video
+can be staged with `py -3 -m showman archive stage-video --run <run-id>`; this hashes the
 original and copy, updates only its catalog location and retains its original
 association provenance. Old databases and original media remain in their prior
 locations; the catalog does not redirect active tools. The five already
@@ -133,9 +132,10 @@ confirmed videos were staged under `videos/` with matching hashes and are
 addressable by `archive review`. Their original MKVs remain at the root.
 The media organization pass cataloged **60 top-level MKVs**: five previously
 confirmed originals copied under `videos/`, plus **55 unlinked videos** copied
-under `videos/unlinked/`. `archive verify-media` returned 60 files and zero
-failures. Originals remain in the root. Four derived QA MKVs and other viewer
-outputs remain grouped beneath `qa_debug/`; the two live viewers currently read
+under `videos/unlinked/`. All 60 root originals remain in place to preserve
+historical references. `archive verify-media` returned 60 files and zero
+failures. Four derived QA MKVs and other viewer outputs remain grouped beneath
+`qa_debug/`; the two live viewers currently read
 there. The recorder still owns `oracle_runs_issue82`, and evaluation manifests
 retain absolute video paths, including the 2026-10-09 capture. Do not remove
 originals or move live capture, QA or referenced paths until all consumers are
