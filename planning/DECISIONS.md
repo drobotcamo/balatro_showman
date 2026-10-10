@@ -379,7 +379,8 @@ considered: combine state and effects (rejected because mutation/contribution
 queries and causal accounting differ); use only visual track IDs as instances
 (rejected because tracks are observation-local and can fragment); infer exact
 order from STEP events alone (rejected because the engine trigger stream is
-incomplete); mandate graph storage or one handler class per Joker (rejected
+incomplete). Graph storage and one handler class per Joker remain implementation
+choices rather than requirements of this contract; see
 `planning/RUN_MECHANICS_DESIGN.md`.
 
 ### D033 — accepted — Separate implementation acceptance from evidence acceptance
