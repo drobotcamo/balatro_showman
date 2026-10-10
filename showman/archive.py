@@ -2,6 +2,8 @@
 
 import argparse
 from contextlib import closing
+import ctypes
+import ctypes.wintypes
 import hashlib
 import json
 import math
@@ -19,7 +21,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from run_bundle import BundleError, InspectionError, RunBundle, RunBundleInspector
-from run_bundle.models import ArchiveEntry, ArchiveMedia, Provenance, Run
+from run_bundle.models import ArchiveAlias, ArchiveEntry, ArchiveMedia, Provenance, Run
 
 
 CAPTURE_ROOTS = (
@@ -73,6 +75,82 @@ def _digest(path):
     return h.hexdigest()
 
 
+def _tree_fingerprint(path):
+    path = Path(path)
+    if path.is_file():
+        return _digest(path), 1, path.stat().st_size
+    entries = []
+    total = 0
+    for item in sorted(path.rglob("*")):
+        if item.is_symlink() or (item.exists() and getattr(item, "is_junction", lambda: False)()):
+            raise ValueError(f"nested reparse point is not safe to relocate: {item}")
+        if item.is_file():
+            digest = _digest(item)
+            size = item.stat().st_size
+            total += size
+            entries.append({"path": item.relative_to(path).as_posix(), "bytes": size, "sha256": digest})
+    encoded = json.dumps(entries, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest(), len(entries), total
+
+
+def _hide_reparse_link(path):
+    """Hide a Windows compatibility link without changing target attributes."""
+    if os.name != "nt":
+        return False
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    create = kernel.CreateFileW
+    create.restype = ctypes.wintypes.HANDLE
+    handle = create(str(path), 0x0100, 0x00000001 | 0x00000002 | 0x00000004,
+                    None, 3, 0x00200000 | 0x02000000, None)
+    invalid = ctypes.wintypes.HANDLE(-1).value
+    if handle == invalid:
+        return False
+
+    class FileBasicInfo(ctypes.Structure):
+        _fields_ = [("CreationTime", ctypes.c_longlong), ("LastAccessTime", ctypes.c_longlong),
+                    ("LastWriteTime", ctypes.c_longlong), ("ChangeTime", ctypes.c_longlong),
+                    ("FileAttributes", ctypes.wintypes.DWORD)]
+
+    info = FileBasicInfo()
+    try:
+        get_info = kernel.GetFileInformationByHandleEx
+        set_info = kernel.SetFileInformationByHandle
+        get_info.restype = ctypes.wintypes.BOOL
+        set_info.restype = ctypes.wintypes.BOOL
+        if not get_info(handle, 0, ctypes.byref(info), ctypes.sizeof(info)):
+            return False
+        info.FileAttributes |= 0x2  # FILE_ATTRIBUTE_HIDDEN on the reparse point itself
+        return bool(set_info(handle, 0, ctypes.byref(info), ctypes.sizeof(info)))
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def _link_target(path):
+    path = Path(path)
+    if not path.is_symlink() and not getattr(path, "is_junction", lambda: False)():
+        return None
+    try:
+        return path.resolve(strict=True)
+    except OSError:
+        return None
+
+
+def _require_quiescent_runtime():
+    """Refuse path relocation while Balatro, OBS, recorder or viewers run."""
+    if os.name != "nt":
+        return
+    script = ("$p=Get-CimInstance Win32_Process | Where-Object { "
+              "$_.CommandLine -match '(\\bshowman\\s+record\\b|ground_truth[./\\\\]file_ipc_bridge|"
+              "ground_truth\\.qa_viewer|obs64\\.exe|obs-ffmpeg-mux|Balatro\\.exe)' }; "
+              "if($p){$p | Select-Object ProcessId,Name,CommandLine | ConvertTo-Json -Compress; exit 17}")
+    result = subprocess.run(["powershell", "-NoProfile", "-Command", script],
+                            capture_output=True, text=True, timeout=20)
+    if result.returncode == 17:
+        raise ValueError("path cutover blocked by active recorder/viewer/game/OBS processes: " + result.stdout.strip())
+    if result.returncode != 0:
+        raise ValueError("could not verify recorder/viewer/OBS shutdown: " + result.stderr.strip())
+
+
 def _components(path):
     for part in (path, *path.parents):
         if part.is_symlink() or (part.exists() and getattr(part, "is_junction", lambda: False)()):
@@ -114,9 +192,11 @@ def inventory(recordings_root):
     _components(root)
     if not root.is_dir():
         raise ValueError(f"recordings root missing: {root}")
+    archive = Path(os.environ.get("SHOWMAN_ARCHIVE_ROOT", root / "showman-archive")).resolve()
     entries = []
     for name in CAPTURE_ROOTS:
-        base = root / name
+        relocated = archive / "source-originals" / name
+        base = relocated if relocated.is_dir() else root / name
         if not base.is_dir():
             raise ValueError(f"approved capture root missing: {base}")
         for child in sorted(base.iterdir()):
@@ -249,6 +329,7 @@ def list_entries(root):
                 run = s.get(Run, row.run_id)
                 result.append({"run_id": row.run_id, "status": run.status,
                                "outcome": run.outcome, "original_path": row.original_path,
+                               "current_source_path": row.current_source_path or row.original_path,
                                "capture_path": row.capture_path,
                                "producer_commit": row.capture_revision,
                                "bridge_commit": row.bridge_revision,
@@ -273,7 +354,8 @@ def verify(root, legacy_databases=()):
         for entry in entries:
             run_id = entry["run_id"]
             try:
-                original = source_fingerprint(entry["original_path"])
+                source_path = entry["current_source_path"]
+                original = source_fingerprint(source_path)
                 staged = source_fingerprint(entry["capture_path"])
                 if original["source_identity"] != staged["source_identity"]:
                     raise ValueError("source identity differs from archive copy")
@@ -292,11 +374,11 @@ def verify(root, legacy_databases=()):
                         raise ValueError("confirmed video file/hash missing")
                     if _digest(Path(entry["video_path"])) != entry["video_sha256"]:
                         raise ValueError("confirmed video bytes changed")
-                original_names = {path.name for path in Path(entry["original_path"]).iterdir()}
+                original_names = {path.name for path in Path(source_path).iterdir()}
                 staged_names = {path.name for path in Path(entry["capture_path"]).iterdir()}
                 if original_names != staged_names:
                     raise ValueError("original/staged directory member set differs")
-                for path in Path(entry["original_path"]).iterdir():
+                for path in Path(source_path).iterdir():
                     if not path.is_file() or not (Path(entry["capture_path"]) / path.name).is_file():
                         raise ValueError(f"missing or unsupported original member: {path.name}")
                     if _digest(path) != _digest(Path(entry["capture_path"]) / path.name):
@@ -389,8 +471,12 @@ def stage_video(root, run_id):
             original_provenance = {p.key: p.value for p in s.scalars(select(Provenance).where(
                 Provenance.run_id == run_id))}
             original = Path(original_provenance.get("recording.video_ref", ""))
-            _components(original)
-            if not original.is_file() or _digest(original) != row.video_sha256:
+            stored_video = Path(row.video_path)
+            if original.is_symlink() and original.resolve() != stored_video.resolve():
+                raise ValueError("historical video compatibility link points elsewhere")
+            source_video = stored_video if stored_video.is_file() else original
+            _components(source_video)
+            if not source_video.is_file() or _digest(source_video) != row.video_sha256:
                 raise ValueError("original video differs from confirmed hash")
             name = original.name
             if not NAME.fullmatch(name):
@@ -398,9 +484,9 @@ def stage_video(root, run_id):
                 if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}-[0-9]{2}-[0-9]{2}\.mkv", name):
                     raise ValueError("video basename is unsafe; inspect before staging")
             target = root / "videos" / name
-            if target.resolve() != original.resolve():
-                _checked_copy(original, target, row.video_sha256)
-            if _digest(original) != row.video_sha256:
+            if target.resolve() != source_video.resolve():
+                _checked_copy(source_video, target, row.video_sha256)
+            if _digest(source_video) != row.video_sha256:
                 raise ValueError("original video changed while being copied")
             affected = s.scalars(select(ArchiveEntry).where(
                 ArchiveEntry.video_status == "confirmed", ArchiveEntry.video_sha256 == row.video_sha256)).all()
@@ -428,12 +514,17 @@ def media_inventory(root, recordings_root):
         with Session(engine) as s:
             entries = []
             for source in sorted(source_root.glob("*.mkv")):
-                _components(source)
-                if not source.is_file():
-                    raise ValueError(f"video is not a regular file: {source}")
                 row = s.get(ArchiveMedia, str(source))
-                stat = source.stat()
-                entries.append({"original": str(source), "bytes": stat.st_size,
+                current = Path(row.current_path) if row and row.current_path else source
+                if source.is_symlink():
+                    if not row or source.resolve() != current.resolve():
+                        raise ValueError(f"unregistered compatibility link: {source}")
+                else:
+                    _components(source)
+                if not current.is_file():
+                    raise ValueError(f"video is not a regular file: {current}")
+                stat = current.stat()
+                entries.append({"original": str(source), "current_path": str(current), "bytes": stat.st_size,
                                 "archive_path": row.archive_path if row else None,
                                 "catalog_status": row.catalog_status if row else "not_staged"})
             return entries
@@ -458,7 +549,8 @@ def stage_media(root, recordings_root, *, exclude=(), only=(), min_age_hours=1):
     result = {"staged": [], "skipped": [], "failures": []}
     try:
         for item in inventory:
-            original = Path(item["original"])
+            original_alias = Path(item["original"])
+            original = Path(item.get("current_path", item["original"]))
             if only and original.name not in only:
                 continue
             if original.name in names:
@@ -487,7 +579,7 @@ def stage_media(root, recordings_root, *, exclude=(), only=(), min_age_hours=1):
                         raise ValueError("unexpected video destination parent")
                     destination.parent.mkdir()
                 with Session(engine) as s, s.begin():
-                    row = s.get(ArchiveMedia, str(original))
+                    row = s.get(ArchiveMedia, str(original_alias))
                     if row and (row.archive_path != str(destination) or row.sha256 != expected
                                 or row.byte_count != before.st_size or row.catalog_status != category):
                         raise ValueError("existing media inventory conflicts with source")
@@ -497,9 +589,12 @@ def stage_media(root, recordings_root, *, exclude=(), only=(), min_age_hours=1):
                             or _digest(original) != expected):
                         raise ValueError("source changed during media staging; retain copy for diagnosis")
                     if row is None:
-                        s.add(ArchiveMedia(original_path=str(original), archive_path=str(destination),
+                        s.add(ArchiveMedia(original_path=str(original_alias), archive_path=str(destination),
+                                           current_path=str(original),
                                            sha256=expected, byte_count=before.st_size,
                                            catalog_status=category))
+                    else:
+                        row.current_path = str(original)
                 result["staged"].append({"video": original.name, "status": category,
                                          "sha256": expected, "archive_path": str(destination)})
             except (OSError, ValueError, SQLAlchemyError) as error:
@@ -518,7 +613,13 @@ def verify_media(root):
             failures = []
             for row in rows:
                 try:
-                    source, staged = Path(row.original_path), Path(row.archive_path)
+                    alias = Path(row.original_path)
+                    source = Path(row.current_path) if row.current_path else alias
+                    staged = Path(row.archive_path)
+                    if alias.is_symlink() and alias.resolve() != source.resolve():
+                        raise ValueError("original compatibility link target differs from current media path")
+                    if not alias.is_symlink():
+                        _components(alias)
                     _components(source)
                     _components(staged)
                     if (not source.is_file() or not staged.is_file()
@@ -529,6 +630,271 @@ def verify_media(root):
                 except (OSError, ValueError) as error:
                     failures.append({"video": row.original_path, "error": str(error)})
             return {"media_count": len(rows), "failures": failures}
+    finally:
+        engine.dispose()
+
+
+def verify_relocation(root):
+    engine = _engine(archive_root(root))
+    try:
+        with Session(engine) as session:
+            aliases = session.scalars(select(ArchiveAlias).order_by(ArchiveAlias.original_path)).all()
+            failures = []
+            for row in aliases:
+                try:
+                    alias, target = Path(row.original_path), Path(row.target_path)
+                    if _link_target(alias) != target.resolve(strict=True):
+                        raise ValueError("compatibility link target differs")
+                    digest, count, size = _tree_fingerprint(target)
+                    if (digest, count, size) != (row.sha256, row.file_count, row.byte_count):
+                        raise ValueError("relocated bytes differ from cutover manifest")
+                except (OSError, ValueError) as error:
+                    failures.append({"alias": row.original_path, "error": str(error)})
+            return {"aliases": len(aliases), "failures": failures}
+    finally:
+        engine.dispose()
+
+
+def _root_category(root, source, engine):
+    if source.name.startswith("oracle_runs") and source.is_dir():
+        return root / "source-originals" / source.name, "directory"
+    if source.name == "qa_debug" and source.is_dir():
+        return root / "reviews" / "qa_debug", "directory"
+    if (source.name == "evaluation_slices" or source.name.startswith(("issue79_pilot_review", "issue82-review-"))) and source.is_dir():
+        return root / "evaluations" / source.name, "directory"
+    if source.suffix.lower() == ".mkv" and source.is_file():
+        with Session(engine) as session:
+            row = session.get(ArchiveMedia, str(source))
+        if row is None:
+            raise ValueError(f"video has not been hash-staged: {source}")
+        return Path(row.archive_path), "file"
+    if source.name in {"run_bundle_issue79.sqlite", "issue123_dagger_reference.sqlite"}:
+        return root / "legacy-databases" / source.name, "file"
+    if source.name == "save.json":
+        return root / "misc" / source.name, "file"
+    if source.name.startswith("issue82-run-"):
+        return root / "evaluations" / "issue82" / source.name, "file"
+    if source.suffix.lower() == ".log":
+        return root / "logs" / source.name, "file"
+    raise ValueError(f"unclassified F-drive root entry: {source}")
+
+
+def _relocate_item(source, target, item_type, expected_digest, file_count, byte_count):
+    source, target = Path(source), Path(target)
+    if source.is_symlink() or getattr(source, "is_junction", lambda: False)():
+        actual = _link_target(source)
+        if actual != target.resolve(strict=True):
+            raise ValueError(f"existing compatibility link has wrong target: {source}")
+        return
+    if not source.exists():
+        if not target.exists():
+            raise ValueError(f"source and relocation target are both missing: {source}")
+        digest, count, size = _tree_fingerprint(target)
+        if (digest, count, size) != (expected_digest, file_count, byte_count):
+            raise ValueError(f"recovery target differs from relocation plan: {target}")
+        try:
+            os.symlink(str(target), str(source), target_is_directory=item_type == "directory")
+            if _link_target(source) != target.resolve(strict=True):
+                raise ValueError(f"recovered compatibility link failed verification: {source}")
+            digest, count, size = _tree_fingerprint(target)
+            if (digest, count, size) != (expected_digest, file_count, byte_count):
+                raise ValueError(f"recovery target changed while linking: {target}")
+            return _hide_reparse_link(source)
+        except (OSError, ValueError):
+            # The prior move already removed the source. Leave the verified
+            # archive target intact and the old path absent so retry can use the
+            # durable plan; don't create an untracked duplicate that looks like
+            # an untouched source on the next invocation.
+            if source.is_symlink() or getattr(source, "is_junction", lambda: False)():
+                source.unlink()
+            elif source.exists():
+                raise ValueError(f"unexpected recovery source appeared: {source}")
+            raise
+    if source == target or source in target.parents:
+        raise ValueError("refusing self-nested relocation")
+    actual_digest, actual_count, actual_size = _tree_fingerprint(source)
+    if (actual_digest, actual_count, actual_size) != (expected_digest, file_count, byte_count):
+        raise ValueError(f"source changed since relocation plan: {source}")
+    if target.exists():
+        target_digest, target_count, target_size = _tree_fingerprint(target)
+        if (target_digest, target_count, target_size) != (expected_digest, file_count, byte_count):
+            raise ValueError(f"destination conflict: {target}")
+        if item_type == "directory":
+            raise ValueError(f"directory destination already exists: {target}")
+        # The archive copy was byte-verified; remove only the duplicate root name.
+        source.unlink()
+    else:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(source, target)
+    try:
+        os.symlink(str(target), str(source), target_is_directory=item_type == "directory")
+    except OSError:
+        # Keep at least one complete copy and restore the old path if link creation fails.
+        if not source.exists() and target.exists():
+            if item_type == "directory":
+                os.replace(target, source)
+            else:
+                shutil.copy2(target, source)
+        raise
+    hidden = _hide_reparse_link(source)
+    if _link_target(source) != target.resolve(strict=True):
+        raise ValueError(f"compatibility link failed verification: {source}")
+    digest, count, size = _tree_fingerprint(target)
+    if (digest, count, size) != (expected_digest, file_count, byte_count):
+        raise ValueError(f"relocated content failed verification: {target}")
+    return hidden
+
+
+def relocate_root(root, recordings_root, *, apply=False, io_dir=None):
+    """Organize F-drive root entries while preserving their absolute paths as links."""
+    root = archive_root(root)
+    recordings_root = Path(recordings_root).resolve()
+    if root.parent != recordings_root:
+        raise ValueError("archive must be a direct child of recordings root")
+    engine = _engine(root)
+    try:
+        items = []
+        receipt = root / "backups" / "root-relocation-plan.json"
+        prior_map = {}
+        if receipt.exists():
+            prior = json.loads(receipt.read_text(encoding="utf-8"))
+            if prior.get("recordings_root") != str(recordings_root):
+                raise ValueError("existing relocation plan is for another root")
+            prior_map = {item["source"]: item for item in prior.get("items", [])}
+        seen = set()
+        for source in sorted(recordings_root.iterdir(), key=lambda item: item.name.casefold()):
+            if source == root:
+                continue
+            seen.add(str(source))
+            target, kind = _root_category(root, source, engine)
+            with Session(engine) as session:
+                alias = session.get(ArchiveAlias, str(source))
+            if alias is not None:
+                if alias.target_path != str(target) or _link_target(source) != target.resolve(strict=True):
+                    raise ValueError(f"existing relocation alias differs from catalog: {source}")
+                digest, count, size = _tree_fingerprint(target)
+                if (digest, count, size) != (alias.sha256, alias.file_count, alias.byte_count):
+                    raise ValueError(f"relocated target differs from its catalog manifest: {target}")
+                items.append({"source": str(source), "target": str(target), "item_type": kind,
+                              "sha256": digest, "file_count": count, "byte_count": size})
+                continue
+            if source.is_symlink() or getattr(source, "is_junction", lambda: False)():
+                planned = prior_map.get(str(source))
+                if (not planned or planned["target"] != str(target)
+                        or _link_target(source) != target.resolve(strict=True)):
+                    raise ValueError(f"unregistered compatibility link: {source}")
+                digest, count, size = _tree_fingerprint(target)
+                if (digest, count, size) != (planned["sha256"], planned["file_count"], planned["byte_count"]):
+                    raise ValueError(f"recovery target differs from relocation plan: {target}")
+                items.append(dict(planned))
+                continue
+            digest, count, size = _tree_fingerprint(source)
+            if kind == "file" and source.suffix.lower() == ".mkv":
+                with Session(engine) as session:
+                    media = session.get(ArchiveMedia, str(source))
+                    if not media or media.sha256 != digest or media.archive_path != str(target):
+                        raise ValueError(f"video copy/catalog verification failed: {source}")
+            items.append({"source": str(source), "target": str(target), "item_type": kind,
+                          "sha256": digest, "file_count": count, "byte_count": size})
+        for old_path, item in prior_map.items():
+            if old_path in seen:
+                continue
+            target = Path(item["target"])
+            if not target.exists():
+                raise ValueError(f"source and relocation target are both missing: {old_path}")
+            digest, count, size = _tree_fingerprint(target)
+            if (digest, count, size) != (item["sha256"], item["file_count"], item["byte_count"]):
+                raise ValueError(f"recovery target differs from prior relocation plan: {target}")
+            items.append(dict(item))
+        if not apply:
+            return {"applied": False, "count": len(items), "plan": items}
+        _require_quiescent_runtime()
+        ipc = Path(io_dir) if io_dir else Path(os.environ.get("APPDATA", "")) / "Balatro" / "agent_io"
+        pending = list(ipc.glob("request_*.json")) + list(ipc.glob("run_end_*.json"))
+        pending += [path for path in (ipc / "snapshot.json", ipc / "run_end.json") if path.exists()]
+        if pending:
+            raise ValueError("pending IPC files block path relocation: " + ", ".join(map(str, pending)))
+
+        # Keep a durable, checksummed plan before touching any source path.
+        receipt.parent.mkdir(exist_ok=True)
+        encoded = json.dumps({"recordings_root": str(recordings_root), "items": items},
+                             sort_keys=True, indent=2).encode("utf-8")
+        if receipt.exists():
+            prior = json.loads(receipt.read_text(encoding="utf-8"))
+            if prior.get("recordings_root") != str(recordings_root):
+                raise ValueError(f"relocation receipt root differs: {receipt}")
+            prior_items = {item["source"]: item for item in prior.get("items", [])}
+            prior_items.update({item["source"]: item for item in items})
+            receipt.with_suffix(".next").write_text(json.dumps(
+                {"recordings_root": str(recordings_root),
+                 "items": [prior_items[key] for key in sorted(prior_items)]},
+                sort_keys=True, indent=2), encoding="utf-8")
+            os.replace(receipt.with_suffix(".next"), receipt)
+        else:
+            with receipt.open("xb") as stream:
+                stream.write(encoded)
+                stream.flush()
+                os.fsync(stream.fileno())
+
+        # Preserve the abandoned active segment inside the configured recorder root
+        # without inventing an outcome or importing a mutable source identity.
+        for item in items:
+            source = Path(item["source"])
+            if not source.name.startswith("oracle_runs") or not source.is_dir():
+                continue
+            for session_file in source.glob("*/session.json"):
+                meta = json.loads(session_file.read_text(encoding="utf-8"))
+                if meta.get("outcome") is not None or meta.get("lifecycle_status") == "incomplete":
+                    continue
+                run_id = meta.get("run_id")
+                if not isinstance(run_id, str) or not NAME.fullmatch(run_id):
+                    raise ValueError(f"invalid unfinished run identity: {session_file}")
+                pending_capture = root / "captures" / run_id
+                if not pending_capture.exists():
+                    pending_capture.mkdir(parents=True)
+                for child in session_file.parent.iterdir():
+                    if not child.is_file():
+                        raise ValueError(f"unexpected unfinished capture member: {child}")
+                    digest = _digest(child)
+                    _checked_copy(child, pending_capture / child.name, digest)
+                for child in session_file.parent.iterdir():
+                    if _digest(child) != _digest(pending_capture / child.name):
+                        raise ValueError(f"unfinished capture copy differs: {child}")
+
+        actions = []
+        for item in items:
+            source, target = Path(item["source"]), Path(item["target"])
+            with Session(engine) as session:
+                existing = session.get(ArchiveAlias, str(source))
+                if existing:
+                    if (existing.target_path != str(target) or existing.sha256 != item["sha256"]
+                            or existing.file_count != item["file_count"]
+                            or existing.byte_count != item["byte_count"]):
+                        raise ValueError(f"compatibility mapping conflict: {source}")
+                    if _link_target(source) != target.resolve(strict=True):
+                        raise ValueError(f"compatibility link missing or changed: {source}")
+                    continue
+            hidden = _relocate_item(source, target, item["item_type"], item["sha256"],
+                                    item["file_count"], item["byte_count"])
+            with Session(engine) as session, session.begin():
+                session.add(ArchiveAlias(original_path=str(source), target_path=str(target),
+                                         item_type=item["item_type"], sha256=item["sha256"],
+                                         file_count=item["file_count"], byte_count=item["byte_count"]))
+                if item["item_type"] == "directory" and source.name.startswith("oracle_runs"):
+                    for entry in session.scalars(select(ArchiveEntry)):
+                        original = Path(entry.original_path)
+                        if source in original.parents:
+                            entry.current_source_path = str(target / original.relative_to(source))
+                if item["item_type"] == "file" and source.suffix.lower() == ".mkv":
+                    media = session.get(ArchiveMedia, str(source))
+                    if not media:
+                        raise ValueError(f"media inventory missing for {source}")
+                    media.current_path = str(target)
+            actions.append({"source_alias": str(source), "organized_path": str(target),
+                            "hidden_alias": bool(hidden), "sha256": item["sha256"]})
+        return {"applied": True, "count": len(actions), "actions": actions,
+                "pending_recovery_runs": [str(path) for path in (root / "captures").glob("*/session.json")
+                                          if json.loads(path.read_text(encoding="utf-8")).get("outcome") is None]}
     finally:
         engine.dispose()
 
@@ -578,7 +944,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     for name in ("init", "upgrade", "ingest", "list", "review", "sync-associations", "verify",
-                 "stage-video", "media-inventory", "stage-media", "verify-media"):
+                 "stage-video", "media-inventory", "stage-media", "verify-media", "relocate-root",
+                 "verify-relocation"):
         child = commands.add_parser(name)
         child.add_argument("--root", help="archive root; otherwise SHOWMAN_ARCHIVE_ROOT")
         if name == "ingest":
@@ -602,6 +969,9 @@ def main(argv=None):
             child.add_argument("--exclude", action="append", default=[], help="basename of an in-use video")
             child.add_argument("--only", action="append", default=[], help="stage only this basename (repeatable)")
             child.add_argument("--min-age-hours", type=float, default=1)
+        if name == "relocate-root":
+            child.add_argument("--recordings-root", type=Path, required=True)
+            child.add_argument("--apply", action="store_true", help="apply the checksummed relocation plan")
     plan = commands.add_parser("inventory", help="read-only inventory of the seven approved capture roots")
     plan.add_argument("--recordings-root", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -647,6 +1017,13 @@ def main(argv=None):
                 return 0 if not value["failures"] else 2
             elif args.command == "verify-media":
                 value = verify_media(root)
+                print(json.dumps({"status": "derived" if not value["failures"] else "unknown",
+                                  "data": value, "diagnostics": value["failures"]}))
+                return 0 if not value["failures"] else 2
+            elif args.command == "relocate-root":
+                value = relocate_root(root, args.recordings_root, apply=args.apply)
+            elif args.command == "verify-relocation":
+                value = verify_relocation(root)
                 print(json.dumps({"status": "derived" if not value["failures"] else "unknown",
                                   "data": value, "diagnostics": value["failures"]}))
                 return 0 if not value["failures"] else 2

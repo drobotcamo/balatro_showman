@@ -12,7 +12,7 @@ or schema. There is no HTTP service.
 | `demo` | `--output-dir NEW_DIR` | Writes labeled synthetic queue/capture/SQLite files under a new directory; returns a JSON result with summary, validation, and next command. Parent must exist. |
 | `store init` | `--db NEW_SQLITE_FILE` | Runs Alembic for a new database only; JSON result. Parent must exist. |
 | `store import` | `--db DB --source CAPTURE_DIR` | Mutates the existing migrated bundle in one import transaction; source files unchanged; JSON envelope. |
-| `record` | `--out-dir ROOT`, optional `--io-dir IO`, `--bundle-db DB`, `--action LABEL`, `--timeout SECONDS`, `--once` | Writable queue consumption/recovery, capture files, optional automatic terminal-run import; human-readable recorder logs. IO defaults to the platform's Balatro `agent_io` directory. `--action` is a smoke-test fallback only. |
+| `record` | required `--out-dir ROOT`, optional `--io-dir IO`, `--bundle-db DB`, `--action LABEL`, `--timeout SECONDS`, `--once` | Writable queue consumption/recovery and capture files. Automatic terminal-run import occurs only when `--bundle-db DB` is supplied; omitting it means no SQLite import. IO defaults to the platform's Balatro `agent_io` directory. There is no implicit capture output or bundle path. `--action` is a smoke-test fallback only. |
 | `capture summary` | `CAPTURE_DIR` | Read-only compatibility result wrapped in JSON; returns source objects/hashes, classification, video status, and diagnostics. |
 | `capture audit` | `CAPTURE_DIR` | Read-only finalized-run audit; JSON summaries plus text findings/failures and final verdict. |
 | `associate` | `--db DB --run ID --marker JSON --confirmed-by HUMAN`, optional `--video FILE`, `--required` | Observed summary and explicit terminal input on stderr/stdin; JSON result on stdout. Confirmed association adds provenance; existing evidence/outcome untouched. A supplied video must be a present file. |
@@ -27,6 +27,8 @@ or schema. There is no HTTP service.
 | `archive media-inventory` | `--root ARCHIVE --recordings-root ROOT` | Read-only list of root-level MKVs and their archive state; no associations inferred. |
 | `archive stage-media` | `--root ARCHIVE --recordings-root ROOT`, optional repeatable `--only BASENAME`, `--exclude BASENAME`, `--min-age-hours N` | Copy stable MKVs to `videos/` when already confirmed or `videos/unlinked/` otherwise. Original paths remain in place. |
 | `archive verify-media` | `--root ARCHIVE` | Read-only source and staged-copy hash/size reconciliation for registered media. |
+| `archive relocate-root` | `--root ARCHIVE --recordings-root ROOT`, optional `--apply` | Dry-run by default. With `--apply`, moves classified root entries into the archive and leaves compatibility links; requires a separately authorized idle/drained cutover. See archive guide for gates and recovery. |
+| `archive verify-relocation` | `--root ARCHIVE` | Read-only validation of registered compatibility links and relocated content hashes. |
 | `archive review` | repeat `--run ID` in verified segment order; optional `--root ARCHIVE --export-root ROOT --recording-start-ns NS --timing-evidence TEXT --open` | Launch the browser QA viewer using only a confirmed video location and all its cataloged segments. The viewer runs until stopped; it does not export scored labels. |
 
 All inspection commands accept `--db DB`; all except `list` require `--run ID`,

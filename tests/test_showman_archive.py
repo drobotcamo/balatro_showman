@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -11,6 +12,12 @@ from run_bundle import RunBundle, RunBundleInspector
 from ground_truth.file_ipc_bridge import capture_build_identity
 from showman.__main__ import main
 from showman import archive
+
+
+def test_archive_root_requires_flag_or_environment(monkeypatch):
+    monkeypatch.delenv("SHOWMAN_ARCHIVE_ROOT", raising=False)
+    with pytest.raises(ValueError, match="specify --root or set SHOWMAN_ARCHIVE_ROOT"):
+        archive.archive_root()
 
 
 def test_staged_capture_is_hash_preserved_and_cataloged(tmp_path, capsys):
@@ -151,6 +158,140 @@ def test_unlinked_media_staging_is_non_associating_and_hash_verified(tmp_path, c
     assert len(archive.stage_media(root, recordings, exclude=[active.name], only=[closed.name])["staged"]) == 1
     (root / "videos" / "unlinked" / closed.name).write_bytes(b"changed")
     assert len(archive.verify_media(root)["failures"]) == 1
+
+
+def test_root_relocation_keeps_hidden_absolute_path_aliases_and_is_resumable(tmp_path, monkeypatch):
+    recordings = tmp_path / "recordings"
+    recordings.mkdir()
+    root = recordings / "archive"
+    main(["archive", "init", "--root", str(root)])
+    media = recordings / "legacy.mkv"
+    media.write_bytes(b"video bytes")
+    source_dir = recordings / "oracle_runs"
+    run_dir = source_dir / "run-x"
+    run_dir.mkdir(parents=True)
+    (run_dir / "session.json").write_text('{"run_id":"run-x","n_steps":0}', encoding="utf-8")
+    (run_dir / "steps.ndjson").write_text("", encoding="utf-8")
+    eval_dir = recordings / "evaluation_slices"
+    eval_dir.mkdir()
+    (eval_dir / "manifest.json").write_text('{"video":"F:/OBS_RECORDINGS/legacy.mkv"}', encoding="utf-8")
+    log = recordings / "capture.log"
+    log.write_text("diagnostic", encoding="utf-8")
+    assert archive.stage_media(root, recordings, min_age_hours=0)["staged"][0]["video"] == media.name
+    monkeypatch.setattr(archive, "_require_quiescent_runtime", lambda: None)
+    assert archive.relocate_root(root, recordings, apply=False)["count"] == 4
+    result = archive.relocate_root(root, recordings, apply=True, io_dir=tmp_path / "empty-io")
+    assert result["count"] == 4
+    assert source_dir.is_symlink()
+    assert eval_dir.is_symlink()
+    assert media.is_symlink()
+    assert log.is_symlink()
+    assert (source_dir / "run-x" / "session.json").is_file()
+    assert (media.read_bytes() == b"video bytes")
+    assert (root / "source-originals" / "oracle_runs" / "run-x" / "session.json").is_file()
+    assert not archive.verify_relocation(root)["failures"]
+    assert not archive.verify_media(root)["failures"]
+    assert archive.relocate_root(root, recordings, apply=True, io_dir=tmp_path / "empty-io")["count"] == 0
+    shutil.rmtree(tmp_path / "empty-io", ignore_errors=True)
+
+
+def test_relocation_recovers_verified_target_when_source_was_moved(tmp_path):
+    source = tmp_path / "old-path.mkv"
+    target = tmp_path / "archive" / "videos" / "old-path.mkv"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"verified bytes")
+    expected = archive._digest(target)
+
+    try:
+        archive._relocate_item(source, target, "file", expected, 1, target.stat().st_size)
+    except OSError as error:
+        if os.name == "nt":
+            pytest.skip(f"Windows symlink permission unavailable: {error}")
+        raise
+
+    assert source.is_symlink()
+    assert source.resolve() == target.resolve()
+    assert target.read_bytes() == b"verified bytes"
+
+
+def test_directory_recovery_link_failure_preserves_retryable_target(tmp_path, monkeypatch):
+    source = tmp_path / "old-captures"
+    target = tmp_path / "archive" / "source-originals" / "oracle_runs"
+    target.mkdir(parents=True)
+    (target / "session.json").write_bytes(b"session")
+    (target / "steps.ndjson").write_bytes(b"steps")
+    expected, count, size = archive._tree_fingerprint(target)
+
+    def fail_link(*args, **kwargs):
+        raise OSError("symlink privilege unavailable")
+
+    monkeypatch.setattr(archive.os, "symlink", fail_link)
+    with pytest.raises(OSError, match="symlink privilege unavailable"):
+        archive._relocate_item(source, target, "directory", expected, count, size)
+
+    assert not source.exists()
+    assert archive._tree_fingerprint(target) == (expected, count, size)
+    monkeypatch.undo()
+    archive._relocate_item(source, target, "directory", expected, count, size)
+    assert source.is_symlink()
+    assert source.resolve() == target.resolve()
+    assert archive._tree_fingerprint(source) == (expected, count, size)
+
+
+def test_directory_recovery_link_points_to_verified_target(tmp_path):
+    source = tmp_path / "old-captures"
+    target = tmp_path / "archive" / "source-originals" / "oracle_runs"
+    target.mkdir(parents=True)
+    (target / "session.json").write_bytes(b"session")
+    expected, count, size = archive._tree_fingerprint(target)
+
+    try:
+        archive._relocate_item(source, target, "directory", expected, count, size)
+    except OSError as error:
+        if os.name == "nt":
+            pytest.skip(f"Windows directory-symlink permission unavailable: {error}")
+        raise
+
+    assert source.is_symlink()
+    assert source.resolve() == target.resolve()
+    assert archive._tree_fingerprint(source) == (expected, count, size)
+
+
+def test_relocate_root_resumes_after_move_when_link_creation_fails(tmp_path, monkeypatch, capsys):
+    recordings = tmp_path / "recordings"
+    recordings.mkdir()
+    root = recordings / "showman-archive"
+    assert main(["archive", "init", "--root", str(root)]) == 0
+    capsys.readouterr()
+    source = recordings / "oracle_runs"
+    source.mkdir()
+    (source / "evidence.txt").write_bytes(b"archive bytes")
+    plan = archive.relocate_root(root, recordings)
+    item = plan["plan"][0]
+    receipt = root / "backups" / "root-relocation-plan.json"
+    receipt.write_text(json.dumps({"recordings_root": str(recordings), "items": plan["plan"]}),
+                       encoding="utf-8")
+    target = Path(item["target"])
+    target.parent.mkdir(parents=True, exist_ok=True)
+    os.replace(source, target)  # Simulate interruption after move, before alias creation.
+    monkeypatch.setattr(archive, "_require_quiescent_runtime", lambda: None)
+
+    def fail_link(*args, **kwargs):
+        raise OSError("symlink privilege unavailable")
+
+    monkeypatch.setattr(archive.os, "symlink", fail_link)
+    with pytest.raises(OSError, match="symlink privilege unavailable"):
+        archive.relocate_root(root, recordings, apply=True, io_dir=tmp_path / "empty-io")
+    assert not source.exists()
+    assert (target / "evidence.txt").read_bytes() == b"archive bytes"
+
+    monkeypatch.undo()
+    monkeypatch.setattr(archive, "_require_quiescent_runtime", lambda: None)
+    result = archive.relocate_root(root, recordings, apply=True, io_dir=tmp_path / "empty-io")
+    assert result["applied"]
+    assert source.is_symlink()
+    assert source.resolve() == target.resolve()
+    assert not archive.verify_relocation(root)["failures"]
 
 
 @pytest.mark.parametrize("min_age_hours", [-1, float("nan"), float("inf"), -float("inf"), True])

@@ -51,6 +51,7 @@ class ArchiveEntry(Base):
     __tablename__ = "archive_entries"
     run_id: Mapped[str] = mapped_column(ForeignKey("runs.id"), primary_key=True)
     original_path: Mapped[str] = mapped_column(Text, nullable=False)
+    current_source_path: Mapped[str | None] = mapped_column(Text)
     capture_path: Mapped[str] = mapped_column(Text, nullable=False)
     source_identity: Mapped[str] = mapped_column(Text, nullable=False)
     capture_revision: Mapped[str | None] = mapped_column(String(40))
@@ -66,6 +67,18 @@ class ArchiveMedia(Base):
     __tablename__ = "archive_media"
     original_path: Mapped[str] = mapped_column(Text, primary_key=True)
     archive_path: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    current_path: Mapped[str | None] = mapped_column(Text)
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     byte_count: Mapped[int] = mapped_column(Integer, nullable=False)
     catalog_status: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class ArchiveAlias(Base):
+    """Verified compatibility symlink from an old path to organized storage."""
+    __tablename__ = "archive_aliases"
+    original_path: Mapped[str] = mapped_column(Text, primary_key=True)
+    target_path: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    item_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    file_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    byte_count: Mapped[int] = mapped_column(Integer, nullable=False)

@@ -11,11 +11,14 @@ and unscored notes. The recording's original filename is retained; a run ID is
 not a video ID and several segments can belong to one video.
 
 Set `SHOWMAN_ARCHIVE_ROOT` to the absolute archive root or pass `--root` to each
-archive command. An archive is created only with `archive init`; inspection does
-not create or migrate a SQLite file. The archive directory must not exist before
-initialization. On this machine the archive has already been initialized; **do
-not run init again**. Schema upgrades are an explicit `showman archive upgrade`
-operation on the existing catalog, never a side effect of reading or ingesting.
+archive command. The tools do **not** silently default to the machine-specific
+F-drive path: without `--root` or `SHOWMAN_ARCHIVE_ROOT`, archive commands fail
+with a diagnostic. On this machine, set the variable once per PowerShell session
+to use the designated catalog. `archive init` alone creates a new archive;
+inspection does not create or migrate a SQLite file. The archive directory must
+not exist before initialization. On this machine it already exists; **do not run
+init again**. Schema upgrades are explicit `showman archive upgrade` operations
+on the existing catalog, never a side effect of reading or ingesting.
 
 ```powershell
 $env:SHOWMAN_ARCHIVE_ROOT = 'F:\OBS_RECORDINGS\showman-archive'
@@ -78,6 +81,44 @@ existing path until verified and changed at a separate idle checkpoint. OBS
 recordings made elsewhere can still be associated by the existing explicit
 human-confirmed flow. Refresh catalog locations with `archive sync-associations`
 after association. The archive must not be under the repository or `%TEMP%`.
+
+There is no implicit recorder output path or implicit database import. The
+`record` command requires `--out-dir`; `--bundle-db` is optional. When it is
+omitted, recording still writes capture directories but does **not** import
+terminal sessions into SQLite or add them to `archive list`. For this machine's
+operational archive, pass both paths as shown in the [capture guide](README.md#record-a-new-session):
+`--out-dir "$env:SHOWMAN_ARCHIVE_ROOT\captures"` and
+`--bundle-db "$env:SHOWMAN_ARCHIVE_ROOT\catalog.sqlite"`. This explicit pairing
+prevents a diagnostic or standalone recording from silently entering the
+operational catalog. After each terminal run, confirm it appears in `archive
+list` and passes strict `showman inspect validate`.
+
+## Media staging and path cutover
+
+`archive media-inventory` is read-only. `archive stage-media` copies stable
+top-level MKVs into the archive, hashes the copy, and records location metadata;
+already confirmed files go under `videos/`, while unlinked files go under
+`videos/unlinked/`. Names, timestamps, and file age never create associations.
+The age threshold is only a precaution: it cannot prove that OBS has closed a
+file. Exclude known active recordings or select explicit basenames with
+`--only`. Original files remain untouched by staging.
+
+`archive relocate-root --recordings-root <F-drive-root>` prints a dry-run plan.
+The separate `--apply` operation moves classified entries under the archive and
+leaves compatibility links at their old absolute paths. It refuses detected
+game/OBS/recorder/viewer processes, pending IPC files, unknown root entries,
+unverified media copies, conflicting destinations and changed bytes. A durable
+plan allows verified interrupted moves to resume; `archive verify-relocation`
+checks links and moved bytes. This operation is **not** needed for recording or
+catalog discovery, and must not be run until every path consumer is stopped,
+external references are inventoried, and the owner authorizes that cutover. A
+symlink permission or filesystem failure aborts; it is not permission to bypass
+the cutover check. If a retry is recovering a move already made, the verified
+archive target remains intact and the old alias may be temporarily absent. Fix
+the link-permission/filesystem issue and rerun the same command to finish from
+the checksummed plan; do not manually move or delete either location. The
+present live recorder/viewers and absolute evaluation references are why old
+paths remain in place.
 
 `capture_build` in newly created `session.json` records the installed Lua
 SHA-256 and the bridge/producer Git commit **only when the bytes match that
