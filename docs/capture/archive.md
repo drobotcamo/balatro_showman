@@ -82,16 +82,17 @@ recordings made elsewhere can still be associated by the existing explicit
 human-confirmed flow. Refresh catalog locations with `archive sync-associations`
 after association. The archive must not be under the repository or `%TEMP%`.
 
-There is no implicit recorder output path or implicit database import. The
-`record` command requires `--out-dir`; `--bundle-db` is optional. When it is
-omitted, recording still writes capture directories but does **not** import
-terminal sessions into SQLite or add them to `archive list`. For this machine's
-operational archive, pass both paths as shown in the [capture guide](README.md#record-a-new-session):
-`--out-dir "$env:SHOWMAN_ARCHIVE_ROOT\captures"` and
-`--bundle-db "$env:SHOWMAN_ARCHIVE_ROOT\catalog.sqlite"`. This explicit pairing
-prevents a diagnostic or standalone recording from silently entering the
-operational catalog. After each terminal run, confirm it appears in `archive
-list` and passes strict `showman inspect validate`.
+With `SHOWMAN_ARCHIVE_ROOT` configured, `showman record` defaults to
+`<root>/captures` and `<root>/catalog.sqlite`, and imports each completed
+terminal session automatically. A custom `--out-dir` requires an explicit
+`--bundle-db`; this prevents imports from becoming undiscoverable outside the
+archive's capture tree. Without the environment variable, supply both explicit
+paths. A diagnostic capture that must not enter SQLite requires the explicit
+`--no-import --out-dir <new-dir>` option. The lower-level bridge entrypoint
+retains its optional bundle behavior, but the documented product command fails
+closed rather than silently capturing without catalog intake. After a
+terminal run, confirm it appears in `archive list` and passes strict
+`showman inspect validate`.
 
 ## Media staging and path cutover
 

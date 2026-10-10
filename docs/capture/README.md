@@ -9,9 +9,10 @@ the game bridge and OBS setup; inspection does not.
 `captures/<run-id>/` evidence directories. See [archive and naming
 rules](archive.md) before choosing a recording destination, moving evidence,
 or launching a catalog-backed review. `showman archive` requires
-`SHOWMAN_ARCHIVE_ROOT` or `--root`; `showman record` always requires explicit
-`--out-dir` and `--bundle-db` for catalog intake. Neither command infers the
-drive or redirects an existing recorder/OBS process.
+`SHOWMAN_ARCHIVE_ROOT` or `--root`. When `SHOWMAN_ARCHIVE_ROOT` is set,
+`showman record` defaults to its `captures/` directory and `catalog.sqlite`,
+and imports completed terminal runs automatically. It never infers this
+machine-specific drive or redirects an existing recorder/OBS process.
 
 ## First ten minutes
 
@@ -153,22 +154,24 @@ After the current recorder is verified stopped and the terminal watermark is
 drained, check the installed and *loaded* producer build, OBS hook, destination,
 FPS, queue and single-consumer ownership using the [live preflight](../../planning/RUN_BUNDLE_OPERATIONS.md#existing-evidence-and-capture-preflight).
 Do not stop or retarget a live process to follow this example. On this machine,
-the archive already exists; set its root and use **both** destination arguments:
+the archive already exists; set its root and use the configured defaults:
 
 ```powershell
 $env:SHOWMAN_ARCHIVE_ROOT = 'F:\OBS_RECORDINGS\showman-archive'
 py -3 -m showman archive list
-py -3 -m showman record --io-dir (Join-Path $env:APPDATA 'Balatro\agent_io') `
-  --out-dir (Join-Path $env:SHOWMAN_ARCHIVE_ROOT 'captures') `
-  --bundle-db (Join-Path $env:SHOWMAN_ARCHIVE_ROOT 'catalog.sqlite')
+py -3 -m showman record --io-dir (Join-Path $env:APPDATA 'Balatro\agent_io')
 ```
 
-`--bundle-db` is optional for isolated diagnostics but omitting it means there
-is **no** automatic catalog intake. Complete terminal sessions imported into
-the paired archive path are registered in `archive list`; an active session is
-still only in its capture directory. Import failures stay pending for retry,
-not successful stored runs. After a terminal signal and queue drain, verify
-both `archive list` and `showman inspect validate --db
+With `SHOWMAN_ARCHIVE_ROOT` set, omitting both path flags selects the paired
+archive `captures/` directory and `catalog.sqlite`. Explicit `--out-dir` and
+`--bundle-db` can override them; a custom output directory requires its own
+explicit bundle path so imports cannot silently land outside archive discovery.
+For a deliberately unimported diagnostic, pass `--no-import --out-dir <new-dir>`.
+Without an archive root, specify both paths or explicitly choose `--no-import`.
+Complete terminal sessions are imported and registered in `archive list`; an
+active session is still only in its capture directory. Import failures stay
+pending for retry, not successful stored runs. After a terminal signal and
+queue drain, verify both `archive list` and `showman inspect validate --db
 "$env:SHOWMAN_ARCHIVE_ROOT\catalog.sqlite" --run <run-id> --strict`.
 The recorder stamps `capture_build` on new sessions: clean-checkout bridge and
 installed-producer Git revisions where verified, plus the installed producer
