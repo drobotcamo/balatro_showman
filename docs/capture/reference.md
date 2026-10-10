@@ -24,6 +24,9 @@ or schema. There is no HTTP service.
 | `archive list`, `archive verify` | optional `--root ARCHIVE`; `verify` also accepts repeated `--legacy-db DB` | Read-only run/location discovery or source-byte, stored-identity, confirmed-video and old-bundle reconciliation. Failures are reported rather than repaired. |
 | `archive sync-associations` | optional `--root ARCHIVE --legacy-db DB` | Copy already-confirmed recording provenance from matching source identity, and hash the existing video; no new association decision. Omit `--legacy-db` to refresh catalog associations. |
 | `archive stage-video` | `--root ARCHIVE --run ID` | Hash-check/copy one already-confirmed original into `videos/` and update only catalog location, retaining original provenance. |
+| `archive media-inventory` | `--root ARCHIVE --recordings-root ROOT` | Read-only list of root-level MKVs and their archive state; no associations inferred. |
+| `archive stage-media` | `--root ARCHIVE --recordings-root ROOT`, optional repeatable `--only BASENAME`, `--exclude BASENAME`, `--min-age-hours N` | Copy stable MKVs to `videos/` when already confirmed or `videos/unlinked/` otherwise. Original paths remain in place. |
+| `archive verify-media` | `--root ARCHIVE` | Read-only source and staged-copy hash/size reconciliation for registered media. |
 | `archive review` | repeat `--run ID` in verified segment order; optional `--root ARCHIVE --export-root ROOT --recording-start-ns NS --timing-evidence TEXT --open` | Launch the browser QA viewer using only a confirmed video location and all its cataloged segments. The viewer runs until stopped; it does not export scored labels. |
 
 All inspection commands accept `--db DB`; all except `list` require `--run ID`,

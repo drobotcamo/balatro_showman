@@ -34,6 +34,23 @@ under its Decisions section. This file is a knowledge base, not a task log.
   failures after staging. The step count is declared, not a per-source
   conformance/visual audit.
 
+## 2026-10-09: Preserve old paths while staging recording media
+
+- Context: User-requested organization of the F-drive recording root while a
+  Showman recorder and two QA viewer processes remained active.
+- Observation: 60 top-level MKVs were registered as five previously confirmed
+  videos and 55 unlinked copies. Original files remain unchanged; all 60
+  source/copy pairs matched their stored SHA-256 and byte counts. Evaluation
+  files retain absolute references to old video locations. The recorder still
+  writes to `oracle_runs_issue82`; viewers use derivatives under `qa_debug`.
+- Implication: verified copies can be organized without implying run membership.
+  Deleting or moving original paths is a separate cutover that requires stopped
+  consumers and a reviewed path-reference plan. Copy verification does not
+  authorize cutover.
+- Verification/source: `showman archive verify-media` returned 60 items and
+  zero failures; read-only process inspection found the active recorder and two
+  viewers; evaluation inventory contains absolute source-video paths.
+
 ## 2026-10-09: Hermit and Mail-In Rebate need occurrence-level money attribution
 
 - Context: Issue #129 source inspection of the installed embedded Balatro

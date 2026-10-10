@@ -2,7 +2,7 @@
 
 The operational home for this machine is
 `F:\OBS_RECORDINGS\showman-archive`. The catalog is `catalog.sqlite` (Alembic
-revision `0005_archive_video_hash`); it holds run records and location metadata,
+revision `0006_archive_media`); it holds run records and location metadata,
 not video bytes. `captures/<producer-run-id>/` contains byte-preserved capture
 files. `videos/` holds checked copies of already confirmed historical originals
 and is the destination for future OBS originals after a separately verified OBS
@@ -43,6 +43,14 @@ not independent visual QA or scored annotation.
 | Video | `showman-archive/videos/<OBS-generated-filename>.mkv` | Historical members are checked copies of confirmed originals; future members may be new OBS originals after a separately verified settings change. Retain the native filename and track identity by confirmation and hash, not by run ID. |
 | QA derivative | `showman-archive/reviews/<review-id>/` | Keep hash-linked source references and unscored status. |
 | Older bundles/sources | Their existing paths under `F:\OBS_RECORDINGS` | Keep while their absolute links and active users exist. No inferred rename or deletion. |
+
+`archive media-inventory` lists root-level MKVs and archive state.
+`archive stage-media` copies and hashes media into `videos/` for already
+confirmed associations, or `videos/unlinked/` otherwise. It never infers a run
+pairing, rewrites references or removes the original. It skips recent files by
+default; repeat `--only <basename>` to limit a pass. `archive verify-media`
+reconciles registered copies against their originals. These commands prepare
+and organize media without performing a source-path cutover.
 
 The old date-prefixed capture folders are staged under their actual `run_id`
 without editing their `session.json`; their original path is retained in
@@ -86,9 +94,12 @@ build label or approximate date is available.
 
 ## Historical staging and verification
 
-Issue #153's approved baseline is exactly the seven roots in `archive inventory`
-and their **28** session files (3,800 *declared* steps). The separate
-`oracle_runs_issue82` live root is excluded. Commands for a new archive:
+Issue #153's approved historical baseline is exactly the seven roots in `archive
+inventory`: **28** sessions and 3,800 *declared* steps. After its recorder
+session finalized, the separate Issue #82 run `894135760800-6346` (77 steps)
+was independently audited and staged too. It is an additional catalog run, not
+part of the historical baseline or an association confirmation. For a new
+archive, use:
 
 ```powershell
 py -3 -m showman archive inventory --recordings-root 'F:\OBS_RECORDINGS'
@@ -109,8 +120,10 @@ compares overlapping runs' status, count and aggregate hash with supplied old
 bundles. Run capture audits separately for field/conformance claims. SQLite hash
 validation does not prove complete gameplay, video identity or rendered frames.
 
-As of the staging check, `archive verify` returned 28 runs, 3,800 declared
-steps, 5 and 4 exact old-bundle matches, and zero failures. Five confirmed
+At the original baseline check, `archive verify` returned 28 runs, 3,800 declared
+steps, 5 and 4 exact old-bundle matches, and zero failures. The current catalog
+has 29 runs and 3,877 declared steps; the old-bundle overlap remains 5 and 4.
+Five confirmed
 recording references were transferred. A confirmed closed video can be staged
 with `py -3 -m showman archive stage-video --run <run-id>`; this hashes the
 original and copy, updates only its catalog location and retains its original
@@ -118,9 +131,14 @@ association provenance. Old databases and original media remain in their prior
 locations; the catalog does not redirect active tools. The five already
 confirmed videos were staged under `videos/` with matching hashes and are
 addressable by `archive review`. Their original MKVs remain at the root.
-There were 55 top-level MKVs and 3 QA-derived MKVs in the initial media
-inventory, not 58 confirmed associations. Do not bulk-pair or relocate those
-files while OBS, the recorder and viewers are using the old paths. A future
-physical media cutover must inventory embedded paths in evaluation artifacts,
-hash each closed original, verify any copied bytes and update *location* only
-after the idle/drained checkpoint. Keep historical provenance paths intact.
+The media organization pass cataloged **60 top-level MKVs**: five previously
+confirmed originals copied under `videos/`, plus **55 unlinked videos** copied
+under `videos/unlinked/`. `archive verify-media` returned 60 files and zero
+failures. Originals remain in the root. Four derived QA MKVs and other viewer
+outputs remain grouped beneath `qa_debug/`; the two live viewers currently read
+there. The recorder still owns `oracle_runs_issue82`, and evaluation manifests
+retain absolute video paths, including the 2026-10-09 capture. Do not remove
+originals or move live capture, QA or referenced paths until all consumers are
+stopped and a path-reference cutover is explicitly reviewed. Historical
+association/provenance strings must remain preserved; use catalog location
+metadata for new lookups.

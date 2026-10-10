@@ -4,6 +4,7 @@ import argparse
 from contextlib import closing
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -18,7 +19,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from run_bundle import BundleError, InspectionError, RunBundle, RunBundleInspector
-from run_bundle.models import ArchiveEntry, Provenance, Run
+from run_bundle.models import ArchiveEntry, ArchiveMedia, Provenance, Run
 
 
 CAPTURE_ROOTS = (
@@ -414,6 +415,124 @@ def stage_video(root, run_id):
         engine.dispose()
 
 
+def media_inventory(root, recordings_root):
+    """List top-level OBS MKVs without interpreting filename as run identity."""
+    root = archive_root(root)
+    source_root = Path(recordings_root).resolve()
+    _components(source_root)
+    if (not source_root.is_dir() or source_root == root
+            or root not in source_root.parents and source_root not in root.parents):
+        raise ValueError("recordings root must contain the archive and exist")
+    engine = _engine(root)
+    try:
+        with Session(engine) as s:
+            entries = []
+            for source in sorted(source_root.glob("*.mkv")):
+                _components(source)
+                if not source.is_file():
+                    raise ValueError(f"video is not a regular file: {source}")
+                row = s.get(ArchiveMedia, str(source))
+                stat = source.stat()
+                entries.append({"original": str(source), "bytes": stat.st_size,
+                                "archive_path": row.archive_path if row else None,
+                                "catalog_status": row.catalog_status if row else "not_staged"})
+            return entries
+    finally:
+        engine.dispose()
+
+
+def stage_media(root, recordings_root, *, exclude=(), only=(), min_age_hours=1):
+    """Copy closed top-level recordings, retaining every original and its references."""
+    root = archive_root(root)
+    if (isinstance(min_age_hours, bool) or not isinstance(min_age_hours, (int, float))
+            or not math.isfinite(min_age_hours) or min_age_hours < 0):
+        raise ValueError("min_age_hours must be a finite non-negative number")
+    names = set(exclude)
+    if any(Path(name).name != name or name in {"", ".", ".."} for name in names):
+        raise ValueError("--exclude must be a video basename")
+    inventory = media_inventory(root, recordings_root)
+    only = set(only)
+    if any(Path(name).name != name or name in {"", ".", ".."} for name in only):
+        raise ValueError("--only must be a video basename")
+    engine = _engine(root)
+    result = {"staged": [], "skipped": [], "failures": []}
+    try:
+        for item in inventory:
+            original = Path(item["original"])
+            if only and original.name not in only:
+                continue
+            if original.name in names:
+                result["skipped"].append({"video": original.name, "reason": "explicitly_excluded"})
+                continue
+            try:
+                before = original.stat()
+                age_seconds = datetime.now(timezone.utc).timestamp() - before.st_mtime
+                if age_seconds < 0 or age_seconds < min_age_hours * 3600:
+                    result["skipped"].append({"video": original.name, "reason": "recently_modified"})
+                    continue
+                with Session(engine) as s:
+                    confirmed = s.scalars(select(ArchiveEntry).where(
+                        ArchiveEntry.video_status == "confirmed")).all()
+                    matched = [row for row in confirmed if row.video_path and
+                               Path(row.video_path).name == original.name and
+                               Path(row.video_path).parent == root / "videos"]
+                expected = _digest(original)
+                if matched and any(row.video_sha256 != expected for row in matched):
+                    raise ValueError("confirmed video hash conflicts with original")
+                category = "confirmed" if matched else "unlinked"
+                destination = (root / "videos" / original.name if matched else
+                               root / "videos" / "unlinked" / original.name)
+                if not destination.parent.is_dir():
+                    if category != "unlinked" or destination.parent.parent != root / "videos":
+                        raise ValueError("unexpected video destination parent")
+                    destination.parent.mkdir()
+                with Session(engine) as s, s.begin():
+                    row = s.get(ArchiveMedia, str(original))
+                    if row and (row.archive_path != str(destination) or row.sha256 != expected
+                                or row.byte_count != before.st_size or row.catalog_status != category):
+                        raise ValueError("existing media inventory conflicts with source")
+                    _checked_copy(original, destination, expected)
+                    after = original.stat()
+                    if (after.st_size != before.st_size or after.st_mtime_ns != before.st_mtime_ns
+                            or _digest(original) != expected):
+                        raise ValueError("source changed during media staging; retain copy for diagnosis")
+                    if row is None:
+                        s.add(ArchiveMedia(original_path=str(original), archive_path=str(destination),
+                                           sha256=expected, byte_count=before.st_size,
+                                           catalog_status=category))
+                result["staged"].append({"video": original.name, "status": category,
+                                         "sha256": expected, "archive_path": str(destination)})
+            except (OSError, ValueError, SQLAlchemyError) as error:
+                result["failures"].append({"video": original.name, "error": str(error)})
+        return result
+    finally:
+        engine.dispose()
+
+
+def verify_media(root):
+    """Read-only byte reconciliation of all registered media copies."""
+    engine = _engine(archive_root(root))
+    try:
+        with Session(engine) as s:
+            rows = s.scalars(select(ArchiveMedia).order_by(ArchiveMedia.original_path)).all()
+            failures = []
+            for row in rows:
+                try:
+                    source, staged = Path(row.original_path), Path(row.archive_path)
+                    _components(source)
+                    _components(staged)
+                    if (not source.is_file() or not staged.is_file()
+                            or source.stat().st_size != row.byte_count
+                            or staged.stat().st_size != row.byte_count
+                            or _digest(source) != row.sha256 or _digest(staged) != row.sha256):
+                        raise ValueError("original/staged bytes differ from inventory")
+                except (OSError, ValueError) as error:
+                    failures.append({"video": row.original_path, "error": str(error)})
+            return {"media_count": len(rows), "failures": failures}
+    finally:
+        engine.dispose()
+
+
 def review(root, run_ids, *, export_root=None, open_browser=False,
            recording_start_ns=None, timing_evidence=None):
     root = archive_root(root)
@@ -458,7 +577,8 @@ def review(root, run_ids, *, export_root=None, open_browser=False,
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("init", "upgrade", "ingest", "list", "review", "sync-associations", "verify", "stage-video"):
+    for name in ("init", "upgrade", "ingest", "list", "review", "sync-associations", "verify",
+                 "stage-video", "media-inventory", "stage-media", "verify-media"):
         child = commands.add_parser(name)
         child.add_argument("--root", help="archive root; otherwise SHOWMAN_ARCHIVE_ROOT")
         if name == "ingest":
@@ -476,6 +596,12 @@ def main(argv=None):
             child.add_argument("--legacy-db", type=Path, action="append", default=[])
         if name == "stage-video":
             child.add_argument("--run", required=True)
+        if name in {"media-inventory", "stage-media"}:
+            child.add_argument("--recordings-root", type=Path, required=True)
+        if name == "stage-media":
+            child.add_argument("--exclude", action="append", default=[], help="basename of an in-use video")
+            child.add_argument("--only", action="append", default=[], help="stage only this basename (repeatable)")
+            child.add_argument("--min-age-hours", type=float, default=1)
     plan = commands.add_parser("inventory", help="read-only inventory of the seven approved capture roots")
     plan.add_argument("--recordings-root", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -510,6 +636,20 @@ def main(argv=None):
                 return 0 if not value["failures"] else 2
             elif args.command == "stage-video":
                 value = stage_video(root, args.run)
+            elif args.command == "media-inventory":
+                value = media_inventory(root, args.recordings_root)
+            elif args.command == "stage-media":
+                value = stage_media(root, args.recordings_root, exclude=args.exclude,
+                                    only=args.only,
+                                    min_age_hours=args.min_age_hours)
+                print(json.dumps({"status": "observed" if not value["failures"] else "unknown",
+                                  "data": value, "diagnostics": value["failures"]}))
+                return 0 if not value["failures"] else 2
+            elif args.command == "verify-media":
+                value = verify_media(root)
+                print(json.dumps({"status": "derived" if not value["failures"] else "unknown",
+                                  "data": value, "diagnostics": value["failures"]}))
+                return 0 if not value["failures"] else 2
             else:
                 return review(root, args.run, export_root=args.export_root, open_browser=args.open,
                               recording_start_ns=args.recording_start_ns,

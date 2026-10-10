@@ -37,7 +37,9 @@ capture-time revisions remain null when they cannot be established. Existing
 bundles require explicit migration before they can contain archive entries;
 inspection never upgrades them. See `docs/capture/archive.md`.
 Revision `0005_archive_video_hash` adds a checked video SHA-256 to confirmed
-location rows; no media bytes are embedded in SQLite.
+location rows. Revision `0006_archive_media` records copied video paths, hashes,
+sizes and whether each media item is confirmed or unlinked; this does not assert
+a new run association. No media bytes are embedded in SQLite.
 
 The intake API requires terminal lifecycle statuses to carry their matching
 outcome. An `incomplete` run must carry no outcome; `active` and `interrupted`

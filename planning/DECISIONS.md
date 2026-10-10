@@ -676,12 +676,16 @@ the revision is unknown while the available file hash is retained. Historical
 capture revisions remain unknown without contemporaneous evidence.
 
 The archive uses `catalog.sqlite`, `captures/<producer-run-id>`, `videos/` for
-future originals, and `reviews/` for derivatives. Old video names and absolute
+confirmed video copies, `videos/unlinked/` for unpaired video copies, and
+`reviews/` for derivatives. Old video names and absolute
 source/provenance references remain unchanged; independently verified location
 rows may point at staged copies. Existing marker and explicit human association
-rules still apply. The live Issue #82 recorder/OBS and their paths are excluded
-from the historical staging set. Physical relocation of in-use paths is not
-authorized by catalog staging and requires an idle/drained checkpoint.
+rules still apply. The live Issue #82 recorder/OBS and their paths were excluded
+from the initial historical staging set. Its closed run `894135760800-6346` was
+later separately audited and added as a post-baseline catalog run; it remains a
+distinct evaluation source and its video association stays unknown. Physical
+removal/relocation of original paths is not authorized by catalog staging and
+requires an idle/drained checkpoint.
 
 Alternative: replace the SQLite boundary or embed media and retrospectively
 rename runs/videos. Rejected because the existing typed, hashed store already

@@ -1,6 +1,8 @@
 import json
+import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -124,6 +126,55 @@ def test_archive_help_reaches_the_real_subcommands():
     assert result.returncode == 0
     assert "sync-associations" in result.stdout
     assert "stage-video" in result.stdout
+
+
+def test_unlinked_media_staging_is_non_associating_and_hash_verified(tmp_path, capsys):
+    recordings = tmp_path / "recordings"
+    recordings.mkdir()
+    root = recordings / "archive"
+    assert main(["archive", "init", "--root", str(root)]) == 0
+    capsys.readouterr()
+    closed = recordings / "2026-04-02 17-10-58.mkv"
+    closed.write_bytes(b"closed source bytes")
+    stale = time.time() - 7200
+    os.utime(closed, (stale, stale))
+    active = recordings / "2026-10-09 13-38-25.mkv"
+    active.write_bytes(b"not closed")
+    assert len(archive.media_inventory(root, recordings)) == 2
+    result = archive.stage_media(root, recordings, exclude=[active.name], only=[closed.name])
+    assert not result["failures"]
+    assert [item["video"] for item in result["staged"]] == [closed.name]
+    assert active.name not in {item["video"] for item in result["staged"]}
+    assert (root / "videos" / "unlinked" / closed.name).read_bytes() == closed.read_bytes()
+    assert not archive.verify_media(root)["failures"]
+    assert archive.list_entries(root) == []  # No video/run association was created.
+    assert len(archive.stage_media(root, recordings, exclude=[active.name], only=[closed.name])["staged"]) == 1
+    (root / "videos" / "unlinked" / closed.name).write_bytes(b"changed")
+    assert len(archive.verify_media(root)["failures"]) == 1
+
+
+@pytest.mark.parametrize("min_age_hours", [-1, float("nan"), float("inf"), -float("inf"), True])
+def test_media_staging_rejects_invalid_closure_threshold(tmp_path, min_age_hours):
+    recordings = tmp_path / "recordings"
+    recordings.mkdir()
+    root = recordings / "archive"
+    main(["archive", "init", "--root", str(root)])
+    with pytest.raises(ValueError, match="finite non-negative"):
+        archive.stage_media(root, recordings, min_age_hours=min_age_hours)
+
+
+def test_media_staging_skips_future_dated_file(tmp_path):
+    recordings = tmp_path / "recordings"
+    recordings.mkdir()
+    root = recordings / "archive"
+    main(["archive", "init", "--root", str(root)])
+    video = recordings / "future.mkv"
+    video.write_bytes(b"possibly active recording")
+    future = time.time() + 3600
+    os.utime(video, (future, future))
+    result = archive.stage_media(root, recordings, min_age_hours=0)
+    assert result["staged"] == []
+    assert result["skipped"] == [{"video": video.name, "reason": "recently_modified"}]
 
 
 def test_direct_recorder_registers_versioned_capture_without_guessing_installed_commit(

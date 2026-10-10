@@ -44,7 +44,7 @@ def test_upgrade_from_previous_revision(tmp_path):
         db.commit()
     command.upgrade(cfg, "head")
     with sqlite3.connect(tmp_path / "upgrade.db") as db:
-        assert db.execute("select version_num from alembic_version").fetchone()[0] == "0005_archive_video_hash"
+        assert db.execute("select version_num from alembic_version").fetchone()[0] == "0006_archive_media"
         assert db.execute("select payload from records where run_id = 'legacy'").fetchone()[0] == b'{"chips":1}'
         assert db.execute("select payload from records where sequence = 1").fetchone()[0] == '{"label":"é"}'.encode()
 

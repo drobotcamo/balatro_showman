@@ -59,3 +59,13 @@ class ArchiveEntry(Base):
     video_path: Mapped[str | None] = mapped_column(Text)
     video_sha256: Mapped[str | None] = mapped_column(String(64))
     video_status: Mapped[str] = mapped_column(String(16), nullable=False, default="unassociated")
+
+
+class ArchiveMedia(Base):
+    """Physical location for a video; does not assert a run association."""
+    __tablename__ = "archive_media"
+    original_path: Mapped[str] = mapped_column(Text, primary_key=True)
+    archive_path: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    byte_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    catalog_status: Mapped[str] = mapped_column(String(32), nullable=False)
