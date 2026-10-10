@@ -34,22 +34,32 @@ under its Decisions section. This file is a knowledge base, not a task log.
   failures after staging. The step count is declared, not a per-source
   conformance/visual audit.
 
-## 2026-10-09: Preserve old paths while staging recording media
+## 2026-10-10: Hidden compatibility links enable a safe F-drive path cutover
 
-- Context: User-requested organization of the F-drive recording root while a
-  Showman recorder and two QA viewer processes remained active.
-- Observation: 60 top-level MKVs were registered as five previously confirmed
-  videos and 55 unlinked copies. Original files remain unchanged; all 60
-  source/copy pairs matched their stored SHA-256 and byte counts. Evaluation
-  files retain absolute references to old video locations. The recorder still
-  writes to `oracle_runs_issue82`; viewers use derivatives under `qa_debug`.
-- Implication: verified copies can be organized without implying run membership.
-  Deleting or moving original paths is a separate cutover that requires stopped
-  consumers and a reviewed path-reference plan. Copy verification does not
-  authorize cutover.
-- Verification/source: `showman archive verify-media` returned 60 items and
-  zero failures; read-only process inspection found the active recorder and two
-  viewers; evaluation inventory contains absolute source-video paths.
+- Context: User authorized F-drive path cutover after capture and viewer
+  processes were stopped with no pending IPC requests.
+- Observation: 101 root entries were moved into archive categories: seven
+  historical producer roots plus Issue #82 originals, 60 videos, four
+  evaluation/review directories, legacy databases and loose reports/logs. Each
+  old absolute path now resolves via a hidden Windows symbolic link to its
+  organized archive target. The archive manifest stores link target, item type,
+  SHA-256/tree hash, file count and byte total. No files were associated by name.
+  Four terminal Issue #82 sessions were added to the catalog. The unfinished
+  112-step `2110871066199-6186` was preserved under `captures/` for possible
+  recovery, not imported as if it had a terminal result.
+- Implication: the visible F-drive root is clean while prior scripts, manifests,
+  reports and bundle provenance continue resolving. Keep compatibility aliases
+  until all static and external consumers can migrate; do not remove them as
+  cosmetic cleanup.
+- Verification/source: `archive verify-relocation` returned 101 aliases and
+  zero failures; `archive verify` returned 32 catalog runs, 4,340 declared
+  steps, exact legacy overlaps 5+4 and zero capture failures. Old-path queries
+  for a capture directory, database and video resolved after cutover. Normal
+  Explorer enumeration showed only `showman-archive` (101 hidden aliases).
+  Fourteen-gigabyte QA tree hashes were included in relocation-manifest checks.
+  Media file-level verification was successful before cutover; root video names
+  were replaced with links to those same staged bytes. None of these checks
+  establishes unlinked video/run correspondence or rendered-frame alignment.
 
 ## 2026-10-09: Hermit and Mail-In Rebate need occurrence-level money attribution
 

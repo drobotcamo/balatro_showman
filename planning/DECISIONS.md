@@ -675,17 +675,18 @@ when the installed producer/bridge bytes match files in that commit; otherwise
 the revision is unknown while the available file hash is retained. Historical
 capture revisions remain unknown without contemporaneous evidence.
 
-The archive uses `catalog.sqlite`, `captures/<producer-run-id>`, `videos/` for
-confirmed video copies, `videos/unlinked/` for unpaired video copies, and
-`reviews/` for derivatives. Old video names and absolute
-source/provenance references remain unchanged; independently verified location
-rows may point at staged copies. Existing marker and explicit human association
-rules still apply. The live Issue #82 recorder/OBS and their paths were excluded
-from the initial historical staging set. Its closed run `894135760800-6346` was
-later separately audited and added as a post-baseline catalog run; it remains a
-distinct evaluation source and its video association stays unknown. Physical
-removal/relocation of original paths is not authorized by catalog staging and
-requires an idle/drained checkpoint.
+The archive uses `catalog.sqlite`, `captures/<producer-run-id>`, confirmed
+`videos/`, unpaired `videos/unlinked/`, and `reviews/`/`evaluations/` for their
+respective artifacts. Old absolute paths remain backward-compatible through
+hidden, cataloged symbolic links to organized locations; content itself is no
+longer stored at the F-drive root. Existing marker and explicit human
+association rules still apply. The live Issue #82 recorder/OBS were stopped
+before path relocation. Four finalized Issue #82 runs were audited and added as
+post-baseline catalog runs; their videos remain unassociated. The unfinished
+segment `2110871066199-6186` was preserved under `captures/` for recovery
+without an invented outcome. The owner authorized moving 101 root entries into
+categories after recorder/viewer shutdown and queue inspection. Future path
+migrations still require the same quiescence and compatibility checks.
 
 Alternative: replace the SQLite boundary or embed media and retrospectively
 rename runs/videos. Rejected because the existing typed, hashed store already

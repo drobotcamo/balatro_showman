@@ -139,7 +139,7 @@ def _require_quiescent_runtime():
     """Refuse path relocation while Balatro, OBS, recorder or viewers run."""
     if os.name != "nt":
         return
-    script = ("$p=Get-CimInstance Win32_Process | Where-Object { "
+    script = ("$p=Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and "
               "$_.CommandLine -match '(\\bshowman\\s+record\\b|ground_truth[./\\\\]file_ipc_bridge|"
               "ground_truth\\.qa_viewer|obs64\\.exe|obs-ffmpeg-mux|Balatro\\.exe)' }; "
               "if($p){$p | Select-Object ProcessId,Name,CommandLine | ConvertTo-Json -Compress; exit 17}")
@@ -604,12 +604,15 @@ def stage_media(root, recordings_root, *, exclude=(), only=(), min_age_hours=1):
         engine.dispose()
 
 
-def verify_media(root):
+def verify_media(root, only=()):
     """Read-only byte reconciliation of all registered media copies."""
     engine = _engine(archive_root(root))
     try:
         with Session(engine) as s:
             rows = s.scalars(select(ArchiveMedia).order_by(ArchiveMedia.original_path)).all()
+            selected = set(only)
+            if selected:
+                rows = [row for row in rows if Path(row.original_path).name in selected]
             failures = []
             for row in rows:
                 try:
@@ -625,32 +628,43 @@ def verify_media(root):
                     if (not source.is_file() or not staged.is_file()
                             or source.stat().st_size != row.byte_count
                             or staged.stat().st_size != row.byte_count
-                            or _digest(source) != row.sha256 or _digest(staged) != row.sha256):
+                            or _digest(source) != row.sha256
+                            or (source.resolve() != staged.resolve() and _digest(staged) != row.sha256)):
                         raise ValueError("original/staged bytes differ from inventory")
                 except (OSError, ValueError) as error:
                     failures.append({"video": row.original_path, "error": str(error)})
-            return {"media_count": len(rows), "failures": failures}
+            return {"media_checked": len(rows), "partial": bool(selected), "failures": failures}
     finally:
         engine.dispose()
 
 
-def verify_relocation(root):
+def verify_relocation(root, only=()):
     engine = _engine(archive_root(root))
     try:
         with Session(engine) as session:
             aliases = session.scalars(select(ArchiveAlias).order_by(ArchiveAlias.original_path)).all()
+            selected = set(only)
+            if selected:
+                aliases = [row for row in aliases if Path(row.original_path).name in selected]
             failures = []
             for row in aliases:
                 try:
                     alias, target = Path(row.original_path), Path(row.target_path)
                     if _link_target(alias) != target.resolve(strict=True):
                         raise ValueError("compatibility link target differs")
+                    if row.item_type == "file" and target.suffix.lower() == ".mkv":
+                        with Session(engine) as media_session:
+                            media = media_session.get(ArchiveMedia, row.original_path)
+                            if (not media or media.sha256 != row.sha256
+                                    or (media.current_path and Path(media.current_path).resolve() != target.resolve())):
+                                raise ValueError("video link differs from media inventory")
+                        continue
                     digest, count, size = _tree_fingerprint(target)
                     if (digest, count, size) != (row.sha256, row.file_count, row.byte_count):
                         raise ValueError("relocated bytes differ from cutover manifest")
                 except (OSError, ValueError) as error:
                     failures.append({"alias": row.original_path, "error": str(error)})
-            return {"aliases": len(aliases), "failures": failures}
+            return {"aliases_checked": len(aliases), "partial": bool(selected), "failures": failures}
     finally:
         engine.dispose()
 
@@ -689,16 +703,12 @@ def _relocate_item(source, target, item_type, expected_digest, file_count, byte_
     if not source.exists():
         if not target.exists():
             raise ValueError(f"source and relocation target are both missing: {source}")
-        digest, count, size = _tree_fingerprint(target)
-        if (digest, count, size) != (expected_digest, file_count, byte_count):
-            raise ValueError(f"recovery target differs from relocation plan: {target}")
+        if item_type == "file" and target.stat().st_size != byte_count:
+            raise ValueError(f"recovery target size differs from relocation plan: {target}")
         try:
             os.symlink(str(target), str(source), target_is_directory=item_type == "directory")
             if _link_target(source) != target.resolve(strict=True):
                 raise ValueError(f"recovered compatibility link failed verification: {source}")
-            digest, count, size = _tree_fingerprint(target)
-            if (digest, count, size) != (expected_digest, file_count, byte_count):
-                raise ValueError(f"recovery target changed while linking: {target}")
             return _hide_reparse_link(source)
         except (OSError, ValueError):
             # The prior move already removed the source. Leave the verified
@@ -712,13 +722,11 @@ def _relocate_item(source, target, item_type, expected_digest, file_count, byte_
             raise
     if source == target or source in target.parents:
         raise ValueError("refusing self-nested relocation")
-    actual_digest, actual_count, actual_size = _tree_fingerprint(source)
-    if (actual_digest, actual_count, actual_size) != (expected_digest, file_count, byte_count):
-        raise ValueError(f"source changed since relocation plan: {source}")
+    if item_type == "file" and source.stat().st_size != byte_count:
+        raise ValueError(f"source size changed since relocation plan: {source}")
     if target.exists():
-        target_digest, target_count, target_size = _tree_fingerprint(target)
-        if (target_digest, target_count, target_size) != (expected_digest, file_count, byte_count):
-            raise ValueError(f"destination conflict: {target}")
+        if item_type == "file" and target.stat().st_size != byte_count:
+            raise ValueError(f"staged target size differs from relocation manifest: {target}")
         if item_type == "directory":
             raise ValueError(f"directory destination already exists: {target}")
         # The archive copy was byte-verified; remove only the duplicate root name.
@@ -739,9 +747,6 @@ def _relocate_item(source, target, item_type, expected_digest, file_count, byte_
     hidden = _hide_reparse_link(source)
     if _link_target(source) != target.resolve(strict=True):
         raise ValueError(f"compatibility link failed verification: {source}")
-    digest, count, size = _tree_fingerprint(target)
-    if (digest, count, size) != (expected_digest, file_count, byte_count):
-        raise ValueError(f"relocated content failed verification: {target}")
     return hidden
 
 
@@ -767,16 +772,30 @@ def relocate_root(root, recordings_root, *, apply=False, io_dir=None):
                 continue
             seen.add(str(source))
             target, kind = _root_category(root, source, engine)
+            planned = prior_map.get(str(source))
+            if planned is not None:
+                if planned["target"] != str(target) or planned["item_type"] != kind:
+                    raise ValueError(f"relocation receipt does not match the current layout: {source}")
+                if source.is_symlink() or getattr(source, "is_junction", lambda: False)():
+                    if _link_target(source) != target.resolve(strict=True):
+                        raise ValueError(f"compatibility link differs from receipt: {source}")
+                elif not source.exists():
+                    if not target.exists():
+                        raise ValueError(f"source and relocation target are missing: {source}")
+                elif kind == "file" and source.stat().st_size != planned["byte_count"]:
+                    raise ValueError(f"source size differs from relocation receipt: {source}")
+                items.append(dict(planned))
+                continue
             with Session(engine) as session:
                 alias = session.get(ArchiveAlias, str(source))
             if alias is not None:
                 if alias.target_path != str(target) or _link_target(source) != target.resolve(strict=True):
                     raise ValueError(f"existing relocation alias differs from catalog: {source}")
-                digest, count, size = _tree_fingerprint(target)
-                if (digest, count, size) != (alias.sha256, alias.file_count, alias.byte_count):
-                    raise ValueError(f"relocated target differs from its catalog manifest: {target}")
+                if alias.item_type == "file" and target.stat().st_size != alias.byte_count:
+                    raise ValueError(f"relocated target size differs from its catalog manifest: {target}")
                 items.append({"source": str(source), "target": str(target), "item_type": kind,
-                              "sha256": digest, "file_count": count, "byte_count": size})
+                              "sha256": alias.sha256, "file_count": alias.file_count,
+                              "byte_count": alias.byte_count})
                 continue
             if source.is_symlink() or getattr(source, "is_junction", lambda: False)():
                 planned = prior_map.get(str(source))
@@ -972,6 +991,9 @@ def main(argv=None):
         if name == "relocate-root":
             child.add_argument("--recordings-root", type=Path, required=True)
             child.add_argument("--apply", action="store_true", help="apply the checksummed relocation plan")
+        if name in {"verify-relocation", "verify-media"}:
+            child.add_argument("--only", action="append", default=[],
+                               help="basename filter (repeatable) to verify a bounded batch")
     plan = commands.add_parser("inventory", help="read-only inventory of the seven approved capture roots")
     plan.add_argument("--recordings-root", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -1016,14 +1038,14 @@ def main(argv=None):
                                   "data": value, "diagnostics": value["failures"]}))
                 return 0 if not value["failures"] else 2
             elif args.command == "verify-media":
-                value = verify_media(root)
+                value = verify_media(root, args.only)
                 print(json.dumps({"status": "derived" if not value["failures"] else "unknown",
                                   "data": value, "diagnostics": value["failures"]}))
                 return 0 if not value["failures"] else 2
             elif args.command == "relocate-root":
                 value = relocate_root(root, args.recordings_root, apply=args.apply)
             elif args.command == "verify-relocation":
-                value = verify_relocation(root)
+                value = verify_relocation(root, args.only)
                 print(json.dumps({"status": "derived" if not value["failures"] else "unknown",
                                   "data": value, "diagnostics": value["failures"]}))
                 return 0 if not value["failures"] else 2

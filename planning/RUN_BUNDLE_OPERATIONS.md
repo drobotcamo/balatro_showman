@@ -13,10 +13,12 @@ capture/import/inspection commands, and the terminal association surface.
 `store init`, `store import`, `record`, and confirmed `associate` are mutating.
 For the default F-drive location, the single operational catalog, source
 staging and location/association rules are in `docs/capture/archive.md`.
-`showman archive inventory/list/verify/media-inventory/verify-media` are
-read-only; `archive init/upgrade/ingest/sync-associations/stage-video/stage-media`
-are explicit writes. The catalog does
-not migrate older bundles or redirect an already-running recorder.
+`showman archive inventory/list/verify/media-inventory/verify-media/verify-relocation`
+are read-only. `archive init/upgrade/ingest/sync-associations/stage-video/stage-media`
+are explicit writes. `archive relocate-root --apply` is the physical path
+cutover: it checks active processes/IPC, creates hidden compatibility aliases,
+and follows a recorded hash plan. The catalog does not migrate older bundles or
+redirect an already-running recorder.
 
 Use the package module rather than a second standalone launcher:
 

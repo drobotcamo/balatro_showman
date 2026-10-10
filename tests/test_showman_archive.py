@@ -1,5 +1,6 @@
 import json
 import os
+import tempfile
 import shutil
 import subprocess
 import sys
@@ -193,6 +194,24 @@ def test_root_relocation_keeps_hidden_absolute_path_aliases_and_is_resumable(tmp
     assert not archive.verify_media(root)["failures"]
     assert archive.relocate_root(root, recordings, apply=True, io_dir=tmp_path / "empty-io")["count"] == 0
     shutil.rmtree(tmp_path / "empty-io", ignore_errors=True)
+
+
+def test_hidden_reparse_link_marks_the_alias_not_its_target():
+    if os.name != "nt":
+        pytest.skip("Windows compatibility-link attributes")
+    with tempfile.TemporaryDirectory() as temp:
+        parent = Path(temp)
+        target = parent / "target.txt"
+        link = parent / "legacy.txt"
+        target.write_text("archive bytes", encoding="utf-8")
+        os.symlink(target, link)
+        hidden = archive._hide_reparse_link(link)
+        assert archive._link_target(link) == target.resolve()
+        if hidden:
+            attrs_target = int(__import__("ctypes").windll.kernel32.GetFileAttributesW(str(target)))
+            attrs_link = int(__import__("ctypes").windll.kernel32.GetFileAttributesW(str(link)))
+            assert not (attrs_target & 0x2)
+            assert attrs_link & 0x2
 
 
 def test_relocation_recovers_verified_target_when_source_was_moved(tmp_path):

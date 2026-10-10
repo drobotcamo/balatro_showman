@@ -27,8 +27,8 @@ or schema. There is no HTTP service.
 | `archive media-inventory` | `--root ARCHIVE --recordings-root ROOT` | Read-only list of root-level MKVs and their archive state; no associations inferred. |
 | `archive stage-media` | `--root ARCHIVE --recordings-root ROOT`, optional repeatable `--only BASENAME`, `--exclude BASENAME`, `--min-age-hours N` | Copy stable MKVs to `videos/` when already confirmed or `videos/unlinked/` otherwise. Original paths remain in place. |
 | `archive verify-media` | `--root ARCHIVE` | Read-only source and staged-copy hash/size reconciliation for registered media. |
-| `archive relocate-root` | `--root ARCHIVE --recordings-root ROOT`, optional `--apply` | Dry-run by default. With `--apply`, moves classified root entries into the archive and leaves compatibility links; requires a separately authorized idle/drained cutover. See archive guide for gates and recovery. |
-| `archive verify-relocation` | `--root ARCHIVE` | Read-only validation of registered compatibility links and relocated content hashes. |
+| `archive relocate-root` | `--root ARCHIVE --recordings-root ROOT`, optional `--apply` | Dry-run by default. With `--apply`, checks process/IPC quiescence, moves classified entries into the archive, and leaves hidden compatibility links. Explicit authorization is required. |
+| `archive verify-relocation` | `--root ARCHIVE`, optional repeatable `--only BASENAME` | Read-only validation of compatibility links and relocated content hashes; `--only` allows bounded batches. |
 | `archive review` | repeat `--run ID` in verified segment order; optional `--root ARCHIVE --export-root ROOT --recording-start-ns NS --timing-evidence TEXT --open` | Launch the browser QA viewer using only a confirmed video location and all its cataloged segments. The viewer runs until stopped; it does not export scored labels. |
 
 All inspection commands accept `--db DB`; all except `list` require `--run ID`,

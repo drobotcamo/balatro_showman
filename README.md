@@ -27,8 +27,10 @@ The Recorder can import terminal captures into the Run Store automatically.
 Video remains external. Recording association is a separate human-confirmed
 operation; successful storage does not imply a confirmed video or alignment.
 The designated F-drive operational catalog is
-`F:\OBS_RECORDINGS\showman-archive\catalog.sqlite`; archived capture files
-live under `captures/`, and checked copies of confirmed videos under `videos/`.
+`F:\OBS_RECORDINGS\showman-archive\catalog.sqlite`; captures live under
+`captures/`, confirmed videos under `videos/`, unlinked video under
+`videos/unlinked/`, and evaluation/review artifacts under their named folders.
+Old absolute paths resolve through hidden compatibility links.
 Use [archive layout and migration rules](docs/capture/archive.md) for paths;
 an active recorder/OBS must not be redirected by following an example.
 
